@@ -1504,6 +1504,16 @@ int term_fprint(FILE *fd, term t, const GlobalContext *global);
 int term_snprint(char *buf, size_t size, term t, const GlobalContext *global);
 
 /**
+ * @brief Writes function name (without module and arity for external functions)
+ * as string to a buffer. Caller owns the buffer and must free it when done.
+ * @param fun the function term that will be converted to a string.
+ * @param global the \c GlobalContext.
+ * @param buf pointer to the buffer where the function name will be written.
+ * @returns the number of written characters.
+ */
+int term_local_function_name(term fun, const GlobalContext *global, char **buf);
+
+/**
  * @brief Checks if a term is a string (i.e., a list of characters)
  *
  * @details Returns \c true if a term is a proper (nil-terminated) list of characters
