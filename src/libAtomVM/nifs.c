@@ -145,6 +145,7 @@ static term nif_erts_debug_flat_size(Context *ctx, int argc, term argv[]);
 static term nif_erlang_process_flag(Context *ctx, int argc, term argv[]);
 static term nif_erlang_processes(Context *ctx, int argc, term argv[]);
 static term nif_erlang_process_info(Context *ctx, int argc, term argv[]);
+static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_put_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_system_info(Context *ctx, int argc, term argv[]);
 static term nif_erlang_system_flag(Context *ctx, int argc, term argv[]);
@@ -357,6 +358,12 @@ static const struct Nif float_to_list_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_float_to_list
+};
+
+static const struct Nif fun_info_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_fun_info_2
 };
 
 static const struct Nif is_process_alive_nif =
@@ -3649,6 +3656,90 @@ static term nif_erlang_make_fun_3(Context *ctx, int argc, term argv[])
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     return term_make_function_reference(module_term, function_term, arity_term, &ctx->heap);
+}
+
+static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    term fun = argv[0];
+    VALIDATE_VALUE(fun, term_is_fun);
+    term key = argv[1];
+    VALIDATE_VALUE(key, term_is_atom);
+
+    term value;
+    switch (key) {
+        case MODULE_ATOM: {
+            const term *boxed_value = term_to_const_term_ptr(fun);
+            if (term_is_external_fun(fun)) {
+                term module_atom = boxed_value[1];
+
+                value = module_atom;
+            } else {
+                Module *module = (Module *) boxed_value[1];
+
+                value = module_get_name(module);
+            }
+            break;
+        }
+        case NAME_ATOM: {
+            if (term_is_external_fun(fun)) {
+                const term *boxed_value = term_to_const_term_ptr(fun);
+                term name_atom = boxed_value[2];
+
+                value = name_atom;
+            } else {
+                const term *boxed_value = term_to_const_term_ptr(fun);
+                Module *fun_module = (Module *) boxed_value[1];
+                uint32_t fun_index = term_to_int32(boxed_value[2]);
+
+                uint32_t label, arity, n_freeze;
+                module_get_fun(fun_module, fun_index, &label, &arity, &n_freeze);
+
+                AtomString fun_name = NULL;
+                bool has_local_name = module_get_function_from_label(fun_module, label, &fun_name, (int *) &arity, (GlobalContext *) ctx->global);
+
+                if (has_local_name) {
+                    value = globalcontext_make_atom(ctx->global, fun_name);
+                } else {
+                    value = term_nil();
+                }
+            }
+            break;
+        }
+
+        case ARITY_ATOM:
+            if (term_is_external_fun(fun)) {
+                const term *boxed_value = term_to_const_term_ptr(fun);
+                term arity = boxed_value[3];
+
+                value = make_maybe_boxed_int64(ctx, term_to_int32(arity));
+            } else {
+                const term *boxed_value = term_to_const_term_ptr(fun);
+                Module *module = (Module *) boxed_value[1];
+                uint32_t fun_index = term_to_int32(boxed_value[2]);
+
+                uint32_t label, arity, n_freeze;
+                module_get_fun(module, fun_index, &label, &arity, &n_freeze);
+
+                value = make_maybe_boxed_int64(ctx, arity);
+            }
+            break;
+
+        case TYPE_ATOM:
+            value = term_is_external_fun(fun) ? EXTERNAL_ATOM : LOCAL_ATOM;
+            break;
+
+        default:
+            AVM_ABORT();
+    }
+
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 1, &value, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term fun_info_tuple = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(fun_info_tuple, 0, key);
+    term_put_tuple_element(fun_info_tuple, 1, value);
+    return fun_info_tuple;
 }
 
 static term nif_erlang_put_2(Context *ctx, int argc, term argv[])
