@@ -23,7 +23,6 @@
 #endif
 
 #include "nifs.h"
-
 #include <errno.h>
 #include <fenv.h>
 #include <math.h>
@@ -5218,7 +5217,8 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
     return result_tuple;
 }
 
-static term remove_first_occurrence(term list, term value, Context *ctx) {
+static term remove_first_occurrence(term list, term value, Context *ctx) 
+{
     term prev = term_nil();
     term current = list;
     term *prev_ptr = NULL;
@@ -5244,7 +5244,8 @@ static term remove_first_occurrence(term list, term value, Context *ctx) {
     return list;
 }
 
-static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[]) {
+static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[]) 
+{
     if (argc != 2) {
         RAISE_ERROR(BADARG_ATOM);
     }
