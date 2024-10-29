@@ -36,6 +36,7 @@ set(ERLANG_MODULES
     erl_scan
     erts_debug
     ets
+    gb_sets
     gen_event
     gen_server
     gen_statem
