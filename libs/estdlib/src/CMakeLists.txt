@@ -32,6 +32,7 @@ set(ERLANG_MODULES
     erl_bits
     erl_eval
     erl_features
+    erl_internal
     erl_lint
     erl_parse.yrl
     erl_scan
