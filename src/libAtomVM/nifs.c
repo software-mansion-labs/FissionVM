@@ -23,6 +23,7 @@
 #endif
 
 #include "nifs.h"
+#include <stdio.h>
 
 #include <errno.h>
 #include <fenv.h>
@@ -189,6 +190,7 @@ static term nif_maps_from_keys(Context *ctx, int argc, term argv[]);
 static term nif_maps_next(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]);
+static term nif_erlang_substract(Context *ctx, int argc, term argv[]);
 
 #define DECLARE_MATH_NIF_FUN(moniker) \
     static term nif_math_##moniker(Context *ctx, int argc, term argv[]);
@@ -795,6 +797,11 @@ static const struct Nif unicode_characters_to_binary_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_binary
+};
+static const struct Nif erlang_substract_nif = 
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_substract
 };
 
 #define DEFINE_MATH_NIF(moniker)                    \
@@ -5212,6 +5219,75 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
     return result_tuple;
 }
 
+static term remove_first_occurrence(term list, term value, Context *ctx) 
+{
+    term result = term_nil();
+    bool found_remove = false;
+
+    printf("Attempting to remove first occurrence of value...\n");
+
+    while (!term_is_nil(list)) 
+    {
+        term *list_ptr = term_get_list_ptr(list);
+        term head = list_ptr[LIST_HEAD_INDEX];
+
+        printf("Inspect head: %d\n", term_to_int32(head));
+
+        if (!found_remove && term_compare(head, value, TermCompareExact, ctx->global) == TermEquals) 
+        {
+            printf("Found element to remove: %d\n", term_to_int32(head));
+            found_remove = true;
+            list = list_ptr[LIST_TAIL_INDEX];
+            continue;
+        }
+
+        result = term_list_prepend(head, result, &ctx->heap);
+        printf("Appending to result: %d\n", term_to_int32(head));
+        list = list_ptr[LIST_TAIL_INDEX];
+    }
+
+    printf("Reversing the result list...\n");
+    return nif_lists_reverse(ctx, 1, &result);
+}
+
+static term nif_erlang_substract(Context *ctx, int argc, term argv[]) 
+{
+    if (argc != 2) 
+    {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    term list1 = argv[0];
+    term list2 = argv[1];
+
+    if (term_is_nil(list1)) 
+    {
+        return term_nil();
+    }
+
+    if (term_is_nil(list2)) 
+    {
+        return list1;
+    }
+
+    term result = list1;
+    term removable = list2;
+    while (!term_is_nil(removable)) 
+    {
+        printf("1");
+        term *list2_ptr = term_get_list_ptr(removable);
+        printf("2");
+        term to_remove = list2_ptr[LIST_HEAD_INDEX];
+        printf("Removing element: %d from list.\n", term_to_int32(to_remove));
+
+        result = remove_first_occurrence(result, to_remove, ctx);
+        removable = list2_ptr[LIST_TAIL_INDEX];
+        printf("NEXT ITERATION\n \n \n \n \n \n");
+    }
+
+    printf("Subtraction of list completed. Returning result.\n");
+    return result;
+}
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math
 // error handling is designed to be thread-safe, as errors are specified
