@@ -53,6 +53,7 @@ set(ERLANG_MODULES
     maps
     math
     net
+    orddict
     ordsets
     logger
     logger_std_h
