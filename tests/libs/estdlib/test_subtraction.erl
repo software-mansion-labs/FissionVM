@@ -21,30 +21,30 @@
 
 -export([test/0, start/0]).
 
-start() -> 
+start() ->
     test().
 
 test() ->
     Tests = [
-        % {[], [], []},
-        % {[1,2,2,3], [], [1,2,2,3]},
-        % {[1, 2, 3], [2], [1, 3]},
-        % {[1, 2, 3, 2, 1], [2], [1, 3, 2, 1]},
-        {[1, 2, 3, 4], [2], [1, 3, 4]},
+        {[], [], []},
+        {[1, 2, 2, 3], [], [1, 2, 2, 3]},
+        {[1, 2, 3], [2, 2], [1, 3]},
+        {[1, 2, 3], [1,2,3], []},
+        {[1, 2, 3, 2, 1], [2], [1, 3, 2, 1]},
+        {[1, 2, 3, 4, 5], [2, 5], [1, 3, 4]},
         {["a", "b", "c"], ["b", "d"], ["a", "c"]},
-        {["apple", "banana", "cherry"], ["banana"], ["apple", "cherry"]}
+        {["apple", "banana", "cherry"], ["banana", "lemon"], ["apple", "cherry"]}
     ],
 
     run_tests(Tests).
 
-run_tests([]) -> ok;
+run_tests([]) ->
+    ok;
 run_tests([{List1, List2, Expected} | T]) ->
     Result = List1 -- List2,
     assert_list_equal(Expected, Result),
     run_tests(T).
 
 assert_list_equal(Expected, Actual) ->
-    erlang:display(Expected),
-    erlang:display(Actual),
     true = Expected == Actual,
     ok.
