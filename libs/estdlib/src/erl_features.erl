@@ -20,6 +20,8 @@
 
 -module(erl_features).
 
--export([keywords/0]).
+-export([keywords/0, configurable/0]).
 
 keywords() -> ['maybe', 'else'].
+
+configurable() -> [maybe_expr].
