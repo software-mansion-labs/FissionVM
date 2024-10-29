@@ -23,6 +23,7 @@
 #endif
 
 #include "nifs.h"
+
 #include <errno.h>
 #include <fenv.h>
 #include <math.h>
