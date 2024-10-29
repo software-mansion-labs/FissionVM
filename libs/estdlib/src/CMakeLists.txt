@@ -29,6 +29,7 @@ set(ERLANG_MODULES
     code
     crypto
     erl_anno
+    erl_bits
     erl_eval
     erl_features
     erl_lint
