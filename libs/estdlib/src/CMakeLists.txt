@@ -58,6 +58,7 @@ set(ERLANG_MODULES
     net
     orddict
     ordsets
+    otp_internal
     logger
     logger_std_h
     proplists
