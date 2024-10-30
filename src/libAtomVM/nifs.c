@@ -4956,6 +4956,7 @@ static term nif_lists_member(Context *ctx, int argc, term argv[])
     UNUSED(argc)
     term elem = argv[0];
     term list = argv[1];
+    VALIDATE_VALUE(list, term_is_list);
 
     int proper;
     term_list_length(list, &proper);
@@ -4970,7 +4971,9 @@ static term nif_lists_member(Context *ctx, int argc, term argv[])
 
         if (cmp_result == TermEquals) {
             return TRUE_ATOM;
-        } else if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+        }
+
+        if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
 
