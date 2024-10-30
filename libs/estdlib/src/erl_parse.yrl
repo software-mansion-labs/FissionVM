@@ -2,7 +2,7 @@
 %%
 %% %CopyrightBegin%
 %%
-%% Copyright Ericsson AB 1996-2024. All Rights Reserved.
+%% Copyright Ericsson AB 1996-2023. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ function_call argument_list
 exprs guard
 atomic strings
 prefix_op mult_op add_op list_op comp_op
-binary bin_elements bin_element bit_expr sigil
+binary bin_elements bin_element bit_expr
 opt_bit_size_expr bit_size_expr opt_bit_type_list bit_type_list bit_type
 top_type top_types type typed_expr typed_attr_val
 type_sig type_sigs type_guard type_guards fun_type binary_type
@@ -79,7 +79,7 @@ ssa_check_when_clause
 ssa_check_when_clauses.
 
 Terminals
-char integer float atom sigil_prefix string sigil_suffix var
+char integer float atom string var
 
 '(' ')' ',' '->' '{' '}' '[' ']' '|' '||' '<-' ';' ':' '#' '.'
 'after' 'begin' 'case' 'try' 'catch' 'end' 'fun' 'if' 'of' 'receive' 'when'
@@ -278,7 +278,6 @@ expr_max -> var : '$1'.
 expr_max -> atomic : '$1'.
 expr_max -> list : '$1'.
 expr_max -> binary : '$1'.
-expr_max -> sigil : '$1'.
 expr_max -> list_comprehension : '$1'.
 expr_max -> map_comprehension : '$1'.
 expr_max -> binary_comprehension : '$1'.
@@ -306,7 +305,6 @@ pat_expr_max -> var : '$1'.
 pat_expr_max -> atomic : '$1'.
 pat_expr_max -> list : '$1'.
 pat_expr_max -> binary : '$1'.
-pat_expr_max -> sigil : '$1'.
 pat_expr_max -> tuple : '$1'.
 pat_expr_max -> '(' pat_expr ')' : '$2'.
 
@@ -351,9 +349,6 @@ bit_type -> atom             : element(3,'$1').
 bit_type -> atom ':' integer : { element(3,'$1'), element(3,'$3') }.
 
 bit_size_expr -> expr_max : '$1'.
-
-
-sigil -> sigil_prefix string sigil_suffix : build_sigil('$1', '$2', '$3').
 
 
 list_comprehension -> '[' expr '||' lc_exprs ']' :
@@ -517,8 +512,8 @@ try_opt_stacktrace -> '$empty' : '_'.
 maybe_expr -> 'maybe' maybe_match_exprs 'end' :
 	{'maybe',?anno('$1'),'$2'}.
 maybe_expr -> 'maybe' maybe_match_exprs 'else' cr_clauses 'end' :
-        %% `erl_lint' can produce a better warning when the position
-        %% of the `else' keyword is known.
+        %% `erl_lint` can produce a better warning when the position
+        %% of the `else` keyword is known.
 	{'maybe',?anno('$1'),'$2',{'else',?anno('$3'),'$4'}}.
 
 maybe_match_exprs -> maybe_match : ['$1'].
@@ -686,7 +681,6 @@ ssa_check_list_lit_ls -> ssa_check_pat '|' ssa_check_pat : ['$1'|'$3'].
 ssa_check_map_key -> atom : '$1'.
 ssa_check_map_key -> integer : '$1'.
 ssa_check_map_key -> float : '$1'.
-ssa_check_map_key -> var : '$1'.
 ssa_check_map_key -> '{' ssa_check_map_key_tuple_elements '}' :
     {tuple, ?anno('$1'), '$2'}.
 ssa_check_map_key -> '{' '}' : {tuple, ?anno('$1'), []}.
@@ -733,39 +727,6 @@ Header
 "".
 
 Erlang code.
-%%----------------------------------------------------------------------------
-%% This module is the basic Erlang parser that converts tokens into the abstract
-%% form of either forms (that is, top-level constructs), expressions, or terms.
-%%
-%% The Abstract Format is described in the ERTS User's Guide. Notice that a token
-%% list must end with the dot token to be acceptable to the parse functions
-%% (see the `m:erl_scan') module.
-%%
-%% ## Error Information
-%%
-%% ErrorInfo is the standard ErrorInfo structure that is returned from all I/O modules.
-%% The format is as follows:
-%%
-%% {ErrorLine, Module, ErrorDescriptor}
-%%
-%% A string describing the error is obtained with the following call:
-%%
-%% Module:format_error(ErrorDescriptor)
-%%
-%% ## See Also
-%%
-%% `m:erl_anno', `m:erl_scan', `m:io', section [The Abstract Format](`e:erts:absform')
-%% in the ERTS User's Guide.
-%%----------------------------------------------------------------------------
-
--define(YECC_PARSE_DOC, false).
--define(YECC_PARSE_AND_SCAN_DOC, false).
--define(YECC_FORMAT_ERROR_DOC, """
-Uses an ErrorDescriptor and returns a string that describes the error.
-
-This function is usually called implicitly when an ErrorInfo structure is
-processed (see section [Error Information](#module-error-information)).
-""").
 
 -export([parse_form/1,parse_exprs/1,parse_term/1]).
 -export([normalise/1,abstract/1,tokens/1,tokens/2]).
@@ -793,11 +754,6 @@ processed (see section [Error Information](#module-error-information)).
 
 -type anno() :: erl_anno:anno().
 
-%%------------------------------------------------------------------------------
-%% @doc "Abstract form of an Erlang form."
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type abstract_form() :: af_module()
                        | af_behavior()
                        | af_behaviour()
@@ -837,11 +793,6 @@ processed (see section [Error Information](#module-error-information)).
 -type af_record_decl() ::
         {'attribute', anno(), 'record', {record_name(), [af_field_decl()]}}.
 
-%%------------------------------------------------------------------------------
-%% @doc "Abstract representation of a record field."
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type af_field_decl() :: af_typed_field() | af_field().
 
 -type af_typed_field() ::
@@ -869,11 +820,6 @@ processed (see section [Error Information](#module-error-information)).
 -type af_function_decl() ::
         {'function', anno(), function_name(), arity(), af_clause_seq()}.
 
-%%------------------------------------------------------------------------------
-%% @doc "Abstract form of an Erlang expression."
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type abstract_expr() :: af_literal()
                        | af_match(abstract_expr())
                        | af_maybe_match()
@@ -924,11 +870,6 @@ processed (see section [Error Information](#module-error-information)).
 
 -type af_local_function() :: abstract_expr().
 
-%%------------------------------------------------------------------------------
-%% @doc "Abstract representation of a remote function call."
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type af_remote_function() ::
         {'remote', anno(), abstract_expr(), abstract_expr()}.
 
@@ -947,11 +888,6 @@ processed (see section [Error Information](#module-error-information)).
 
 -type af_qualifier() :: af_generator() | af_filter().
 
-%%------------------------------------------------------------------------------
-%% @doc "Abstract representation of a generator or a bitstring generator."
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type af_generator() :: {'generate', anno(), af_pattern(), abstract_expr()}
                       | {'m_generate', anno(), af_assoc_exact(af_pattern()), abstract_expr()}
                       | {'b_generate', anno(), af_pattern(), abstract_expr()}.
@@ -993,11 +929,6 @@ processed (see section [Error Information](#module-error-information)).
 
 -type fun_name() :: atom().
 
-%%------------------------------------------------------------------------------
-%% @doc "Abstract form of an Erlang clause."
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type abstract_clause() :: af_clause().
 
 -type af_clause() ::
@@ -1071,11 +1002,6 @@ processed (see section [Error Information](#module-error-information)).
 -type af_maybe() :: {'maybe', anno(), af_body()}.
 -type af_maybe_else() :: {'maybe', anno(), af_body(), {'else', anno(), af_clause_seq()}}.
 
-%%------------------------------------------------------------------------------
-%% @doc "Abstract form of an Erlang type."
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type abstract_type() :: af_annotated_type()
                        | af_atom()
                        | af_bitstring_type()
@@ -1184,13 +1110,6 @@ processed (see section [Error Information](#module-error-information)).
 
 -type af_string() :: {'string', anno(), string()}.
 
-%% Not emitted by the parser
-%%
-%% -type af_sigil_prefix() :: {'sigil_prefix', anno(), atom()}.
-%%
-%% -type af_sigil_suffix() :: {'sigil_suffix', anno(), string()}.
-%%
-
 -type af_match(T) :: {'match', anno(), af_pattern(), T}.
 
 -type af_maybe_match() :: {'maybe_match', anno(), af_pattern(), abstract_expr()}.
@@ -1207,11 +1126,6 @@ processed (see section [Error Information](#module-error-information)).
 
 -type af_bin(T) :: {'bin', anno(), [af_binelement(T)]}.
 
-%%------------------------------------------------------------------------------
-%% @doc "Abstract representation of an element of a bitstring."
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type af_binelement(T) :: {'bin_element',
                            anno(),
                            T,
@@ -1263,14 +1177,6 @@ processed (see section [Error Information](#module-error-information)).
 
 -type type_name() :: atom().
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Tuples `{error, error_info()}' and `{warning, error_info()}', denoting
-%% syntactically incorrect forms and warnings, and `{eof, line()}', denoting an
-%% end-of-stream encountered before a complete form had been parsed.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -type form_info() :: {'eof', erl_anno:location()}
                    | {'error', erl_scan:error_info() | error_info()}
                    | {'warning', erl_scan:error_info() | error_info()}.
@@ -1314,19 +1220,6 @@ processed (see section [Error Information](#module-error-information)).
 %% These really suck and are only here until Calle gets multiple
 %% entry points working.
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Parses `Tokens' as if it was a form.
-%%
-%% Returns one of the following:
-%%
-%% - **`{ok, AbsForm}'** - The parsing was successful. `AbsForm' is the abstract
-%%   form of the parsed form.
-%%
-%% - **`{error, ErrorInfo}'** - An error occurred.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec parse_form(Tokens) -> {ok, AbsForm} | {error, ErrorInfo} when
       Tokens :: [token()],
       AbsForm :: abstract_form(),
@@ -1343,19 +1236,6 @@ parse_form(Tokens) ->
     ?ANNO_CHECK(Tokens),
     parse(Tokens).
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Parses `Tokens' as if it was a list of expressions.
-%%
-%% Returns one of the following:
-%%
-%% - **`{ok, ExprList}'** - The parsing was successful. `ExprList' is a list of the
-%%   abstract forms of the parsed expressions.
-%%
-%% - **`{error, ErrorInfo}'** - An error occurred.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec parse_exprs(Tokens) -> {ok, ExprList} | {error, ErrorInfo} when
       Tokens :: [token()],
       ExprList :: [abstract_expr()],
@@ -1369,19 +1249,6 @@ parse_exprs(Tokens) ->
 	{error,_} = Err -> Err
     end.
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Parses `Tokens' as if it was a term.
-%%
-%% Returns one of the following:
-%%
-%% - **`{ok, Term}'** - The parsing was successful. `Term' is the Erlang term
-%%   corresponding to the token list.
-%%
-%% - **`{error, ErrorInfo}'** - An error occurred.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec parse_term(Tokens) -> {ok, Term} | {error, ErrorInfo} when
       Tokens :: [token()],
       Term :: term(),
@@ -1541,47 +1408,6 @@ build_attribute({atom,Aa,file}, Val) ->
 	    {attribute,Aa,file,{Name,Line}};
         [Other|_] -> error_bad_decl(Other, file)
     end;
-build_attribute({atom,Aa,Attr}, Val) when Attr =:= doc; Attr =:= moduledoc ->
-    case Val of
-        [{atom,_,Value}] when is_boolean(Value) ->
-	    {attribute,Aa,Attr,Value};
-        [{atom,_,hidden=Value}]  ->
-	    {attribute,Aa,Attr,Value};
-	[{string,_,Value}] ->
-	    {attribute,Aa,Attr,Value};
-        [{bin,_, _} = Bin] ->
-            case term(Bin) of
-                Value when is_binary(Value) ->
-                    {attribute,Aa,Attr,Value};
-                _Else ->
-                    error_bad_decl(Bin, doc)
-            end;
-	[{map,_,Pairs} = Expr] ->
-            Value =
-                try
-                    maps:from_list(
-                      lists:map(
-                        fun({map_field_assoc,_,K,V}) ->
-                                case normalise(K) of
-                                    equiv when Attr =:= doc, element(1, V) =:= call ->
-                                        {equiv, V};
-                                    NormalK ->
-                                        {NormalK, normalise(attribute_farity(V))}
-                                end;
-                           (E) ->
-                                throw({badarg, E})
-                        end, Pairs))
-                catch {badarg,E} ->
-                        ret_abstr_err(E, "bad attribute");
-                      _:_ ->
-                        ret_abstr_err(Expr, "bad attribute")
-                end,
-            {attribute,Aa,Attr,Value};
-        [{tuple,_,[{atom,_,file},{string,_,Value}]}] ->
-            {attribute,Aa,Attr,{file,Value}};
-	[Other|_] ->
-            error_bad_decl(Other, doc)
-    end;
 build_attribute({atom,Aa,Attr}, Val) ->
     case Val of
 	[Expr0] ->
@@ -1675,66 +1501,12 @@ check_clauses(Cs, Name, Arity) ->
     [case C of
          {clause,A,N,As,G,B} when N =:= Name, length(As) =:= Arity ->
              {clause,A,As,G,B};
-         {clause,A,N,As,_G,_B} when N =:= Name ->
-             Detail = io_lib:format(
-                 "head mismatch: function ~s with arities ~w and ~w is "
-                 "regarded as two distinct functions. Is the number of "
-                 "arguments incorrect or is the semicolon in ~s/~w unwanted?",
-                 [Name, Arity, length(As), Name, Arity]
-             ),
-             ret_err(A, Detail);
-         {clause,A,N,As,_G,_B} ->
-             Detail = io_lib:format(
-                 "head mismatch: previous function ~s/~w is distinct from ~s/~w. "
-                 "Is the semicolon in ~s/~w unwanted?",
-                 [Name, Arity, N, length(As), Name, Arity]
-             ),
-             ret_err(A, Detail)
+         {clause,A,_N,_As,_G,_B} ->
+             ret_err(A, "head mismatch")
      end || C <- Cs].
 
 build_try(A,Es,Scs,{Ccs,As}) ->
     {'try',A,Es,Scs,Ccs,As}.
-
-build_sigil(SigilPrefix, String, SigilSuffix) ->
-    Type = element(3, SigilPrefix),
-    Suffix = element(3, SigilSuffix),
-    if
-        Type =:= 'S';
-        Type =:= 's' ->
-            case Suffix of
-                "" ->
-                    %% Keep as string()
-                    String;
-                _ ->
-                    ret_err(
-                      element(2, SigilSuffix),
-                      "illegal sigil suffix")
-            end;
-        Type =:= '';    % The empty (default) sigil
-        Type =:= 'B';
-        Type =:= 'b' ->
-            case Suffix of
-                "" ->
-                    %% Convert to UTF-8 binary()
-                    {bin,?anno(SigilPrefix),
-                     [{bin_element,
-                       ?anno(String),String,default,[utf8]}]};
-                _ ->
-                    ret_err(
-                      element(2, SigilSuffix),
-                      "illegal sigil suffix")
-            end;
-%%%         Type =:= 'r' -> % Regular expression
-%%%             %% Convert to {re,RE,Flags}
-%%%             {tuple, ?anno(SigilPrefix),
-%%%              [{atom,?anno(SigilPrefix),'re'},
-%%%               String,
-%%%               {string,?anno(SigilSuffix),Suffix}]};
-        true ->
-            ret_err(
-              element(2, SigilPrefix),
-              "illegal sigil prefix")
-    end.
 
 -spec ret_err(_, _) -> no_return().
 ret_err(Anno, S) ->
@@ -1751,7 +1523,6 @@ first_location(Abstract) ->
 %% Use the fact that fold_anno() visits nodes from left to right.
 %% Could be a bit slow on deeply nested code without column numbers
 %% even though only the left-most branch is traversed.
-
 first_anno(Abstract) ->
     Anno0 = element(2, Abstract),
     F = fun(Anno, Anno1) ->
@@ -1800,14 +1571,6 @@ location(Anno) ->
 
 %%  Convert between the abstract form of a term and a term.
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Converts the abstract form `AbsTerm' of a term into a conventional Erlang data
-%% structure (that is, the term itself). This function is the inverse of
-%% `abstract/1'.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec normalise(AbsTerm) -> Data when
       AbsTerm :: abstract_expr(),
       Data :: term().
@@ -1850,15 +1613,6 @@ normalise_list([H|T]) ->
 normalise_list([]) ->
     [].
 
-%------------------------------------------------------------------------------
-% @doc
-% Converts the Erlang data structure `Data' into an abstract form of type
-% `AbsTerm'. This function is the inverse of `normalise/1'.
-%
-% `erl_parse:abstract(T)' is equivalent to `erl_parse:abstract(T, 0)'.
-%
-% @end
-%------------------------------------------------------------------------------
 -spec abstract(Data) -> AbsTerm when
       Data :: term(),
       AbsTerm :: abstract_expr().
@@ -1869,25 +1623,6 @@ abstract(T) ->
 -type encoding_func() :: fun((non_neg_integer()) -> boolean()).
 
 %%% abstract/2 takes line and encoding options
-
-%%------------------------------------------------------------------------------
-%% @since OTP R16B01
-%% @doc Converts the Erlang data structure `Data' into an abstract form of type
-%% `AbsTerm'.
-%%
-%% Each node of `AbsTerm' is assigned an annotation, see `m:erl_anno'. The
-%% annotation contains the location given by option `location' or by option `line'.
-%% Option `location' overrides option `line'. If neither option `location' nor
-%% option `line' is given, `0' is used as location.
-%%
-%% Option `Encoding' is used for selecting which integer lists to be considered as
-%% strings. The default is to use the encoding returned by function
-%% `epp:default_encoding/0'. Value `none' means that no integer lists are
-%% considered as strings. `encoding_func()' is called with one integer of a list at
-%% a time; if it returns `true' for every integer, the list is considered a string.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec abstract(Data, Options) -> AbsTerm when
       Data :: term(),
       Options :: Location | [Option],
@@ -1995,13 +1730,6 @@ abstract_byte(Bits, A) ->
 tokens(Abs) ->
     tokens(Abs, []).
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Generates a list of tokens representing the abstract form `AbsTerm' of an
-%% expression. Optionally, `MoreTokens' is appended.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec tokens(AbsTerm, MoreTokens) -> Tokens when
       AbsTerm :: abstract_expr(),
       MoreTokens :: [token()],
@@ -2130,15 +1858,6 @@ type_preop_prec('#') -> {700,800}.
                         | abstract_form()
                         | abstract_type().
 
-%%------------------------------------------------------------------------------
-%% @since OTP 18.0
-%% @doc
-%% Modifies the `erl_parse' tree `Abstr' by applying `Fun' on each collection of
-%% annotations of the nodes of the `erl_parse' tree. The `erl_parse' tree is
-%% traversed in a depth-first, left-to-right fashion.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec map_anno(Fun, Abstr) -> NewAbstr when
       Fun :: fun((Anno) -> NewAnno),
       Anno :: erl_anno:anno(),
@@ -2151,19 +1870,6 @@ map_anno(F0, Abstr) ->
     {NewAbstr, []} = modify_anno1(Abstr, [], F),
     NewAbstr.
 
-%%------------------------------------------------------------------------------
-%% @since OTP 18.0
-%% @doc
-%% Updates an accumulator by applying `Fun' on each collection of annotations of
-%% the `erl_parse' tree `Abstr'.
-%%
-%% The first call to `Fun' has `AccIn' as argument, the returned accumulator
-%% `AccOut' is passed to the next call, and so on. The
-%% final value of the accumulator is returned. The `erl_parse' tree is traversed in
-%% a depth-first, left-to-right fashion.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec fold_anno(Fun, Acc0, Abstr) -> Acc1 when
       Fun :: fun((Anno, AccIn) -> AccOut),
       Anno :: erl_anno:anno(),
@@ -2178,20 +1884,6 @@ fold_anno(F0, Acc0, Abstr) ->
     {_, NewAcc} = modify_anno1(Abstr, Acc0, F),
     NewAcc.
 
-%%------------------------------------------------------------------------------
-%% @since OTP 18.0
-%% @doc
-%% Modifies the `erl_parse' tree `Abstr' by applying `Fun' on each collection of
-%% annotations of the nodes of the `erl_parse' tree, while at the same time
-%% updating an accumulator.
-%%
-%% The first call to `Fun' has `AccIn' as second argument,
-%% the returned accumulator `AccOut' is passed to the next call, and so on. The
-%% modified `erl_parse' tree and the final value of the accumulator are returned.
-%% The `erl_parse' tree is traversed in a depth-first, left-to-right fashion.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec mapfold_anno(Fun, Acc0, Abstr) -> {NewAbstr, Acc1} when
       Fun :: fun((Anno, AccIn) -> {NewAnno, AccOut}),
       Anno :: erl_anno:anno(),
@@ -2206,19 +1898,6 @@ fold_anno(F0, Acc0, Abstr) ->
 mapfold_anno(F, Acc0, Abstr) ->
     modify_anno1(Abstr, Acc0, F).
 
-%%------------------------------------------------------------------------------
-%% @since OTP 18.0
-%% @doc
-%% Assumes that `Term' is a term with the same structure as a `erl_parse' tree, but
-%% with [locations](`t:erl_anno:location/0') where a `erl_parse' tree has
-%% collections of annotations.
-%%
-%% Returns a `erl_parse' tree where each location `L'
-%% is replaced by the value returned by [`erl_anno:new(L)'](`erl_anno:new/1'). The
-%% term `Term' is traversed in a depth-first, left-to-right fashion.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec new_anno(Term) -> Abstr when
       Term :: term(),
       Abstr :: erl_parse_tree() | form_info().
@@ -2228,16 +1907,6 @@ new_anno(Term) ->
     {NewAbstr, []} = modify_anno1(Term, [], F),
     NewAbstr.
 
-%%------------------------------------------------------------------------------
-%% @since OTP 18.0
-%% @doc
-%% Returns a term where each collection of annotations `Anno' of the nodes of the
-%% `erl_parse' tree `Abstr' is replaced by the term returned by
-%% [`erl_anno:to_term(Anno)'](`erl_anno:to_term/1'). The `erl_parse' tree is
-%% traversed in a depth-first, left-to-right fashion.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec anno_to_term(Abstr) -> term() when
       Abstr :: erl_parse_tree() | form_info().
 
@@ -2246,17 +1915,6 @@ anno_to_term(Abstract) ->
     {NewAbstract, []} = modify_anno1(Abstract, [], F),
     NewAbstract.
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Assumes that `Term' is a term with the same structure as a `erl_parse' tree, but
-%% with terms, say `T', where a `erl_parse' tree has collections of annotations.
-%%
-%% Returns a `erl_parse' tree where each term `T' is replaced by the value returned
-%% by [`erl_anno:from_term(T)'](`erl_anno:from_term/1'). The term `Term' is
-%% traversed in a depth-first, left-to-right fashion.
-%%
-%% @end
-%%------------------------------------------------------------------------------
 -spec anno_from_term(Term) -> erl_parse_tree() | form_info() when
       Term :: term().
 
