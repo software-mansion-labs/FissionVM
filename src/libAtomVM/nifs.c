@@ -5218,41 +5218,50 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
     return result_tuple;
 }
 
-static term remove_first_occurrence(term list, term value, Context *ctx) 
+static term remove_first_occurrence(term list, term value, Context *ctx)
 {
-    term prev = term_nil();
     term current = list;
     term *prev_ptr = NULL;
 
     while (!term_is_nil(current)) {
         term *list_ptr = term_get_list_ptr(current);
-        term head = list_ptr[LIST_HEAD_INDEX];
+        term head = term_get_list_head(current);
 
         if (term_compare(head, value, TermCompareExact, ctx->global) == TermEquals) {
             if (prev_ptr) {
-                prev_ptr[LIST_TAIL_INDEX] = list_ptr[LIST_TAIL_INDEX];
+                prev_ptr[LIST_TAIL_INDEX] = term_get_list_tail(current);
             } else {
-                list = list_ptr[LIST_TAIL_INDEX];
+                list = term_get_list_tail(current);
             }
             break;
         }
 
         prev_ptr = list_ptr;
-        prev = current;
-        current = list_ptr[LIST_TAIL_INDEX];
+        current = term_get_list_tail(current);
     }
 
     return list;
 }
 
-static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[]) 
+static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
 {
-    if (argc != 2) {
+    UNUSED(argc)
+
+    int proper;
+    size_t len = term_list_length(argv[0], &proper);
+    if (UNLIKELY(!proper)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, len * CONS_SIZE, 2, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
     term list1 = argv[0];
     term list2 = argv[1];
+
+    if (!term_is_list(list1) || !term_is_list(list2)) {
+        return BADARG_ATOM;
+    }
 
     if (term_is_nil(list1)) {
         return term_nil();
@@ -5265,10 +5274,9 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     term result = list1;
 
     while (!term_is_nil(list2)) {
-        term *list2_ptr = term_get_list_ptr(list2);
-        term to_remove = list2_ptr[LIST_HEAD_INDEX];
+        term to_remove = term_get_list_head(list2);
         result = remove_first_occurrence(result, to_remove, ctx);
-        list2 = list2_ptr[LIST_TAIL_INDEX];
+        list2 = term_get_list_tail(list2);
     }
 
     return result;
