@@ -17,12 +17,27 @@
 %
 % SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 %
+-module(test_erl_eval).
 
--module(erl_features).
+-export([test/0]).
 
--export([keywords/0, keywords/1, configurable/0]).
+test() ->
+    Fn = "fun(X) -> X + 1 end.",
+    {value, EvaluatedFn, []} = eval(Fn),
+    2 = EvaluatedFn(1),
 
-keywords() -> ['maybe', 'else'].
-keywords(maybe_expr) -> ['maybe', 'else'].
+    Bindings = "A = 1,\nB = 2, A+B.",
+    {value, 3, [{'A', 1}, {'B', 2}]} = eval(Bindings),
 
-configurable() -> [maybe_expr].
+    ok.
+
+eval(String) ->
+    try
+        {ok, Ts, _} = erl_scan:string(String),
+        {ok, Exprs} = erl_parse:parse_exprs(Ts),
+        erl_eval:exprs(Exprs, [])
+    catch
+        _:FullError ->
+            {badmatch, Error} = FullError,
+            Error
+    end.

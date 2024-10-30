@@ -29,11 +29,17 @@ set(ERLANG_MODULES
     code
     crypto
     erl_anno
+    erl_bits
+    erl_eval
     erl_features
+    erl_internal
+    erl_lint
     erl_parse.yrl
     erl_scan
     erts_debug
     ets
+    eval_bits
+    gb_sets
     gen_event
     gen_server
     gen_statem
@@ -51,6 +57,9 @@ set(ERLANG_MODULES
     maps
     math
     net
+    orddict
+    ordsets
+    otp_internal
     logger
     logger_std_h
     proplists
