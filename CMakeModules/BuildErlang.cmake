@@ -24,13 +24,27 @@ macro(pack_archive avm_name)
     cmake_parse_arguments(PACK_ARCHIVE "" "" "${multiValueArgs}" ${ARGN})
     list(JOIN PACK_ARCHIVE_ERLC_FLAGS " " PACK_ARCHIVE_ERLC_FLAGS)
     foreach(module_name IN LISTS ${PACK_ARCHIVE_MODULES} PACK_ARCHIVE_MODULES PACK_ARCHIVE_UNPARSED_ARGUMENTS)
-        add_custom_command(
+        if(module_name MATCHES "\\.yrl$")
+            string(REGEX REPLACE "\\.yrl$" "" module_name ${module_name})
+            add_custom_command(
             OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/beams/${module_name}.beam
-            COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/beams && erlc +debug_info ${PACK_ARCHIVE_ERLC_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/beams -I ${CMAKE_SOURCE_DIR}/libs/include ${CMAKE_CURRENT_SOURCE_DIR}/${module_name}.erl
-            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${module_name}.erl
-            COMMENT "Compiling ${module_name}.erl"
+            COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/erls &&
+                    erlc +debug_info ${PACK_ARCHIVE_ERLC_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/erls ${CMAKE_CURRENT_SOURCE_DIR}/${module_name}.yrl &&
+                    mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/beams &&
+                    erlc +debug_info ${PACK_ARCHIVE_ERLC_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/beams -I ${CMAKE_SOURCE_DIR}/libs/include ${CMAKE_CURRENT_BINARY_DIR}/erls/${module_name}.erl
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${module_name}.yrl
+            COMMENT "Compiling ${module_name}.yrl"
             VERBATIM
-        )
+            )
+        else()
+            add_custom_command(
+                OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/beams/${module_name}.beam
+                COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/beams && erlc +debug_info ${PACK_ARCHIVE_ERLC_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/beams -I ${CMAKE_SOURCE_DIR}/libs/include ${CMAKE_CURRENT_SOURCE_DIR}/${module_name}.erl
+                DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${module_name}.erl
+                COMMENT "Compiling ${module_name}.erl"
+                VERBATIM
+            )
+        endif()
         set(pack_archive_${avm_name}_beams ${pack_archive_${avm_name}_beams} ${CMAKE_CURRENT_BINARY_DIR}/beams/${module_name}.beam)
     endforeach()
 

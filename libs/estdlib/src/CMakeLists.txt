@@ -30,6 +30,7 @@ set(ERLANG_MODULES
     crypto
     erl_anno
     erl_features
+    erl_parse.yrl
     erl_scan
     erts_debug
     ets
