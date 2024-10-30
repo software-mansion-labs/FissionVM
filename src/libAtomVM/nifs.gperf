@@ -166,6 +166,7 @@ lists:reverse/1, &lists_reverse_nif
 lists:reverse/2, &lists_reverse_nif
 lists:member/2, &lists_member_nif
 lists:keymember/3, &lists_keymember_nif
+lists:keyfind/3, &lists_keyfind_nif
 maps:from_keys/2, &maps_from_keys_nif
 maps:next/1, &maps_next_nif
 unicode:characters_to_list/1, &unicode_characters_to_list_nif
