@@ -5221,26 +5221,35 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
 static term remove_first_occurrence(term list, term value, Context *ctx)
 {
     term current = list;
-    term *prev_ptr = NULL;
+    term *end_of_result = NULL;
+    term start_of_result = term_nil();
 
     while (!term_is_nil(current)) {
-        term *list_ptr = term_get_list_ptr(current);
         term head = term_get_list_head(current);
 
         if (term_compare(head, value, TermCompareExact, ctx->global) == TermEquals) {
-            if (prev_ptr) {
-                prev_ptr[LIST_TAIL_INDEX] = term_get_list_tail(current);
+            if (term_is_nil(start_of_result)) {
+                start_of_result = term_get_list_tail(current);
+                return start_of_result;
             } else {
-                list = term_get_list_tail(current);
+                current = term_get_list_tail(current);
+                end_of_result[LIST_TAIL_INDEX] = current;
+                return start_of_result;
             }
-            break;
+        } else {
+            if (term_is_nil(start_of_result)) {
+                start_of_result = term_list_prepend(head, start_of_result, &ctx->heap);
+                end_of_result = &term_get_list_ptr(start_of_result)[LIST_TAIL_INDEX];
+            } else {
+                term temp = term_list_prepend(head, term_nil(), &ctx->heap);
+                end_of_result[LIST_TAIL_INDEX] = temp;
+                end_of_result = &term_get_list_ptr(temp)[LIST_TAIL_INDEX];
+            }
         }
-
-        prev_ptr = list_ptr;
         current = term_get_list_tail(current);
     }
 
-    return list;
+    return start_of_result;
 }
 
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
@@ -5271,12 +5280,19 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    term result = list1;
+    term result = term_nil();
 
     while (!term_is_nil(list2)) {
         term to_remove = term_get_list_head(list2);
-        result = remove_first_occurrence(result, to_remove, ctx);
+        if (term_is_nil(result)) {
+            result = remove_first_occurrence(list1, to_remove, ctx);
+        } else {
+            result = remove_first_occurrence(result, to_remove, ctx);
+        }
         list2 = term_get_list_tail(list2);
+        if (term_is_nil(result)) {
+            return result;
+        }
     }
 
     return result;
