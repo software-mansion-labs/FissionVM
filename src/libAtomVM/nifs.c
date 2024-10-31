@@ -5354,14 +5354,10 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    term result_tail = term_nil();
+    term result_tail = list1;
 
     for (int i = 0; i < last_changed_element_index; i++) { // getting the unchanged part of list 1
-        if (term_is_nil(result_tail)) {
-            result_tail = term_get_list_tail(list1);
-        } else {
             result_tail = term_get_list_tail(result_tail);
-        }
     }
 
     return build_list_from_term_table(elements_from_list1, last_changed_element_index, result_tail, ctx);
