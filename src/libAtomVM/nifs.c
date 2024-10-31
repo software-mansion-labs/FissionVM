@@ -5034,11 +5034,12 @@ static term nif_lists_keyfind(Context *ctx, int argc, term argv[])
     term key = argv[0];
     term n = argv[1];
     term tuple_list = argv[2];
-    int n_pos = term_to_int(n);
 
-    if (!term_is_integer(n) || n_pos <= 0) {
+    if (!term_is_integer(n) || term_to_int(n) <= 0 || !term_is_list(tuple_list)) {
         RAISE_ERROR(BADARG_ATOM);
     }
+
+    int n_pos = term_to_int(n);
 
     int proper;
     term_list_length(tuple_list, &proper);
@@ -5066,7 +5067,8 @@ static term nif_lists_keyfind(Context *ctx, int argc, term argv[])
 
         if (cmp_result == TermEquals) {
             return tuple;
-        } else if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+        }
+        if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
 
