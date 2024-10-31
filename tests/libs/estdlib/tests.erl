@@ -47,6 +47,8 @@ get_tests(_OTPVersion) ->
         test_apply,
         test_lists,
         test_calendar,
+        test_erl_eval,
+        test_erl_parse,
         test_erl_scan,
         test_gen_event,
         test_gen_server,
@@ -61,5 +63,6 @@ get_tests(_OTPVersion) ->
         test_timer,
         test_spawn,
         test_supervisor,
-        test_lists_subtraction
+        test_lists_subtraction,
+        test_lists_member
     ].
