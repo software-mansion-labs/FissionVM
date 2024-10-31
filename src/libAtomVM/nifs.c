@@ -5218,38 +5218,35 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
     return result_tuple;
 }
 
-static term remove_first_occurrence(term list, term value, Context *ctx)
+static inline term *get_cons_tail(term list)
 {
-    term current = list;
+    return &term_get_list_ptr(list)[LIST_TAIL_INDEX];
+}
+
+static term build_list_from_term_table(term *elements_from_list1, int length_to_copy, term tail, Context *ctx)
+{
+    term first_element = term_nil();
     term *end_of_result = NULL;
-    term start_of_result = term_nil();
 
-    while (!term_is_nil(current)) {
-        term head = term_get_list_head(current);
-
-        if (term_compare(head, value, TermCompareExact, ctx->global) == TermEquals) {
-            if (term_is_nil(start_of_result)) {
-                start_of_result = term_get_list_tail(current);
-                return start_of_result;
+    for (int i = 0; i < length_to_copy; i++) {
+        if (!term_is_invalid_term(elements_from_list1[i])) {
+            term cons = term_list_prepend(elements_from_list1[i], term_nil(), &ctx->heap);
+            if (term_is_nil(first_element)) { // creating list backwards to avoid reversing
+                first_element = cons;
+                end_of_result = get_cons_tail(first_element);
             } else {
-                current = term_get_list_tail(current);
-                end_of_result[LIST_TAIL_INDEX] = current;
-                return start_of_result;
-            }
-        } else {
-            if (term_is_nil(start_of_result)) {
-                start_of_result = term_list_prepend(head, start_of_result, &ctx->heap);
-                end_of_result = &term_get_list_ptr(start_of_result)[LIST_TAIL_INDEX];
-            } else {
-                term temp = term_list_prepend(head, term_nil(), &ctx->heap);
-                end_of_result[LIST_TAIL_INDEX] = temp;
-                end_of_result = &term_get_list_ptr(temp)[LIST_TAIL_INDEX];
+                end_of_result[LIST_TAIL_INDEX] = cons;
+                end_of_result = get_cons_tail(cons);
             }
         }
-        current = term_get_list_tail(current);
     }
 
-    return start_of_result;
+    if (term_is_nil(first_element)) {
+        return tail;
+    }
+
+    end_of_result[LIST_TAIL_INDEX] = tail; // assigning unchanged part of oryginal list as tail
+    return first_element;
 }
 
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
@@ -5257,7 +5254,7 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     UNUSED(argc)
 
     int proper;
-    size_t len = term_list_length(argv[0], &proper);
+    int len = term_list_length(argv[0], &proper);
     if (UNLIKELY(!proper)) {
         RAISE_ERROR(BADARG_ATOM);
     }
@@ -5280,22 +5277,55 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    term result = term_nil();
+    term elements_from_list1[len];
+    term list_1_iterator = list1;
+    int index = 0;
 
-    while (!term_is_nil(list2)) {
-        term to_remove = term_get_list_head(list2);
-        if (term_is_nil(result)) {
-            result = remove_first_occurrence(list1, to_remove, ctx);
-        } else {
-            result = remove_first_occurrence(result, to_remove, ctx);
+    while (!term_is_nil(list_1_iterator)) { // copying the elements from list1 into table
+        term head = term_get_list_head(list_1_iterator);
+        elements_from_list1[index] = head;
+        list_1_iterator = term_get_list_tail(list_1_iterator);
+        index++;
+    }
+
+    term list_2_iterator = list2;
+    int last_changed_element_index = 0;
+
+    while (!term_is_nil(list_2_iterator)) { // nullyfying elements from list2 in table
+        term to_nullify = term_get_list_head(list_2_iterator);
+
+        for (int i = 0; i < len; i++) {
+            TermCompareResult cmp_result = term_compare(to_nullify, elements_from_list1[i], TermCompareExact, ctx->global);
+
+            if (cmp_result == TermEquals) {
+                elements_from_list1[i] = term_invalid_term();
+                if (last_changed_element_index < i + 1) {
+                    last_changed_element_index = i + 1;
+                }
+                break;
+            }
+            if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+                RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+            }
         }
-        list2 = term_get_list_tail(list2);
-        if (term_is_nil(result)) {
-            return result;
+        list_2_iterator = term_get_list_tail(list_2_iterator);
+    }
+
+    if (last_changed_element_index == -1) { // returning original list if nothing changed
+        return list1;
+    }
+
+    term result_tail = term_nil();
+
+    for (int i = 0; i < last_changed_element_index; i++) { // getting the unchanged part of list 1
+        if (term_is_nil(result_tail)) {
+            result_tail = term_get_list_tail(list1);
+        } else {
+            result_tail = term_get_list_tail(result_tail);
         }
     }
 
-    return result;
+    return build_list_from_term_table(elements_from_list1, last_changed_element_index, result_tail, ctx);
 }
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math
