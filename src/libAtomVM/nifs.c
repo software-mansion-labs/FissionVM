@@ -5261,14 +5261,14 @@ static inline term *get_cons_tail(term list)
     return &term_get_list_ptr(list)[LIST_TAIL_INDEX];
 }
 
-static term build_list_from_term_table(term *elements_from_list1, int length_to_copy, term tail, Context *ctx)
+static term build_list_from_term_table(term *items, int length_to_copy, term tail, Context *ctx)
 {
     term first_element = term_nil();
     term *end_of_result = NULL;
 
     for (int i = 0; i < length_to_copy; i++) {
-        if (!term_is_invalid_term(elements_from_list1[i])) {
-            term cons = term_list_prepend(elements_from_list1[i], term_nil(), &ctx->heap);
+        if (!term_is_invalid_term(items[i])) {
+            term cons = term_list_prepend(items[i], term_nil(), &ctx->heap);
             if (term_is_nil(first_element)) { // creating list backwards to avoid reversing
                 first_element = cons;
                 end_of_result = get_cons_tail(first_element);
@@ -5315,51 +5315,57 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    term elements_from_list1[len];
-    term list_1_iterator = list1;
+    term items[len];
     int index = 0;
 
-    while (!term_is_nil(list_1_iterator)) { // copying the elements from list1 into table
-        term head = term_get_list_head(list_1_iterator);
-        elements_from_list1[index] = head;
-        list_1_iterator = term_get_list_tail(list_1_iterator);
+    while (!term_is_nil(list1)) { // copying the elements from list1 into table
+        items[index] = list1;
+        list1 = term_get_list_tail(list1);
         index++;
     }
 
-    term list_2_iterator = list2;
-    int last_changed_element_index = 0;
+    int last_filtered_idx = -1;
+    term result = term_nil();
 
-    while (!term_is_nil(list_2_iterator)) { // nullyfying elements from list2 in table
-        term to_nullify = term_get_list_head(list_2_iterator);
+    while (!term_is_nil(list2)) { // nullyfying elements from list2 in table
+        term to_nullify = term_get_list_head(list2);
 
         for (int i = 0; i < len; i++) {
-            TermCompareResult cmp_result = term_compare(to_nullify, elements_from_list1[i], TermCompareExact, ctx->global);
+            term con = term_get_list_head(items[i]);
+            TermCompareResult cmp_result = term_compare(to_nullify, con, TermCompareExact, ctx->global);
 
-            if (cmp_result == TermEquals) {
-                elements_from_list1[i] = term_invalid_term();
-                if (last_changed_element_index < i + 1) {
-                    last_changed_element_index = i + 1;
-                }
-                break;
-            }
             if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
                 RAISE_ERROR(OUT_OF_MEMORY_ATOM);
             }
+            if (cmp_result == TermEquals) {
+                printf("Deleting head: %d\n", term_to_int32(con));
+                if (last_filtered_idx < i) {
+                 printf("New max: %d\n", i);
+                    last_filtered_idx = i;
+                    result = term_get_list_tail(items[i]);
+                }
+                items[i] = term_invalid_term();
+                break;
+            }
         }
-        list_2_iterator = term_get_list_tail(list_2_iterator);
+        list2 = term_get_list_tail(list2);
     }
 
-    if (last_changed_element_index == -1) { // returning original list if nothing changed
+                printf("Inspect head: %d\n", 69);
+
+    if (last_filtered_idx == -1) {
         return list1;
     }
 
-    term result_tail = list1;
-
-    for (int i = 0; i < last_changed_element_index; i++) { // getting the unchanged part of list 1
-            result_tail = term_get_list_tail(result_tail);
+    for(int i = last_filtered_idx -1; i >= 0; i--) {
+        if(!term_is_invalid_term(items[i])) {
+            term con = term_get_list_head(items[i]);
+            result = term_list_prepend(con, result, &ctx->heap);
+        }
     }
 
-    return build_list_from_term_table(elements_from_list1, last_changed_element_index, result_tail, ctx);
+
+    return result;
 }
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math
