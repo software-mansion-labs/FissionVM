@@ -188,6 +188,7 @@ static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
 static term nif_lists_member(Context *ctx, int argc, term argv[]);
 static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
 static term nif_lists_keyfind(Context *ctx, int argc, term argv[]);
+static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
 static term nif_maps_from_keys(Context *ctx, int argc, term argv[]);
 static term nif_maps_next(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[]);
@@ -793,6 +794,10 @@ static const struct Nif lists_keyfind_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keyfind
+static const struct Nif lists_keymember_nif = 
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_lists_keymember
 };
 static const struct Nif maps_from_keys_nif =
 {

@@ -65,5 +65,6 @@ get_tests(_OTPVersion) ->
         test_lists_keymember,
         test_lists_member,
         test_lists_keyfind,
-        test_supervisor
+        test_supervisor,
+        test_lists_keymember
     ].
