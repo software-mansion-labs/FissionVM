@@ -27,10 +27,12 @@ set(ERLANG_MODULES
     binary
     calendar
     code
+    compile
     crypto
     persistent_term
     erl_anno
     erl_bits
+    erl_error
     erl_eval
     erl_features
     erl_internal
@@ -45,6 +47,7 @@ set(ERLANG_MODULES
     ets
     eval_bits
     file
+    filename
     gb_sets
     gen_event
     gen_server
@@ -72,6 +75,7 @@ set(ERLANG_MODULES
     queue
     sets
     socket
+    sofs
     ssl
     string
     timer
