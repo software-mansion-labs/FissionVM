@@ -12,7 +12,7 @@ defmodule StringTokenizerTest do
       :ok
   end
 
-  # defp test_unicode_normalization() do
+  # defp test_unicode_normalization() do Uncomment after adding unicode_utils module
   #   {:identifier,~c"μ", [], 1, false, [:nfkc]} =
   #     String.Tokenizer.tokenize(~c"µ")
   #     :ok
