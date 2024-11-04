@@ -5260,14 +5260,20 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc)
 
+    term list1 = argv[0];
+    term list2 = argv[1];
+
     int proper;
-    int len = term_list_length(argv[0], &proper);
+    int len = term_list_length(list1, &proper);
     if (UNLIKELY(!proper)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    term list1 = argv[0];
-    term list2 = argv[1];
+    int proper_2;
+    term_list_length(list2, &proper_2);
+    if (UNLIKELY(!proper_2)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
 
     if (!term_is_list(list1) || !term_is_list(list2)) {
         return BADARG_ATOM;
@@ -5281,41 +5287,43 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    term *items = malloc(len * sizeof(term_get_list_head));
-    if (!items) {
+    term *cons = malloc(len * sizeof(term_get_list_head));
+    if (UNLIKELY(IS_NULL_PTR(cons))) {
+        free(cons);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-    int index = 0;
+    int i = 0;
     term list = list1;
 
-    while (!term_is_nil(list)) { // copying the elements from list1 into table
-        items[index] = list;
+    while (!term_is_nil(list)) {
+        cons[i] = list;
         list = term_get_list_tail(list);
-        index++;
+        i++;
     }
 
     int last_filtered_idx = -1;
     term result = term_nil();
 
-    while (!term_is_nil(list2)) { // nullyfying elements from list2 in table
+    while (!term_is_nil(list2)) {
         term to_nullify = term_get_list_head(list2);
 
         for (int i = 0; i < len; i++) {
-            if (term_is_invalid_term(items[i])) {
+            if (term_is_invalid_term(cons[i])) {
                 continue;
             }
-            term item = term_get_list_head(items[i]);
+            term item = term_get_list_head(cons[i]);
             TermCompareResult cmp_result = term_compare(to_nullify, item, TermCompareExact, ctx->global);
 
             if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+                free(cons);
                 RAISE_ERROR(OUT_OF_MEMORY_ATOM);
             }
             if (cmp_result == TermEquals) {
                 if (last_filtered_idx < i) {
                     last_filtered_idx = i;
-                    result = term_get_list_tail(items[i]);
+                    result = term_get_list_tail(cons[i]);
                 }
-                items[i] = term_invalid_term();
+                cons[i] = term_invalid_term();
                 break;
             }
         }
@@ -5323,22 +5331,23 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     }
 
     if (last_filtered_idx == -1) {
-        free((void *) items);
+        free(cons);
         return list1;
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, len * CONS_SIZE, 2, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, (last_filtered_idx + 1) * CONS_SIZE, 1, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        free(cons);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
     for (int i = last_filtered_idx - 1; i >= 0; i--) {
-        if (!term_is_invalid_term(items[i])) {
-            term item = term_get_list_head(items[i]);
+        if (!term_is_invalid_term(cons[i])) {
+            term item = term_get_list_head(cons[i]);
             result = term_list_prepend(item, result, &ctx->heap);
         }
     }
 
-    free((void *) items);
+    free(cons);
     return result;
 }
 //
