@@ -26,9 +26,12 @@ set(ERLANG_MODULES
     base64
     binary
     calendar
+    cerl_clauses
+    cerl_trees
     cerl
     code
     compile
+    core_lib
     crypto
     persistent_term
     erl_anno
@@ -80,6 +83,7 @@ set(ERLANG_MODULES
     sofs
     ssl
     string
+    sys_core_fold
     timer
     unicode
     unicode_util

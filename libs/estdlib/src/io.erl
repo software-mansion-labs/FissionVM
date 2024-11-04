@@ -27,7 +27,7 @@
 %%-----------------------------------------------------------------------------
 -module(io).
 
--export([format/1, format/2, get_line/1, put_chars/1, put_chars/2]).
+-export([format/1, format/2, get_line/1, put_chars/1, put_chars/2, fwrite/2]).
 
 %%-----------------------------------------------------------------------------
 %% @doc     Equivalent to format(Format, []).
@@ -96,6 +96,9 @@ put_chars(Chars) ->
                 {io_reply, Ref, Line} -> Line
             end
     end.
+
+fwrite(Format, Data) ->
+    put_chars(format(Format, Data)).
 
 %%-----------------------------------------------------------------------------
 %% @param   Chars character(s) to write to console
