@@ -26,6 +26,7 @@ set(ERLANG_MODULES
     base64
     binary
     calendar
+    cerl
     code
     compile
     crypto
@@ -34,6 +35,7 @@ set(ERLANG_MODULES
     erl_bits
     erl_error
     erl_eval
+    erl_expand_records
     erl_features
     erl_internal
     erl_lint
@@ -81,6 +83,7 @@ set(ERLANG_MODULES
     timer
     unicode
     unicode_util
+    v3_core
     erlang
 )
 
