@@ -188,7 +188,6 @@ static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
 static term nif_lists_member(Context *ctx, int argc, term argv[]);
 static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
 static term nif_lists_keyfind(Context *ctx, int argc, term argv[]);
-static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
 static term nif_maps_from_keys(Context *ctx, int argc, term argv[]);
 static term nif_maps_next(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[]);
@@ -794,10 +793,6 @@ static const struct Nif lists_keyfind_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keyfind
-static const struct Nif lists_keymember_nif = 
-{
-    .base.type = NIFFunctionType,
-    .nif_ptr = nif_lists_keymember
 };
 static const struct Nif maps_from_keys_nif =
 {
@@ -5002,53 +4997,8 @@ static term nif_lists_member(Context *ctx, int argc, term argv[])
 
 static term nif_lists_keymember(Context *ctx, int argc, term argv[])
 {
-    UNUSED(argc);
-
-    term key = argv[0];
-    term n = argv[1];
-    term tuple_list = argv[2];
-
-    if (!term_is_integer(n) || term_to_int(n) <= 0 || !term_is_list(tuple_list)) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
-
-    int n_pos = term_to_int(n);
-
-    int proper;
-    term_list_length(tuple_list, &proper);
-    if (UNLIKELY(!proper)) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
-
-    while (!term_is_nil(tuple_list)) {
-        term tuple = term_get_list_head(tuple_list);
-
-        if (!term_is_tuple(tuple)) {
-            RAISE_ERROR(BADARG_ATOM);
-        }
-
-        int tuple_size = term_get_tuple_arity(tuple);
-
-        if (n_pos > tuple_size) {
-            tuple_list = term_get_list_tail(tuple_list);
-            continue;
-        }
-
-        term nth_element = term_get_tuple_element(tuple, n_pos - 1);
-
-        TermCompareResult cmp_result = term_compare(nth_element, key, TermCompareExact, ctx->global);
-
-        if (cmp_result == TermEquals) {
-            return TRUE_ATOM;
-        }
-        if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
-            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-        }
-
-        tuple_list = term_get_list_tail(tuple_list);
-    }
-
-    return FALSE_ATOM;
+    term result = nif_lists_keyfind(ctx, argc, argv);
+    return result == FALSE_ATOM ? FALSE_ATOM : TRUE_ATOM;
 }
 
 // assumption: size is at least 1
