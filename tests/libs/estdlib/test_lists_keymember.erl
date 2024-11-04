@@ -1,9 +1,6 @@
 -module(test_lists_keymember).
 
--export([test/0, start/0]).
-
-start() ->
-    test().
+-export([test/0]).
 
 test() ->
     ok = test_keymember_with_existing_key(),

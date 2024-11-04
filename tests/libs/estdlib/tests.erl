@@ -63,7 +63,7 @@ get_tests(_OTPVersion) ->
         test_timer,
         test_spawn,
         test_supervisor,
-        test_lists_keymember
+        test_lists_keymember,
         test_lists_keyfind,
         test_lists_subtraction,
         test_lists_member
