@@ -47,8 +47,10 @@ set(ERLANG_MODULES
     test_queue
     test_timer
     test_supervisor
+    test_lists_subtraction
     test_lists_member
     test_lists_keyfind
+    test_lists_subtraction
     test_tcp_socket
     test_udp_socket
     notify_init_server
