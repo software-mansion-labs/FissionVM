@@ -84,6 +84,7 @@ set(ELIXIR_MODULES
     List.Chars.Integer
     List.Chars.List
 
+    String.Tokenizer
     String.Chars
     String.Chars.Atom
     String.Chars.BitString
