@@ -5035,11 +5035,14 @@ static term nif_lists_keyfind(Context *ctx, int argc, term argv[])
     term n = argv[1];
     term tuple_list = argv[2];
 
-    if (!term_is_integer(n) || term_to_int(n) <= 0 || !term_is_list(tuple_list)) {
+    if (!term_is_integer(n) || !term_is_list(tuple_list)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
     int n_pos = term_to_int(n);
+    if (n_pos <= 0) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
 
     int proper;
     term_list_length(tuple_list, &proper);
