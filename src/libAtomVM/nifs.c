@@ -186,6 +186,7 @@ static term nif_code_load_binary(Context *ctx, int argc, term argv[]);
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[]);
 static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
 static term nif_lists_member(Context *ctx, int argc, term argv[]);
+static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
 static term nif_lists_keyfind(Context *ctx, int argc, term argv[]);
 static term nif_maps_from_keys(Context *ctx, int argc, term argv[]);
 static term nif_maps_next(Context *ctx, int argc, term argv[]);
@@ -783,6 +784,11 @@ static const struct Nif lists_member_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_member
+};
+static const struct Nif lists_keymember_nif = 
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_lists_keymember
 };
 static const struct Nif lists_keyfind_nif = 
 {
@@ -4993,6 +4999,12 @@ static term nif_lists_member(Context *ctx, int argc, term argv[])
     }
 
     return FALSE_ATOM;
+}
+
+static term nif_lists_keymember(Context *ctx, int argc, term argv[])
+{
+    term result = nif_lists_keyfind(ctx, argc, argv);
+    return result == FALSE_ATOM ? FALSE_ATOM : TRUE_ATOM;
 }
 
 // assumption: size is at least 1
