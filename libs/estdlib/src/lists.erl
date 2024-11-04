@@ -30,6 +30,7 @@
 -module(lists).
 
 -export([
+    flatmap/2,
     map/2,
     nth/2,
     nthtail/2,
@@ -58,12 +59,19 @@
     seq/2, seq/3,
     sort/1, sort/2,
     split/2,
+    partition/2,
+    append/1,
     umerge/3,
     ukeysort/2,
     usort/1, usort/2,
     duplicate/2,
     sublist/2
 ]).
+
+-spec flatmap(Fun, List1) -> List2 when
+    Fun :: fun((A) -> [B]), List1 :: [A], List2 :: [B], A :: term(), B :: term().
+flatmap(Fun, List) ->
+    append(map(Fun, List)).
 
 %%-----------------------------------------------------------------------------
 %% @param   Fun the function to apply
@@ -675,6 +683,30 @@ split(N, [H | T], R) ->
     split(N - 1, T, [H | R]);
 split(_, [], _) ->
     badarg.
+
+partition(Pred, L) when is_function(Pred, 1) ->
+    partition(Pred, L, [], []).
+
+partition(_Pred, [], A, B) ->
+    {A, B};
+partition(Pred, [H | T], A, B) ->
+    case Pred(H) of
+        true ->
+            partition(Pred, T, [H | A], B);
+        false ->
+            partition(Pred, T, A, [H | B])
+    end.
+%%-----------------------------------------------------------------------------
+%% @param   List containing other lists
+%% @returns Joined list.
+%% @doc     Concatenates all lists from passed list.
+%%
+%% @end
+%%-----------------------------------------------------------------------------
+append([]) ->
+    [];
+append([H | T]) ->
+    H ++ append(T).
 
 %% Attribution: https://erlang.org/doc/programming_examples/list_comprehensions.html#quick-sort
 %% @private
