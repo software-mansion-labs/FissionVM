@@ -5058,7 +5058,6 @@ static term nif_lists_keyfind(Context *ctx, int argc, term argv[])
     }
 
     int n_pos = term_to_int(n);
-
     if (n_pos <= 0) {
         RAISE_ERROR(BADARG_ATOM);
     }
