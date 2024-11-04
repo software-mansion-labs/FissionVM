@@ -1,9 +1,6 @@
 -module(test_lists_subtraction).
 
--export([test/0, start/0]).
-
-start() ->
-    test().
+-export([test/0]).
 
 test() ->
     Tests = [

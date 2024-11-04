@@ -5269,9 +5269,9 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    int proper_2;
-    term_list_length(list2, &proper_2);
-    if (UNLIKELY(!proper_2)) {
+    int proper2;
+    term_list_length(list2, &proper2);
+    if (UNLIKELY(!proper2)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
@@ -5289,7 +5289,6 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
 
     term *cons = malloc(len * sizeof(term_get_list_head));
     if (UNLIKELY(IS_NULL_PTR(cons))) {
-        free(cons);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     int i = 0;
@@ -5335,7 +5334,7 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, (last_filtered_idx + 1) * CONS_SIZE, 1, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, (last_filtered_idx + 1) * CONS_SIZE, 1, &list1, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(cons);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
