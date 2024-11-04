@@ -5256,37 +5256,6 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
     return result_tuple;
 }
 
-static inline term *get_cons_tail(term list)
-{
-    return &term_get_list_ptr(list)[LIST_TAIL_INDEX];
-}
-
-static term build_list_from_term_table(term *items, int length_to_copy, term tail, Context *ctx)
-{
-    term first_element = term_nil();
-    term *end_of_result = NULL;
-
-    for (int i = 0; i < length_to_copy; i++) {
-        if (!term_is_invalid_term(items[i])) {
-            term cons = term_list_prepend(items[i], term_nil(), &ctx->heap);
-            if (term_is_nil(first_element)) { // creating list backwards to avoid reversing
-                first_element = cons;
-                end_of_result = get_cons_tail(first_element);
-            } else {
-                end_of_result[LIST_TAIL_INDEX] = cons;
-                end_of_result = get_cons_tail(cons);
-            }
-        }
-    }
-
-    if (term_is_nil(first_element)) {
-        return tail;
-    }
-
-    end_of_result[LIST_TAIL_INDEX] = tail; // assigning unchanged part of oryginal list as tail
-    return first_element;
-}
-
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc)
@@ -5297,9 +5266,6 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, len * CONS_SIZE, 2, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-    }
     term list1 = argv[0];
     term list2 = argv[1];
 
@@ -5315,12 +5281,16 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    term items[len];
+    term *items = malloc(len * sizeof(term_get_list_head));
+    if (!items) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
     int index = 0;
+    term list = list1;
 
-    while (!term_is_nil(list1)) { // copying the elements from list1 into table
-        items[index] = list1;
-        list1 = term_get_list_tail(list1);
+    while (!term_is_nil(list)) { // copying the elements from list1 into table
+        items[index] = list;
+        list = term_get_list_tail(list);
         index++;
     }
 
@@ -5331,16 +5301,17 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         term to_nullify = term_get_list_head(list2);
 
         for (int i = 0; i < len; i++) {
-            term con = term_get_list_head(items[i]);
-            TermCompareResult cmp_result = term_compare(to_nullify, con, TermCompareExact, ctx->global);
+            if (term_is_invalid_term(items[i])) {
+                continue;
+            }
+            term item = term_get_list_head(items[i]);
+            TermCompareResult cmp_result = term_compare(to_nullify, item, TermCompareExact, ctx->global);
 
             if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
                 RAISE_ERROR(OUT_OF_MEMORY_ATOM);
             }
             if (cmp_result == TermEquals) {
-                printf("Deleting head: %d\n", term_to_int32(con));
                 if (last_filtered_idx < i) {
-                 printf("New max: %d\n", i);
                     last_filtered_idx = i;
                     result = term_get_list_tail(items[i]);
                 }
@@ -5351,20 +5322,23 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         list2 = term_get_list_tail(list2);
     }
 
-                printf("Inspect head: %d\n", 69);
-
     if (last_filtered_idx == -1) {
+        free((void *) items);
         return list1;
     }
 
-    for(int i = last_filtered_idx -1; i >= 0; i--) {
-        if(!term_is_invalid_term(items[i])) {
-            term con = term_get_list_head(items[i]);
-            result = term_list_prepend(con, result, &ctx->heap);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, len * CONS_SIZE, 2, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    for (int i = last_filtered_idx - 1; i >= 0; i--) {
+        if (!term_is_invalid_term(items[i])) {
+            term item = term_get_list_head(items[i]);
+            result = term_list_prepend(item, result, &ctx->heap);
         }
     }
 
-
+    free((void *) items);
     return result;
 }
 //
