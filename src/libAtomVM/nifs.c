@@ -3403,6 +3403,9 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
 
     term tuple = argv[1];
     VALIDATE_VALUE(tuple, term_is_tuple);
+    if (term_get_tuple_arity(tuple) < 1) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
     term key = term_get_tuple_element(tuple, 0);
 
     term ret = term_invalid_term();

@@ -75,7 +75,7 @@ insert(_Table, _Entry) ->
 %% @doc Same as insert/2 except that instead of overwriting objects with the same key already existing in the table, false is returned.
 %% @end
 %%-----------------------------------------------------------------------------
--spec insert_new(Table :: table(), Entry :: tuple()) -> true.
+-spec insert_new(Table :: table(), Entry :: tuple()) -> boolean().
 insert_new(_Table, _Entry) ->
     erlang:nif_error(undefined).
 
