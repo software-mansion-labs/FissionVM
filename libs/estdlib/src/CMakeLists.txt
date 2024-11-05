@@ -28,6 +28,7 @@ set(ERLANG_MODULES
     calendar
     code
     crypto
+    persistent_term
     erl_anno
     erl_bits
     erl_eval
