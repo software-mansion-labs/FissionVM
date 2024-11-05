@@ -130,6 +130,7 @@ erlang:get_module_info/1, &get_module_info_nif
 erlang:get_module_info/2, &get_module_info_nif
 erts_debug:flat_size/1, &flat_size_nif
 ets:new/2, &ets_new_nif
+ets:insert_new/2, &ets_insert_new_nif
 ets:insert/2, &ets_insert_nif
 ets:lookup/2, &ets_lookup_nif
 ets:lookup_element/3, &ets_lookup_element_nif
