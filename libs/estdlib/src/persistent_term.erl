@@ -22,22 +22,23 @@
 -export([get/2, put/2]).
 
 get(Key, Default) ->
-    try ets:lookup('persistent_term', Key) of
-        Result -> case Result of
-        [{Key, Res}] -> Res;
-        _ -> Default
-    end
+    try ets:lookup(persistent_term, Key) of
+        Result ->
+            case Result of
+                [{Key, Res}] -> Res;
+                _ -> Default
+            end
     catch
-        _:_R ->
-        ets:new('persistent_term', [set, public, named_table]),
-        Default
+        error:badarg ->
+            ets:new(persistent_term, [set, public, named_table]),
+            Default
     end.
 
 put(Key, Value) ->
-    try ets:insert('persistent_term', {Key, Value}) of
+    try ets:insert(persistent_term, {Key, Value}) of
         Result -> Result
     catch
-        _:_R ->
-        ets:new('persistent_term', [set, public, named_table]),
-        ets:insert('persistent_term', {Key, Value})
+        error:badarg ->
+            ets:new(persistent_term, [set, public, named_table]),
+            ets:insert(persistent_term, {Key, Value})
     end.
