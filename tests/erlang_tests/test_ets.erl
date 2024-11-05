@@ -359,4 +359,5 @@ test_insert_new() ->
     true = ets:insert_new(Tid, {foo, tapas}),
     tapas = ets:lookup_element(Tid, foo, 2),
     false = ets:insert_new(Tid, {foo, tapas}),
+    expect_failure(fun() -> ets:insert_new(Tid, {}) end),
     ok.
