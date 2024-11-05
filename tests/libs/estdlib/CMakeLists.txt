@@ -55,6 +55,7 @@ set(ERLANG_MODULES
     test_udp_socket
     notify_init_server
     ping_pong_server
+    test_elixir
 )
 
 pack_archive(test_estdlib_lib ${ERLANG_MODULES})

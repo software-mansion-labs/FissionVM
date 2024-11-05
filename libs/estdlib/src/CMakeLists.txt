@@ -70,6 +70,7 @@ set(ERLANG_MODULES
     string
     timer
     unicode
+    elixir
     erlang
 )
 
