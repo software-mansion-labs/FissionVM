@@ -27,6 +27,7 @@
 -export([
     new/2,
     insert/2,
+    insert_new/2,
     lookup/2,
     lookup_element/3,
     delete/2
@@ -65,6 +66,17 @@ new(_Name, _Options) ->
 %%-----------------------------------------------------------------------------
 -spec insert(Table :: table(), Entry :: tuple()) -> true.
 insert(_Table, _Entry) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param   Table a reference to the ets table
+%% @param   Entry the entry to insert
+%% @returns false if there is already a value under key from entry, otherwise true
+%% @doc Same as insert/2 except that instead of overwriting objects with the same key already existing in the table, false is returned.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec insert_new(Table :: table(), Entry :: tuple()) -> boolean().
+insert_new(_Table, _Entry) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------

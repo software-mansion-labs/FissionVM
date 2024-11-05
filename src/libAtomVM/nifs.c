@@ -155,6 +155,7 @@ static term nif_erlang_throw(Context *ctx, int argc, term argv[]);
 static term nif_erlang_raise(Context *ctx, int argc, term argv[]);
 static term nif_ets_new(Context *ctx, int argc, term argv[]);
 static term nif_ets_insert(Context *ctx, int argc, term argv[]);
+static term nif_ets_insert_new(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup_element(Context *ctx, int argc, term argv[]);
 static term nif_ets_delete(Context *ctx, int argc, term argv[]);
@@ -680,6 +681,12 @@ static const struct Nif ets_insert_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_insert
+};
+
+static const struct Nif ets_insert_new_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_insert_new
 };
 
 static const struct Nif ets_lookup_nif =
@@ -3377,6 +3384,36 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return ret;
+        case EtsTableNotFound:
+        case EtsPermissionDenied:
+            RAISE_ERROR(BADARG_ATOM);
+        case EtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_ets_table_id);
+
+    term tuple = argv[1];
+    VALIDATE_VALUE(tuple, term_is_tuple);
+    if (term_get_tuple_arity(tuple) < 1) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    term key = term_get_tuple_element(tuple, 0);
+
+    term ret = term_invalid_term();
+    EtsErrorCode result = ets_lookup(ref, key, &ret, ctx);
+
+    switch (result) {
+        case EtsOk:
+            return term_is_nil(ret) ? nif_ets_insert(ctx, argc, argv) : FALSE_ATOM;
         case EtsTableNotFound:
         case EtsPermissionDenied:
             RAISE_ERROR(BADARG_ATOM);

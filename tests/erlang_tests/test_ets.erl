@@ -31,6 +31,7 @@ start() ->
     ok = test_protected_access(),
     ok = test_public_access(),
     ok = test_lookup_element(),
+    ok = test_insert_new(),
 
     0.
 
@@ -351,4 +352,12 @@ test_lookup_element() ->
     expect_failure(fun() -> ets:lookup_element(Tid, bar, 1) end),
     expect_failure(fun() -> ets:lookup_element(Tid, foo, 3) end),
     expect_failure(fun() -> ets:lookup_element(Tid, foo, 0) end),
+    ok.
+
+test_insert_new() ->
+    Tid = ets:new(test_lookup_element, []),
+    true = ets:insert_new(Tid, {foo, tapas}),
+    tapas = ets:lookup_element(Tid, foo, 2),
+    false = ets:insert_new(Tid, {foo, tapas}),
+    expect_failure(fun() -> ets:insert_new(Tid, {}) end),
     ok.
