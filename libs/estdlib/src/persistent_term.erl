@@ -34,10 +34,10 @@ get(Key, Default) ->
     end.
 
 put(Key, Value) ->
-    try ets:insert('persistent_term', Key, Value) of
+    try ets:insert('persistent_term', {Key, Value}) of
         Result -> Result
     catch
         _:_R ->
         ets:new('persistent_term', [set, public, named_table]),
-        ets:insert('persistent_term', Key, Value)
+        ets:insert('persistent_term', {Key, Value})
     end.

@@ -14,7 +14,8 @@ test() ->
 
     test_put_without_initialized() ->
         persistent_term:put(key, "SECRET VALUE"),
-        clean_after_test().
+        clean_after_test(),
+        ok.
 
     test_get_with_empty_table() ->
         Default = "SECRET VALUE",
