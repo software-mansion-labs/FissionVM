@@ -156,6 +156,7 @@ static term nif_erlang_raise(Context *ctx, int argc, term argv[]);
 static term nif_ets_new(Context *ctx, int argc, term argv[]);
 static term nif_ets_insert(Context *ctx, int argc, term argv[]);
 static term nif_ets_insert_new(Context *ctx, int argc, term argv[]);
+static term nif_ets_update_counter(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup_element(Context *ctx, int argc, term argv[]);
 static term nif_ets_delete(Context *ctx, int argc, term argv[]);
@@ -687,6 +688,12 @@ static const struct Nif ets_insert_new_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_insert_new
+};
+
+static const struct Nif ets_update_counter_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_update_counter
 };
 
 static const struct Nif ets_lookup_nif =
@@ -3415,6 +3422,119 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
         case EtsOk:
             return term_is_nil(ret) ? nif_ets_insert(ctx, argc, argv) : FALSE_ATOM;
         case EtsTableNotFound:
+        case EtsPermissionDenied:
+            RAISE_ERROR(BADARG_ATOM);
+        case EtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
+{
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_ets_table_id);
+
+    term key = argv[1];
+    term args = argv[2];
+    term to_insert = term_invalid_term();
+    term default_value = term_invalid_term();
+    if (argc == 4) {
+        VALIDATE_VALUE(argv[3], term_is_tuple);
+        default_value = argv[3];
+        term_put_tuple_element(default_value, 0, key);
+    }
+
+    term ret = term_invalid_term();
+    EtsErrorCode result = ets_lookup(ref, key, &ret, ctx);
+    switch (result) {
+        case EtsOk:
+            if (term_is_invalid_term(ret) && term_is_invalid_term(default_value)) {
+                RAISE_ERROR(BADARG_ATOM);
+            }
+            if (term_is_nil(ret)) {
+                if (term_is_invalid_term(default_value)) {
+                    RAISE_ERROR(BADARG_ATOM);
+                }
+                to_insert = default_value;
+            } else {
+                to_insert = term_get_list_head(ret);
+            }
+            break;
+        case EtsTableNotFound:
+        case EtsPermissionDenied:
+            RAISE_ERROR(BADARG_ATOM);
+        case EtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+    term position_term = term_from_int(2);
+    term increment_term = term_invalid_term();
+    term threshold_term = term_invalid_term();
+    term set_value_term = term_invalid_term();
+
+    if (term_is_integer(args)) {
+        increment_term = args;
+    } else if (term_is_tuple(args)) {
+        int arity = term_get_tuple_arity(args);
+        if (arity != 2 && arity != 4) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
+        term term_pos = term_get_tuple_element(args, 0);
+        term term_incr = term_get_tuple_element(args, 1);
+        if (!term_is_integer(term_pos) || !term_is_integer(term_incr)) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
+        position_term = term_pos;
+        increment_term = term_incr;
+
+        if (arity == 4) {
+            term term_tresh = term_get_tuple_element(args, 2);
+            term term_set_val = term_get_tuple_element(args, 3);
+            if (!term_is_integer(term_tresh) || !term_is_integer(term_set_val)) {
+                RAISE_ERROR(BADARG_ATOM);
+            }
+            threshold_term = term_tresh;
+            set_value_term = term_set_val;
+        }
+    } else {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    VALIDATE_VALUE(to_insert, term_is_tuple);
+    int arity = term_get_tuple_arity(to_insert);
+    int position = term_to_int(position_term) - 1;
+    if (arity < position || position < 1) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    term elem = term_get_tuple_element(to_insert, position);
+    if (!term_is_integer(elem)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    int increment = term_to_int(increment_term);
+    int elem_value = term_to_int(elem) + increment;
+    if (!term_is_invalid_term(threshold_term) && !term_is_invalid_term(set_value_term)) {
+        int threshold = term_to_int(threshold_term);
+        int set_value = term_to_int(set_value_term);
+
+        if (increment >= 0 && elem_value > threshold) {
+            elem_value = set_value;
+        } else if (increment < 0 && elem_value < threshold) {
+            elem_value = set_value;
+        }
+    }
+
+    elem = term_from_int(elem_value);
+    term_put_tuple_element(to_insert, position, elem);
+    EtsErrorCode insert_result = ets_insert(ref, to_insert, ctx);
+    switch (insert_result) {
+        case EtsOk:
+            return elem;
+        case EtsTableNotFound:
+        case EtsBadEntry:
         case EtsPermissionDenied:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
