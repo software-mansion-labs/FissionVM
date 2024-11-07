@@ -119,10 +119,10 @@ delete(_Table, _Key) ->
 %%-----------------------------------------------------------------------------
 %% @param   Table a reference to the ets table
 %% @param   Key the key used to look up the entry expecting to contain a tuple of integers or a single integer
-%% @param   Params the increment value or a tuple {Pos,Increment} or {Pos, Increment, Treshold, SetValue},
-%%         where Pos is an integer (1-based index) specifying the position in the tuple to increment. If after incrementation value exceeds the Treshold, it is set to SetValue.
+%% @param   Params the increment value or a tuple {Pos, Increment} or {Pos, Increment, Treshold, SetValue},
+%%         where Pos is an integer (1-based index) specifying the position in the tuple to increment. Value is clamped to SetValue if it exceeds Threshold after update.
 %% @returns the updated element's value after performing the increment, or the default value if applicable
-%% @doc Updates a counter value at Key in the table. If Params is a single integer, it increments the direct integer value at Key or the first integer in a tuple. If Params is a tuple {Pos, Increment}, it increments the integer at the specified position Pos in the tuple stored at Key. If the needed element does not exist, uses Default value as a fallback.
+%% @doc Updates a counter value at Key in the table. If Params is a single integer, it increments the direct integer value at Key or the first integer in a tuple. If Params is a tuple {Pos, Increment}, it increments the integer at the specified position Pos in the tuple stored at Key.
 %% @end
 %%-----------------------------------------------------------------------------
 -spec update_counter(
@@ -137,7 +137,7 @@ update_counter(_Table, _Key, _Params) ->
 %%-----------------------------------------------------------------------------
 %% @param   Table a reference to the ets table
 %% @param   Key the key used to look up the entry expecting to contain a tuple of integers or a single integer
-%% @param   Params the increment value or a tuple {Pos,Increment} or {Pos, Increment, Treshold, SetValue},
+%% @param   Params the increment value or a tuple {Pos, Increment} or {Pos, Increment, Treshold, SetValue},
 %%         where Pos is an integer (1-based index) specifying the position in the tuple to increment. If after incrementation value exceeds the Treshold, it is set to SetValue.
 %% @param   Default the default value used if the entry at Key doesn't exist or doesn't contain a valid tuple with a sufficient size or integer at Pos
 %% @returns the updated element's value after performing the increment, or the default value if applicable
