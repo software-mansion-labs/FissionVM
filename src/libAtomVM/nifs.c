@@ -3413,16 +3413,16 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
     if (term_get_tuple_arity(tuple) < 1) {
         RAISE_ERROR(BADARG_ATOM);
     }
-    term key = term_get_tuple_element(tuple, 0);
 
     term ret = term_invalid_term();
-    EtsErrorCode result = ets_lookup(ref, key, &ret, ctx);
+    EtsErrorCode result = ets_insert_new(ref, tuple, &ret, ctx);
 
     switch (result) {
         case EtsOk:
-            return term_is_nil(ret) ? nif_ets_insert(ctx, argc, argv) : FALSE_ATOM;
+            return ret;
         case EtsTableNotFound:
         case EtsPermissionDenied:
+        case EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3440,8 +3440,8 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
     term operation = argv[2];
     term default_value = term_invalid_term();
     if (argc == 4) {
-        VALIDATE_VALUE(argv[3], term_is_tuple);
         default_value = argv[3];
+        VALIDATE_VALUE(default_value, term_is_tuple);
         term_put_tuple_element(default_value, 0, key);
     }
     term ret = term_invalid_term();

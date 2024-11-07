@@ -66,8 +66,7 @@ typedef enum TableAccessType
 {
     TableAccessNone,
     TableAccessRead,
-    TableAccessWrite,
-    TableAccessReadAndWrite
+    TableAccessWrite
 } TableAccessType;
 
 static void ets_delete_all_tables(struct Ets *ets, GlobalContext *global);
@@ -88,7 +87,6 @@ static struct EtsTable *ets_get_table_by_ref(struct Ets *ets, uint64_t ref, Tabl
     struct EtsTable *ret = NULL;
     LIST_FOR_EACH (item, ets_tables_list) {
         struct EtsTable *table = GET_LIST_ENTRY(item, struct EtsTable, head);
-        printf("ETST \n \n \n \n ");
         if (table->ref_ticks == ref) {
             switch (access_type) {
                 case TableAccessRead:
@@ -278,13 +276,13 @@ EtsErrorCode ets_table_insert(struct EtsTable *ets_table, term entry, Context *c
     term new_entry = memory_copy_term_tree(heap, entry);
     term key = term_get_tuple_element(new_entry, (int) ets_table->keypos);
 
-    EtsErrorCode ret = EtsOk;
+    EtsErrorCode result = EtsOk;
     EtsHashtableErrorCode res = ets_hashtable_insert(ets_table->hashtable, key, new_entry, EtsHashtableAllowOverwrite, heap, ctx->global);
     if (UNLIKELY(res != EtsHashtableOk)) {
-        ret = EtsAllocationFailure;
+        result = EtsAllocationFailure;
     }
 
-    return ret;
+    return result;
 }
 
 EtsErrorCode ets_insert(term ref, term entry, Context *ctx)
@@ -294,11 +292,11 @@ EtsErrorCode ets_insert(term ref, term entry, Context *ctx)
         return EtsTableNotFound;
     }
 
-    term ret = ets_table_insert(ets_table, entry, ctx);
+    EtsErrorCode result = ets_table_insert(ets_table, entry, ctx);
 
     SMP_UNLOCK(ets_table);
 
-    return ret;
+    return result;
 }
 
 EtsErrorCode ets_table_lookup(struct EtsTable *ets_table, term key, term *ret, Context *ctx)
@@ -378,6 +376,33 @@ EtsErrorCode ets_lookup_element(term ref, term key, size_t pos, term *ret, Conte
 
     return EtsOk;
 }
+EtsErrorCode ets_insert_new(term ref, term tuple, term *ret, Context *ctx)
+{
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
+    if (ets_table == NULL) {
+        return EtsTableNotFound;
+    }
+
+    term key = term_get_tuple_element(tuple, 0);
+    term list = term_invalid_term();
+    EtsErrorCode result = ets_table_lookup(ets_table, key, &list, ctx);
+    if (result != EtsOk) {
+        SMP_UNLOCK(ets_table);
+        return result;
+    }
+    if (!term_is_nil(list)) {
+        *ret = FALSE_ATOM;
+        SMP_UNLOCK(ets_table);
+        return EtsOk;
+    }
+
+    result = ets_table_insert(ets_table, tuple, ctx);
+    if (result == EtsOk) {
+        *ret = TRUE_ATOM;
+    }
+    SMP_UNLOCK(ets_table);
+    return result;
+}
 
 EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
 {
@@ -447,7 +472,7 @@ bool operation_to_tuple4(term operation, term *position, term *increment, term *
 
 EtsErrorCode ets_update_counter(term ref, term key, term operation, term default_value, term *ret, Context *ctx)
 {
-    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessRead) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessRead);
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
     if (ets_table == NULL) {
         return EtsTableNotFound;
     }
@@ -472,10 +497,7 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
         SMP_UNLOCK(ets_table);
         return EtsBadEntry;
     }
-    term position_term = term_invalid_term();
-    term increment_term = term_invalid_term();
-    term threshold_term = term_invalid_term();
-    term set_value_term = term_invalid_term();
+    term position_term, increment_term, threshold_term, set_value_term;
 
     if (!operation_to_tuple4(operation, &position_term, &increment_term, &threshold_term, &set_value_term)) {
         SMP_UNLOCK(ets_table);
