@@ -37,10 +37,12 @@ set(ERLANG_MODULES
     erl_lint
     erl_parse.yrl
     elixir_config
+    elixir_utils
     erl_scan
     erts_debug
     ets
     eval_bits
+    file
     gb_sets
     gen_event
     gen_server
@@ -72,6 +74,7 @@ set(ERLANG_MODULES
     string
     timer
     unicode
+    unicode_util
     erlang
 )
 
