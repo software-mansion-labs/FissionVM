@@ -36,6 +36,7 @@ set(ERLANG_MODULES
     erl_internal
     erl_lint
     erl_parse.yrl
+    elixir_config
     erl_scan
     erts_debug
     ets
