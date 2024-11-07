@@ -516,6 +516,7 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
         return EtsBadEntry;
     }
     int increment = term_to_int(increment_term);
+    // We don't check overflow here.
     int elem_value = term_to_int(elem) + increment;
     if (!term_is_invalid_term(threshold_term) && !term_is_invalid_term(set_value_term)) {
         int threshold = term_to_int(threshold_term);
