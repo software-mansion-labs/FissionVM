@@ -62,6 +62,8 @@
     ukeysort/2,
     usort/1, usort/2,
     duplicate/2,
+    droplast/1,
+    takewhile/2,
     sublist/2
 ]).
 
@@ -1121,7 +1123,38 @@ ufmerge2_2(H1, T1, Fun, [H2 | T2], M) ->
 ufmerge2_2(H1, T1, _Fun, [], M) ->
     lists:reverse(T1, [H1 | M]).
 
-%%-----------------------------------------------------------------------------
+%% droplast(List) returns the list dropping its last element
+
+-spec droplast(List) -> InitList when
+      List :: [T, ...],
+      InitList :: [T],
+      T :: term().
+
+%% This is the simple recursive implementation
+%% reverse(tl(reverse(L))) is faster on average,
+%% but creates more garbage.
+droplast([_T])  -> [];
+droplast([H|T]) -> [H|droplast(T)].
+
+
+-spec takewhile(Pred, List1) -> List2 when
+      Pred :: fun((Elem :: T) -> boolean()),
+      List1 :: [T],
+      List2 :: [T],
+      T :: term().
+
+takewhile(Pred, List) when is_function(Pred, 1) ->
+    takewhile_1(Pred, List).
+
+takewhile_1(Pred, [Hd | Tail]) ->
+    case Pred(Hd) of
+        true -> [Hd | takewhile_1(Pred, Tail)];
+        false -> []
+    end;
+takewhile_1(_Pred, []) ->
+    [].
+
+% --------------------------------------------------
 %% @param   List a list
 %% @returns Sorted list with duplicates removed, ordered by `<'
 %% @see sort/1
