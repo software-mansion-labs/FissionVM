@@ -35,6 +35,7 @@ set(ERLANG_MODULES
     crypto
     persistent_term
     erl_anno
+    erl_bifs
     erl_bits
     erl_error
     erl_eval
@@ -49,6 +50,7 @@ set(ERLANG_MODULES
     elixir_interpolation
     erl_scan
     erts_debug
+    erts_internal
     ets
     eval_bits
     file

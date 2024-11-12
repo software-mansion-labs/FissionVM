@@ -115,7 +115,7 @@
     cons_tl/1
 ]).
 
--include("core_parse.hrl").
+-include("../../include/core_parse.hrl").
 
 %% Matches expansion max segment in v3_kernel.
 -define(COLLAPSE_MAX_SIZE_SEGMENT, 1024).
