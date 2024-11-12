@@ -27,7 +27,16 @@
 %%-----------------------------------------------------------------------------
 -module(io_lib).
 
--export([format/2, latin1_char_list/1]).
+-export([format/2, fwrite/2, latin1_char_list/1, write_atom/1, write_atom_as_latin1/1]).
+
+-spec fwrite(Format, Data) -> chars() when
+    Format :: io:format(),
+    Data :: [term()].
+
+fwrite(Format, Args) when is_binary(Format) ->
+    format(binary_to_list(Format), Args);
+fwrite(Format, Args) ->
+    format(Format, Args).
 
 %%-----------------------------------------------------------------------------
 %% @param   Format format string
@@ -443,6 +452,134 @@ format_char(#format{precision = Precision} = Format, T) when Precision =/= undef
     lists:duplicate(Precision, Ch);
 format_char(_, _) ->
     error(badarg).
+
+-type chars() :: [char() | chars()].
+-type latin1_string() :: [unicode:latin1_char()].
+-spec write_atom(Atom) -> chars() when
+    Atom :: atom().
+
+write_atom(Atom) ->
+    write_possibly_quoted_atom(Atom, fun write_string/2).
+
+-spec write_atom_as_latin1(Atom) -> latin1_string() when
+    Atom :: atom().
+
+write_atom_as_latin1(Atom) ->
+    write_possibly_quoted_atom(Atom, fun write_string_as_latin1/2).
+
+write_possibly_quoted_atom(Atom, PFun) ->
+    Chars = atom_to_list(Atom),
+    case quote_atom(Atom, Chars) of
+        true ->
+            %'
+            PFun(Chars, $');
+        false ->
+            Chars
+    end.
+
+%% quote_atom(Atom, CharList)
+%%  Return 'true' if atom with chars in CharList needs to be quoted, else
+%%  return 'false'. Notice that characters >= 160 are always quoted.
+
+-spec quote_atom(atom(), chars()) -> boolean().
+
+quote_atom(Atom, Cs0) ->
+    case erl_scan:reserved_word(Atom) of
+	true -> true;
+	false ->
+	    case Cs0 of
+		[C|Cs] when is_integer(C), C >= $a, C =< $z ->
+		    not name_chars(Cs);
+		[C|Cs] when is_integer(C), C >= $ß, C =< $ÿ, C =/= $÷ ->
+		    not name_chars(Cs);
+		[C|_] when is_integer(C) -> true;
+                [] -> true
+	    end
+    end.
+
+name_chars([C | Cs]) when is_integer(C) ->
+    case name_char(C) of
+        true -> name_chars(Cs);
+        false -> false
+    end;
+name_chars([]) ->
+    true.
+
+name_char(C) when C >= $a, C =< $z -> true;
+name_char(C) when C >= $ß, C =< $ÿ, C =/= $÷ -> true;
+name_char(C) when C >= $A, C =< $Z -> true;
+name_char(C) when C >= $À, C =< $Þ, C =/= $× -> true;
+name_char(C) when C >= $0, C =< $9 -> true;
+name_char($_) -> true;
+name_char($@) -> true;
+name_char(_) -> false.
+
+%%% There are two functions to write Unicode strings:
+%%% - they both escape control characters < 160;
+%%% - write_string() never escapes characters >= 160;
+%%% - write_string_as_latin1() also escapes characters >= 255.
+
+%% write_string([Char]) -> [Char]
+%%  Generate the list of characters needed to print a string.
+
+-spec write_string(string(), char()) -> chars().
+write_string(S, Q) ->
+    [Q | write_string1(unicode_as_unicode, S, Q)].
+
+-spec write_string_as_latin1(string(), char()) -> latin1_string().
+write_string_as_latin1(S, Q) ->
+    [Q | write_string1(unicode_as_latin1, S, Q)].
+
+write_string1(_, [], Q) ->
+    [Q];
+write_string1(Enc, [C | Cs], Q) when is_integer(C) ->
+    string_char(Enc, C, Q, write_string1(Enc, Cs, Q)).
+
+%Must check these first!
+string_char(_, Q, Q, Tail) ->
+    [$\\, Q | Tail];
+string_char(_, $\\, _, Tail) ->
+    [$\\, $\\ | Tail];
+string_char(_, C, _, Tail) when C >= $\s, C =< $~ ->
+    [C | Tail];
+string_char(latin1, C, _, Tail) when C >= $\240, C =< $\377 ->
+    [C | Tail];
+string_char(unicode_as_unicode, C, _, Tail) when C >= $\240 ->
+    [C | Tail];
+string_char(unicode_as_latin1, C, _, Tail) when C >= $\240, C =< $\377 ->
+    [C | Tail];
+string_char(unicode_as_latin1, C, _, Tail) when C >= $\377 ->
+    "\\x{" ++ erlang:integer_to_list(C, 16) ++ "}" ++ Tail;
+%\n = LF
+string_char(_, $\n, _, Tail) ->
+    [$\\, $n | Tail];
+%\r = CR
+string_char(_, $\r, _, Tail) ->
+    [$\\, $r | Tail];
+%\t = TAB
+string_char(_, $\t, _, Tail) ->
+    [$\\, $t | Tail];
+%\v = VT
+string_char(_, $\v, _, Tail) ->
+    [$\\, $v | Tail];
+%\b = BS
+string_char(_, $\b, _, Tail) ->
+    [$\\, $b | Tail];
+%\f = FF
+string_char(_, $\f, _, Tail) ->
+    [$\\, $f | Tail];
+%\e = ESC
+string_char(_, $\e, _, Tail) ->
+    [$\\, $e | Tail];
+%\d = DEL
+string_char(_, $\d, _, Tail) ->
+    [$\\, $d | Tail];
+%Other control characters.
+string_char(_, C, _, Tail) when C < $\240 ->
+    C1 = (C bsr 6) + $0,
+    C2 = ((C bsr 3) band 7) + $0,
+    C3 = (C band 7) + $0,
+    [$\\, C1, C2, C3 | Tail].
 
 %% @private
 %% String classes:

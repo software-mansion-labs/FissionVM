@@ -30,6 +30,7 @@
 -module(lists).
 
 -export([
+    flatmap/2,
     map/2,
     nth/2,
     nthtail/2,
@@ -58,14 +59,22 @@
     seq/2, seq/3,
     sort/1, sort/2,
     split/2,
+    partition/2,
+    append/1,
     umerge/3,
     ukeysort/2,
     usort/1, usort/2,
     duplicate/2,
+    dropwhile/2,
     droplast/1,
     takewhile/2,
     sublist/2
 ]).
+
+-spec flatmap(Fun, List1) -> List2 when
+    Fun :: fun((A) -> [B]), List1 :: [A], List2 :: [B], A :: term(), B :: term().
+flatmap(Fun, List) ->
+    append(map(Fun, List)).
 
 %%-----------------------------------------------------------------------------
 %% @param   Fun the function to apply
@@ -678,6 +687,30 @@ split(N, [H | T], R) ->
 split(_, [], _) ->
     badarg.
 
+partition(Pred, L) when is_function(Pred, 1) ->
+    partition(Pred, L, [], []).
+
+partition(_Pred, [], A, B) ->
+    {A, B};
+partition(Pred, [H | T], A, B) ->
+    case Pred(H) of
+        true ->
+            partition(Pred, T, [H | A], B);
+        false ->
+            partition(Pred, T, A, [H | B])
+    end.
+%%-----------------------------------------------------------------------------
+%% @param   List containing other lists
+%% @returns Joined list.
+%% @doc     Concatenates all lists from passed list.
+%%
+%% @end
+%%-----------------------------------------------------------------------------
+append([]) ->
+    [];
+append([H | T]) ->
+    H ++ append(T).
+
 %% Attribution: https://erlang.org/doc/programming_examples/list_comprehensions.html#quick-sort
 %% @private
 quick_sort(Fun, [Pivot | T]) ->
@@ -1123,25 +1156,41 @@ ufmerge2_2(H1, T1, Fun, [H2 | T2], M) ->
 ufmerge2_2(H1, T1, _Fun, [], M) ->
     lists:reverse(T1, [H1 | M]).
 
+-spec dropwhile(Pred, List1) -> List2 when
+    Pred :: fun((Elem :: T) -> boolean()),
+    List1 :: [T],
+    List2 :: [T],
+    T :: term().
+
+dropwhile(Pred, List) when is_function(Pred, 1) ->
+    dropwhile_1(Pred, List).
+
+dropwhile_1(Pred, [Hd | Tail] = Rest) ->
+    case Pred(Hd) of
+        true -> dropwhile_1(Pred, Tail);
+        false -> Rest
+    end;
+dropwhile_1(_Pred, []) ->
+    [].
+
 %% droplast(List) returns the list dropping its last element
 
 -spec droplast(List) -> InitList when
-      List :: [T, ...],
-      InitList :: [T],
-      T :: term().
+    List :: [T, ...],
+    InitList :: [T],
+    T :: term().
 
 %% This is the simple recursive implementation
 %% reverse(tl(reverse(L))) is faster on average,
 %% but creates more garbage.
-droplast([_T])  -> [];
-droplast([H|T]) -> [H|droplast(T)].
-
+droplast([_T]) -> [];
+droplast([H | T]) -> [H | droplast(T)].
 
 -spec takewhile(Pred, List1) -> List2 when
-      Pred :: fun((Elem :: T) -> boolean()),
-      List1 :: [T],
-      List2 :: [T],
-      T :: term().
+    Pred :: fun((Elem :: T) -> boolean()),
+    List1 :: [T],
+    List2 :: [T],
+    T :: term().
 
 takewhile(Pred, List) when is_function(Pred, 1) ->
     takewhile_1(Pred, List).
@@ -1204,7 +1253,7 @@ unique([X, Y | Tail], Fun) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec duplicate(integer(), Elem) -> [Elem].
-duplicate(Count, Elem) when is_integer(Count) andalso Count > 0 ->
+duplicate(Count, Elem) when is_integer(Count) andalso Count >= 0 ->
     duplicate(Count, Elem, []).
 
 duplicate(0, _Elem, Acc) -> Acc;
