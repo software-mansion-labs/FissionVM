@@ -43,6 +43,7 @@ set(ERLANG_MODULES
     elixir_erl_var
     elixir_sup
     elixir_aliases
+    elixir_quote
     erl_scan
     erts_debug
     ets
