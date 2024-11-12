@@ -27,7 +27,7 @@
 %%-----------------------------------------------------------------------------
 -module(string).
 
--export([to_upper/1, to_lower/1, split/2, split/3, trim/1, trim/2, find/2, find/3]).
+-export([to_upper/1, to_lower/1, split/2, split/3, trim/1, trim/2, find/2, find/3, tokens/2]).
 
 %%-----------------------------------------------------------------------------
 %% @param Input a string or character to convert
@@ -231,6 +231,60 @@ find(String, SearchPattern, Direction) when is_list(String) andalso is_binary(Se
     find_list(String, unicode:characters_to_list(SearchPattern), Direction);
 find(String, SearchPattern, Direction) when is_list(String) andalso is_list(SearchPattern) ->
     find_list(String, SearchPattern, Direction).
+
+
+
+%%-----------------------------------------------------------------------------
+%% @param String string to be tokenized
+%% @param SeparatorList list of characters used as separators
+%% @returns a list of tokens extracted from String where each token is separated
+%% by one or more characters found in SeparatorList; if no separatators are found,
+%% returns a list containing the original String as the sole element
+%% @end
+%%-----------------------------------------------------------------------------
+
+tokens(S, Seps) ->
+    case Seps of
+	[] ->
+	    case S of
+		[] -> [];
+		[_|_] -> [S]
+	    end;
+	[C] ->
+	    tokens_single_1(lists:reverse(S), C, []);
+	[_|_] ->
+	    tokens_multiple_1(lists:reverse(S), Seps, [])
+    end.
+
+tokens_single_1([Sep|S], Sep, Toks) ->
+    tokens_single_1(S, Sep, Toks);
+tokens_single_1([C|S], Sep, Toks) ->
+    tokens_single_2(S, Sep, Toks, [C]);
+tokens_single_1([], _, Toks) ->
+    Toks.
+
+tokens_single_2([Sep|S], Sep, Toks, Tok) ->
+    tokens_single_1(S, Sep, [Tok|Toks]);
+tokens_single_2([C|S], Sep, Toks, Tok) ->
+    tokens_single_2(S, Sep, Toks, [C|Tok]);
+tokens_single_2([], _Sep, Toks, Tok) ->
+    [Tok|Toks].
+
+tokens_multiple_1([C|S], Seps, Toks) ->
+    case lists:member(C, Seps) of
+	true -> tokens_multiple_1(S, Seps, Toks);
+	false -> tokens_multiple_2(S, Seps, Toks, [C])
+    end;
+tokens_multiple_1([], _Seps, Toks) ->
+    Toks.
+
+tokens_multiple_2([C|S], Seps, Toks, Tok) ->
+    case lists:member(C, Seps) of
+	true -> tokens_multiple_1(S, Seps, [Tok|Toks]);
+	false -> tokens_multiple_2(S, Seps, Toks, [C|Tok])
+    end;
+tokens_multiple_2([], _Seps, Toks, Tok) ->
+    [Tok|Toks].
 
 %% @private
 find_binary(<<_C, Rest/binary>> = String, SearchPattern, leading) when
