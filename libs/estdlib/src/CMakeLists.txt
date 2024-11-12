@@ -40,6 +40,8 @@ set(ERLANG_MODULES
     elixir_utils
     elixir_tokenizer
     elixir_interpolation
+    elixir_erl_var
+    elixir_sup
     elixir_aliases
     erl_scan
     erts_debug
