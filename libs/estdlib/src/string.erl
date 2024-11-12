@@ -27,7 +27,18 @@
 %%-----------------------------------------------------------------------------
 -module(string).
 
--export([to_upper/1, to_lower/1, split/2, split/3, trim/1, trim/2, find/2, find/3, tokens/2]).
+-export([
+    to_upper/1, to_lower/1, split/2, split/3, trim/1, trim/2, find/2, find/3, tokens/2, length/1
+]).
+-define(ASCII_LIST(CP1, CP2),
+    is_integer(CP1),
+    0 =< CP1,
+    CP1 < 256,
+    is_integer(CP2),
+    0 =< CP2,
+    CP2 < 256,
+    CP1 =/= $\r
+).
 
 %%-----------------------------------------------------------------------------
 %% @param Input a string or character to convert
@@ -232,8 +243,6 @@ find(String, SearchPattern, Direction) when is_list(String) andalso is_binary(Se
 find(String, SearchPattern, Direction) when is_list(String) andalso is_list(SearchPattern) ->
     find_list(String, SearchPattern, Direction).
 
-
-
 %%-----------------------------------------------------------------------------
 %% @param String string to be tokenized
 %% @param SeparatorList list of characters used as separators
@@ -245,46 +254,61 @@ find(String, SearchPattern, Direction) when is_list(String) andalso is_list(Sear
 
 tokens(S, Seps) ->
     case Seps of
-	[] ->
-	    case S of
-		[] -> [];
-		[_|_] -> [S]
-	    end;
-	[C] ->
-	    tokens_single_1(lists:reverse(S), C, []);
-	[_|_] ->
-	    tokens_multiple_1(lists:reverse(S), Seps, [])
+        [] ->
+            case S of
+                [] -> [];
+                [_ | _] -> [S]
+            end;
+        [C] ->
+            tokens_single_1(lists:reverse(S), C, []);
+        [_ | _] ->
+            tokens_multiple_1(lists:reverse(S), Seps, [])
     end.
 
-tokens_single_1([Sep|S], Sep, Toks) ->
+tokens_single_1([Sep | S], Sep, Toks) ->
     tokens_single_1(S, Sep, Toks);
-tokens_single_1([C|S], Sep, Toks) ->
+tokens_single_1([C | S], Sep, Toks) ->
     tokens_single_2(S, Sep, Toks, [C]);
 tokens_single_1([], _, Toks) ->
     Toks.
 
-tokens_single_2([Sep|S], Sep, Toks, Tok) ->
-    tokens_single_1(S, Sep, [Tok|Toks]);
-tokens_single_2([C|S], Sep, Toks, Tok) ->
-    tokens_single_2(S, Sep, Toks, [C|Tok]);
+tokens_single_2([Sep | S], Sep, Toks, Tok) ->
+    tokens_single_1(S, Sep, [Tok | Toks]);
+tokens_single_2([C | S], Sep, Toks, Tok) ->
+    tokens_single_2(S, Sep, Toks, [C | Tok]);
 tokens_single_2([], _Sep, Toks, Tok) ->
-    [Tok|Toks].
+    [Tok | Toks].
 
-tokens_multiple_1([C|S], Seps, Toks) ->
+tokens_multiple_1([C | S], Seps, Toks) ->
     case lists:member(C, Seps) of
-	true -> tokens_multiple_1(S, Seps, Toks);
-	false -> tokens_multiple_2(S, Seps, Toks, [C])
+        true -> tokens_multiple_1(S, Seps, Toks);
+        false -> tokens_multiple_2(S, Seps, Toks, [C])
     end;
 tokens_multiple_1([], _Seps, Toks) ->
     Toks.
 
-tokens_multiple_2([C|S], Seps, Toks, Tok) ->
+tokens_multiple_2([C | S], Seps, Toks, Tok) ->
     case lists:member(C, Seps) of
-	true -> tokens_multiple_1(S, Seps, [Tok|Toks]);
-	false -> tokens_multiple_2(S, Seps, Toks, [C|Tok])
+        true -> tokens_multiple_1(S, Seps, [Tok | Toks]);
+        false -> tokens_multiple_2(S, Seps, Toks, [C | Tok])
     end;
 tokens_multiple_2([], _Seps, Toks, Tok) ->
-    [Tok|Toks].
+    [Tok | Toks].
+
+%%-----------------------------------------------------------------------------
+%% @doc
+%% Counts the number of Unicode grapheme clusters in a given string. A grapheme cluster
+%% represents a user-perceived character, which may consist of one or more code points.
+%%
+%% @spec length(String :: unicode:chardata()) -> non_neg_integer()
+%% @param String The string from which to count grapheme clusters.
+%% @returns The number of grapheme clusters in the string.
+%% @end
+%%-----------------------------------------------------------------------------
+length(<<CP1/utf8, Bin/binary>>) ->
+    length_b(Bin, CP1, 0);
+length(CD) ->
+    length_1(CD, 0).
 
 %% @private
 find_binary(<<_C, Rest/binary>> = String, SearchPattern, leading) when
@@ -296,6 +320,28 @@ find_binary(<<_C, Rest/binary>> = String, SearchPattern, leading) when
     end;
 find_binary(_Sring, _SearchPattern, leading) ->
     nomatch.
+
+%% @private
+length_1([CP1 | [CP2 | _] = Cont], N) when ?ASCII_LIST(CP1, CP2) ->
+    length_1(Cont, N + 1);
+length_1(Str, N) ->
+    case unicode_util:gc(Str) of
+        [] -> N;
+        [_ | Rest] -> length_1(Rest, N + 1);
+        {error, Err} -> error({badarg, Err})
+    end.
+
+length_b(<<CP2/utf8, Rest/binary>>, CP1, N) when
+    ?ASCII_LIST(CP1, CP2)
+->
+    length_b(Rest, CP2, N + 1);
+length_b(Bin0, CP1, N) ->
+    [_ | Bin1] = unicode_util:gc([CP1 | Bin0]),
+    case unicode_util:cp(Bin1) of
+        [] -> N + 1;
+        [CP3 | Bin] -> length_b(Bin, CP3, N + 1);
+        {error, Err} -> error({badarg, Err})
+    end.
 
 %% @private
 find_list([_C | Rest] = String, SearchPattern, leading) ->
