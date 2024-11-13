@@ -50,6 +50,9 @@ set(ERLANG_MODULES
     elixir_interpolation
     elixir_erl_var
     elixir_fn
+    elixir_erl_pass
+    elixir_erl_try
+    elixir_erl_clauses
     elixir_sup
     elixir_aliases
     elixir_env
