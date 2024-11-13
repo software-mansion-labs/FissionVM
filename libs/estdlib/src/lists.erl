@@ -60,7 +60,9 @@
     sort/1, sort/2,
     split/2,
     partition/2,
+    unzip/1,
     append/1,
+    umerge/1,
     umerge/3,
     ukeysort/2,
     usort/1, usort/2,
@@ -699,6 +701,11 @@ partition(Pred, [H | T], A, B) ->
         false ->
             partition(Pred, T, A, [H | B])
     end.
+
+unzip(Ts) -> unzip(Ts, [], []).
+
+unzip([{X, Y} | Ts], Xs, Ys) -> unzip(Ts, [X | Xs], [Y | Ys]);
+unzip([], Xs, Ys) -> {reverse(Xs), reverse(Ys)}.
 %%-----------------------------------------------------------------------------
 %% @param   List containing other lists
 %% @returns Joined list.
@@ -1112,6 +1119,223 @@ ukeymerge2_2(I, T1, E1, H1, [H2 | T2], M) ->
     end;
 ukeymerge2_2(_I, T1, _E1, H1, [], M) ->
     lists:reverse(T1, [H1 | M]).
+
+%% umerge(List) -> L
+%%  merges a list of sorted lists without duplicates, removes duplicates
+
+-spec umerge(ListOfLists) -> List1 when
+    ListOfLists :: [List],
+    List :: [T],
+    List1 :: [T],
+    T :: term().
+
+umerge(L) ->
+    umergel(L).
+
+umergel(L) ->
+    umergel(L, [], asc).
+
+umergel([], [], _O) ->
+    [];
+umergel([[_ | _] = L], [], _O) ->
+    L;
+umergel([], Acc, O) ->
+    rumergel(Acc, [], O);
+umergel([[_ | _] = L], Acc, O) ->
+    rumergel([lists:reverse(L, []) | Acc], [], O);
+umergel([[] | L], Acc, O) ->
+    umergel(L, Acc, O);
+umergel([[_ | _] = A, [] | L], Acc, O) ->
+    umergel([A | L], Acc, O);
+umergel([[_ | _] = A, [_ | _] = B, [] | L], Acc, O) ->
+    umergel([A, B | L], Acc, O);
+umergel([[_ | _] = T1, [H2 | T2], [H3 | T3] | L], Acc, asc) ->
+    umergel(L, [umerge3_1(T1, [H2 | H3], T2, H2, [], T3, H3) | Acc], asc);
+umergel([[H3 | T3], [H2 | T2], [_ | _] = T1 | L], Acc, desc) ->
+    umergel(L, [umerge3_1(T1, [H2 | H3], T2, H2, [], T3, H3) | Acc], desc);
+umergel([[H1 | T1], [_ | _] = T2 | L], Acc, asc) ->
+    umergel(L, [umerge2_2(T1, T2, [], H1) | Acc], asc);
+umergel([[_ | _] = T2, [H1 | T1] | L], Acc, desc) ->
+    umergel(L, [umerge2_2(T1, T2, [], H1) | Acc], desc).
+
+rumergel([[H3 | T3], [H2 | T2], T1 | L], Acc, asc) ->
+    rumergel(L, [rumerge3_1(T1, T2, H2, [], T3, H3) | Acc], asc);
+rumergel([T1, [H2 | T2], [H3 | T3] | L], Acc, desc) ->
+    rumergel(L, [rumerge3_1(T1, T2, H2, [], T3, H3) | Acc], desc);
+rumergel([[H2 | T2], T1 | L], Acc, asc) ->
+    rumergel(L, [rumerge2_1(T1, T2, [], H2) | Acc], asc);
+rumergel([T1, [H2 | T2] | L], Acc, desc) ->
+    rumergel(L, [rumerge2_1(T1, T2, [], H2) | Acc], desc);
+rumergel([L], Acc, O) ->
+    umergel([lists:reverse(L, []) | Acc], [], O);
+rumergel([], Acc, O) ->
+    umergel(Acc, [], O).
+
+%% Take L1 apart.
+umerge3_1([H1 | T1], HdM, T2, H2, M, T3, H3) when H1 =< H2 ->
+    umerge3_12(T1, H1, T2, H2, M, T3, H3, HdM);
+umerge3_1([H1 | T1], HdM, T2, H2, M, T3, H3) when H2 == HdM ->
+    umerge3_2(T1, H1, T2, H2, M, T3, H3);
+umerge3_1([H1 | T1], HdM, T2, H2, M, T3, H3) ->
+    umerge3_21(T1, H1, T2, H2, M, T3, H3, HdM);
+umerge3_1([], HdM, T2, H2, M, T3, H3) when H2 == HdM ->
+    umerge2_1(T2, T3, M, HdM, H3);
+umerge3_1([], _HdM, T2, H2, M, T3, H3) when H2 =< H3 ->
+    umerge2_1(T2, T3, [H2 | M], H2, H3);
+umerge3_1([], HdM, T2, H2, M, T3, H3) when H3 == HdM ->
+    umerge2_2(T2, T3, M, H2);
+umerge3_1([], _HdM, T2, H2, M, T3, H3) ->
+    umerge2_2(T2, T3, [H3 | M], H2).
+
+umerge2_2(T1, [H2 | T2], M, H1) when H1 =< H2 ->
+    umerge2_1(T1, T2, [H1 | M], H1, H2);
+umerge2_2(T1, [H2 | T2], M, H1) ->
+    umerge2_2(T1, T2, [H2 | M], H1);
+umerge2_2(T1, [], M, H1) ->
+    lists:reverse(T1, [H1 | M]).
+
+%% Take L1 apart.
+rumerge3_1([H1 | T1], T2, H2, M, T3, H3) when H1 =< H2 ->
+    rumerge3_12a(T1, H1, T2, H2, M, T3, H3);
+rumerge3_1([H1 | T1], T2, H2, M, T3, H3) when H1 =< H3 ->
+    rumerge3_21_3(T1, T2, H2, M, T3, H3, H1);
+rumerge3_1([H1 | T1], T2, H2, M, T3, H3) ->
+    rumerge3_1(T1, T2, H2, [H1 | M], T3, H3);
+rumerge3_1([], T2, H2, M, T3, H3) when H2 =< H3 ->
+    rumerge2_2(T2, T3, M, H3, H2);
+rumerge3_1([], T2, H2, M, T3, H3) ->
+    rumerge2_1(T2, T3, [H2 | M], H3).
+
+%% Elements from the first list are kept and prioritized.
+rumerge2_1([H1 | T1], T2, M, H2) when H1 =< H2 ->
+    rumerge2_2(T1, T2, M, H2, H1);
+rumerge2_1([H1 | T1], T2, M, H2) ->
+    rumerge2_1(T1, T2, [H1 | M], H2);
+rumerge2_1([], T2, M, H2) ->
+    lists:reverse(T2, [H2 | M]).
+
+% H1 =< H2. Inlined.
+umerge3_12(T1, H1, T2, H2, M, T3, H3, _HdM) when H1 =< H3 ->
+    umerge3_1(T1, H1, T2, H2, [H1 | M], T3, H3);
+umerge3_12(T1, H1, T2, H2, M, T3, H3, HdM) when H3 == HdM ->
+    umerge3_12_3(T1, H1, T2, H2, M, T3);
+umerge3_12(T1, H1, T2, H2, M, T3, H3, _HdM) ->
+    umerge3_12_3(T1, H1, T2, H2, [H3 | M], T3).
+
+%% Take L2 apart.
+umerge3_2(T1, H1, [H2 | T2], HdM, M, T3, H3) when H1 =< H2 ->
+    umerge3_12(T1, H1, T2, H2, M, T3, H3, HdM);
+umerge3_2(T1, H1, [H2 | T2], HdM, M, T3, H3) ->
+    umerge3_21(T1, H1, T2, H2, M, T3, H3, HdM);
+umerge3_2(T1, H1, [], _HdM, M, T3, H3) when H1 =< H3 ->
+    umerge2_1(T1, T3, [H1 | M], H1, H3);
+umerge3_2(T1, H1, [], HdM, M, T3, H3) when H3 == HdM ->
+    umerge2_2(T1, T3, M, H1);
+umerge3_2(T1, H1, [], _HdM, M, T3, H3) ->
+    umerge2_2(T1, T3, [H3 | M], H1).
+
+% H1 > H2. Inlined.
+umerge3_21(T1, H1, T2, H2, M, T3, H3, _HdM) when H2 =< H3 ->
+    umerge3_2(T1, H1, T2, H2, [H2 | M], T3, H3);
+umerge3_21(T1, H1, T2, H2, M, T3, H3, HdM) when H3 == HdM ->
+    umerge3_21_3(T1, H1, T2, H2, M, T3);
+umerge3_21(T1, H1, T2, H2, M, T3, H3, _HdM) ->
+    umerge3_21_3(T1, H1, T2, H2, [H3 | M], T3).
+
+% H1 > H2, take L3 apart.
+umerge3_21_3(T1, H1, T2, H2, M, [H3 | T3]) when H2 =< H3 ->
+    umerge3_2(T1, H1, T2, H2, [H2 | M], T3, H3);
+umerge3_21_3(T1, H1, T2, H2, M, [H3 | T3]) ->
+    umerge3_21_3(T1, H1, T2, H2, [H3 | M], T3);
+umerge3_21_3(T1, H1, T2, H2, M, []) ->
+    umerge2_2(T1, T2, [H2 | M], H1).
+
+%% Elements from the first list are kept and prioritized.
+umerge2_1([H1 | T1], T2, M, _HdM, H2) when H1 =< H2 ->
+    umerge2_1(T1, T2, [H1 | M], H1, H2);
+umerge2_1([H1 | T1], T2, M, HdM, H2) when H2 == HdM ->
+    umerge2_2(T1, T2, M, H1);
+umerge2_1([H1 | T1], T2, M, _HdM, H2) ->
+    umerge2_2(T1, T2, [H2 | M], H1);
+umerge2_1([], T2, M, HdM, H2) when H2 == HdM ->
+    lists:reverse(T2, M);
+umerge2_1([], T2, M, _HdM, H2) ->
+    lists:reverse(T2, [H2 | M]).
+
+% H1 =< H2. Inlined.
+rumerge3_12a(T1, H1, T2, H2, M, T3, H3) when H2 =< H3 ->
+    rumerge3_12_3(T1, T2, H2, M, T3, H3, H1);
+rumerge3_12a(T1, H1, T2, H2, M, T3, H3) ->
+    rumerge3_2(T1, T2, H2, M, T3, H3, H1).
+
+% H1 > H2, take L3 apart.
+rumerge3_21_3(T1, T2, H2, M, [H3 | T3], H3M, H1) when H1 =< H3 ->
+    rumerge3_21_3(T1, T2, H2, [H3M | M], T3, H3, H1);
+rumerge3_21_3(T1, T2, H2, M, [H3 | T3], H3M, H1) when H1 == H3M ->
+    rumerge3_1(T1, T2, H2, [H1 | M], T3, H3);
+rumerge3_21_3(T1, T2, H2, M, [H3 | T3], H3M, H1) ->
+    rumerge3_1(T1, T2, H2, [H1, H3M | M], T3, H3);
+rumerge3_21_3(T1, T2, H2, M, [], H3M, H1) when H1 == H3M ->
+    rumerge2_1(T1, T2, [H1 | M], H2);
+rumerge3_21_3(T1, T2, H2, M, [], H3M, H1) ->
+    rumerge2_1(T1, T2, [H1, H3M | M], H2).
+
+% H1 =< H2M.
+rumerge2_2(T1, [H2 | T2], M, H2M, H1) when H1 =< H2 ->
+    rumerge2_2(T1, T2, [H2M | M], H2, H1);
+rumerge2_2(T1, [H2 | T2], M, H2M, H1) when H1 == H2M ->
+    rumerge2_1(T1, T2, [H1 | M], H2);
+rumerge2_2(T1, [H2 | T2], M, H2M, H1) ->
+    rumerge2_1(T1, T2, [H1, H2M | M], H2);
+rumerge2_2(T1, [], M, H2M, H1) when H1 == H2M ->
+    lists:reverse(T1, [H1 | M]);
+rumerge2_2(T1, [], M, H2M, H1) ->
+    lists:reverse(T1, [H1, H2M | M]).
+
+% H1 =< H2, take L3 apart.
+umerge3_12_3(T1, H1, T2, H2, M, [H3 | T3]) when H1 =< H3 ->
+    umerge3_1(T1, H1, T2, H2, [H1 | M], T3, H3);
+umerge3_12_3(T1, H1, T2, H2, M, [H3 | T3]) ->
+    umerge3_12_3(T1, H1, T2, H2, [H3 | M], T3);
+umerge3_12_3(T1, H1, T2, H2, M, []) ->
+    umerge2_1(T1, T2, [H1 | M], H1, H2).
+
+% H1 =< H2, take L3 apart.
+rumerge3_12_3(T1, T2, H2, M, [H3 | T3], H3M, H1) when H2 =< H3 ->
+    rumerge3_12_3(T1, T2, H2, [H3M | M], T3, H3, H1);
+rumerge3_12_3(T1, T2, H2, M, [H3 | T3], H3M, H1) when H2 == H3M ->
+    rumerge3_2(T1, T2, H2, M, T3, H3, H1);
+rumerge3_12_3(T1, T2, H2, M, [H3 | T3], H3M, H1) ->
+    rumerge3_2(T1, T2, H2, [H3M | M], T3, H3, H1);
+rumerge3_12_3(T1, T2, H2, M, [], H3M, H1) when H2 == H3M ->
+    rumerge2_2(T1, T2, M, H2, H1);
+rumerge3_12_3(T1, T2, H2, M, [], H3M, H1) ->
+    rumerge2_2(T1, T2, [H3M | M], H2, H1).
+
+%% Take L2 apart. H2M > H3. H2M > H2.
+rumerge3_2(T1, [H2 | T2], H2M, M, T3, H3, H1) when H1 =< H2 ->
+    % H2M > H1.
+    rumerge3_12b(T1, H1, T2, H2, M, T3, H3, H2M);
+rumerge3_2(T1, [H2 | T2], H2M, M, T3, H3, H1) when H1 == H2M ->
+    rumerge3_1(T1, T2, H2, [H1 | M], T3, H3);
+rumerge3_2(T1, [H2 | T2], H2M, M, T3, H3, H1) when H1 =< H3 ->
+    % H2M > H1.
+    rumerge3_21_3(T1, T2, H2, [H2M | M], T3, H3, H1);
+rumerge3_2(T1, [H2 | T2], H2M, M, T3, H3, H1) ->
+    % H2M > H1.
+    rumerge3_1(T1, T2, H2, [H1, H2M | M], T3, H3);
+rumerge3_2(T1, [], H2M, M, T3, H3, H1) when H1 == H2M ->
+    rumerge2_1(T1, T3, [H1 | M], H3);
+rumerge3_2(T1, [], H2M, M, T3, H3, H1) when H1 =< H3 ->
+    rumerge2_2(T1, T3, [H2M | M], H3, H1);
+rumerge3_2(T1, [], H2M, M, T3, H3, H1) ->
+    rumerge2_1(T1, T3, [H1, H2M | M], H3).
+
+% H1 =< H2. Inlined.
+rumerge3_12b(T1, H1, T2, H2, M, T3, H3, H2M) when H2 =< H3 ->
+    rumerge3_12_3(T1, T2, H2, [H2M | M], T3, H3, H1);
+rumerge3_12b(T1, H1, T2, H2, M, T3, H3, H2M) ->
+    rumerge3_2(T1, T2, H2, [H2M | M], T3, H3, H1).
 
 umerge(Fun, L1, L2) when is_function(Fun, 2) ->
     umerge_1(Fun, L1, L2).
