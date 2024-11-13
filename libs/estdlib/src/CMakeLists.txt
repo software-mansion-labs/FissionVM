@@ -53,6 +53,7 @@ set(ERLANG_MODULES
     elixir_erl_pass
     elixir_erl_try
     elixir_erl_clauses
+    elixir_erl_for
     elixir_sup
     elixir_aliases
     elixir_env
