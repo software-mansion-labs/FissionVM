@@ -5131,7 +5131,7 @@ static term nif_lists_keyfind(Context *ctx, int argc, term argv[])
     }
 
     int n_pos = term_to_int(n);
-    
+
     if (n_pos <= 0) {
         RAISE_ERROR(BADARG_ATOM);
     }
@@ -5146,7 +5146,8 @@ static term nif_lists_keyfind(Context *ctx, int argc, term argv[])
         term tuple = term_get_list_head(tuple_list);
 
         if (!term_is_tuple(tuple)) {
-            RAISE_ERROR(BADARG_ATOM);
+            tuple_list = term_get_list_tail(tuple_list);
+            continue;
         }
 
         int tuple_size = term_get_tuple_arity(tuple);
