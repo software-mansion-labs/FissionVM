@@ -49,6 +49,7 @@ set(ERLANG_MODULES
     elixir_tokenizer
     elixir_interpolation
     elixir_erl_var
+    elixir_erl_clauses
     elixir_sup
     elixir_aliases
     elixir_env
