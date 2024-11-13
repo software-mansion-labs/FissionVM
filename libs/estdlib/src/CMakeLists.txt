@@ -59,6 +59,7 @@ set(ERLANG_MODULES
     elixir_clauses
     elixir_quote
     elixir_parser.yrl
+    elixir_bistring
     erl_scan
     erts_debug
     erts_internal
