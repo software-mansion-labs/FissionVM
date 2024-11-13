@@ -33,6 +33,7 @@ start() ->
     ok = test_lookup_element(),
     ok = test_insert_new(),
     ok = test_update_counter(),
+    ok = test_delete_object(),
 
     0.
 
@@ -380,3 +381,15 @@ test_update_counter() ->
     10 = ets:update_counter(Tid, patatas, {3, 10, 10, 0}),
     0 = ets:update_counter(Tid, patatas, {3, 10, 10, 0}),
     ok.
+
+test_delete_object() ->
+    Tid = ets:new(test_delete_object, []),
+    true = ets:insert(Tid, {foo, 1, 2, 3}),
+    true = ets:delete_object(Tid, {foo, 3 ,2 ,1}),
+    true = ets:delete_object(Tid, {tapas, 3 ,2 ,1}),
+    [{foo, 1, 2, 3}] =ets:lookup(Tid, foo),
+    true = ets:delete_object(Tid, {foo, 1,2,3}),
+    [] = ets:lookup(Tid, foo),
+    ok.
+
+
