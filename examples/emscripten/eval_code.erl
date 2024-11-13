@@ -1,7 +1,7 @@
 %
 % This file is part of AtomVM.
 %
-% Copyright 2023 Paul Guyot <pguyot@kallisys.net>
+% Copyright 2023 Mateusz Front <mateusz.front@swmansion.com>
 %
 % Licensed under the Apache License, Version 2.0 (the "License");
 % you may not use this file except in compliance with the License.
