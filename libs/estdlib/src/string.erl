@@ -28,7 +28,15 @@
 -module(string).
 
 -export([
-    to_upper/1, to_lower/1, split/2, split/3, trim/1, trim/2, find/2, find/3, tokens/2, length/1
+    to_upper/1,
+    to_lower/1,
+    split/2, split/3,
+    trim/1, trim/2,
+    find/2, find/3,
+    tokens/2,
+    length/1,
+    casefold/1,
+    join/2
 ]).
 -define(ASCII_LIST(CP1, CP2),
     is_integer(CP1),
@@ -310,6 +318,103 @@ length(<<CP1/utf8, Bin/binary>>) ->
 length(CD) ->
     length_1(CD, 0).
 
+%%-----------------------------------------------------------------------------
+%% @param String a Unicode character data to be transformed
+%% @returns a comparable version of String transformed to a form suitable for
+%% equality tests, where case distinctions are removed according to Unicode
+%% case folding rules. This allows for case-insensitive comparisons.
+%% @end
+%%-----------------------------------------------------------------------------
+casefold(CD) when is_list(CD) ->
+    try
+        casefold_list(CD, false)
+    catch
+        unchanged -> CD
+    end;
+casefold(<<CP1/utf8, Rest/binary>> = Orig) ->
+    try casefold_bin(CP1, Rest, false) of
+        List -> unicode:characters_to_binary(List)
+    catch
+        unchanged -> Orig
+    end;
+casefold(<<>>) ->
+    <<>>;
+casefold(Bin) ->
+    error({badarg, Bin}).
+
+%% @private
+casefold_list([CP1 | [CP2 | _] = Cont], _Changed) when
+    is_integer(CP1),
+    $A =< CP1,
+    CP1 =< $Z,
+    is_integer(CP2),
+    0 =< CP2,
+    CP2 < 256
+->
+    [CP1 + 32 | casefold_list(Cont, true)];
+casefold_list([CP1 | [CP2 | _] = Cont], Changed) when
+    is_integer(CP1),
+    0 =< CP1,
+    CP1 < 128,
+    is_integer(CP2),
+    0 =< CP2,
+    CP2 < 256
+->
+    [CP1 | casefold_list(Cont, Changed)];
+casefold_list([], true) ->
+    [];
+casefold_list([], false) ->
+    throw(unchanged);
+casefold_list(CPs0, Changed) ->
+    case unicode_util:casefold(CPs0) of
+        [Char | CPs] when Char =:= hd(CPs0) -> [Char | casefold_list(CPs, Changed)];
+        [Char | CPs] -> append(Char, casefold_list(CPs, true));
+        [] -> casefold_list([], Changed)
+    end.
+casefold_bin(CP1, <<CP2/utf8, Bin/binary>>, _Changed) when
+    is_integer(CP1), $A =< CP1, CP1 =< $Z, CP2 < 256
+->
+    [CP1 + 32 | casefold_bin(CP2, Bin, true)];
+casefold_bin(CP1, <<CP2/utf8, Bin/binary>>, Changed) when
+    is_integer(CP1), 0 =< CP1, CP1 < 128, CP2 < 256
+->
+    [CP1 | casefold_bin(CP2, Bin, Changed)];
+casefold_bin(CP1, Bin, Changed) ->
+    case unicode_util:casefold([CP1 | Bin]) of
+        [CP1 | CPs] ->
+            case unicode_util:cp(CPs) of
+                [Next | Rest] when is_integer(Next), Next >= 0 ->
+                    [CP1 | casefold_bin(Next, Rest, Changed)];
+                [] when Changed ->
+                    [CP1];
+                [] ->
+                    throw(unchanged);
+                {error, Err} ->
+                    error({badarg, Err})
+            end;
+        [Char | CPs] ->
+            case unicode_util:cp(CPs) of
+                [Next | Rest] when is_integer(Next), Next >= 0 ->
+                    [Char | casefold_bin(Next, Rest, true)];
+                [] ->
+                    [Char];
+                {error, Err} ->
+                    error({badarg, Err})
+            end
+    end.
+
+%%-----------------------------------------------------------------------------
+%% @param StringList list of strings to be concatenated
+%% @param Separator string used to separate each element in the final concatenated string
+%% @returns a single string composed by joining each element of StringList with the
+%% specified Separator between them. If StringList is empty, returns an empty string.
+%% @end
+%%-----------------------------------------------------------------------------
+join([], Sep) when is_list(Sep) ->
+    [];
+join([H | T], Sep) ->
+    H ++ lists:append([Sep ++ X || X <- T]).
+
 %% @private
 find_binary(<<_C, Rest/binary>> = String, SearchPattern, leading) when
     byte_size(String) >= byte_size(SearchPattern)
@@ -351,3 +456,9 @@ find_list([_C | Rest] = String, SearchPattern, leading) ->
     end;
 find_list([], _SearchPattern, leading) ->
     nomatch.
+
+append(Char, <<>>) when is_integer(Char) -> [Char];
+append(Char, <<>>) when is_list(Char) -> Char;
+append(Char, Bin) when is_binary(Bin) -> [Char, Bin];
+append(Char, Str) when is_integer(Char) -> [Char | Str];
+append(GC, Str) when is_list(GC) -> GC ++ Str.
