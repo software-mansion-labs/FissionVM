@@ -26,12 +26,20 @@ set(ERLANG_MODULES
     base64
     binary
     calendar
+    cerl_clauses
+    cerl_trees
+    cerl
     code
+    compile
+    core_lib
     crypto
     persistent_term
     erl_anno
+    erl_bifs
     erl_bits
+    erl_error
     erl_eval
+    erl_expand_records
     erl_features
     erl_internal
     erl_lint
@@ -44,12 +52,15 @@ set(ERLANG_MODULES
     elixir_sup
     elixir_aliases
     elixir_env
+    elixir_clauses
     elixir_quote
     erl_scan
     erts_debug
+    erts_internal
     ets
     eval_bits
     file
+    filename
     gb_sets
     gen_event
     gen_server
@@ -77,11 +88,14 @@ set(ERLANG_MODULES
     queue
     sets
     socket
+    sofs
     ssl
     string
+    sys_core_fold
     timer
     unicode
     unicode_util
+    v3_core
     erlang
 )
 
