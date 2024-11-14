@@ -59,9 +59,13 @@ set(ERLANG_MODULES
     elixir_env
     elixir_clauses
     elixir_quote
+    elixir_dispatch
     elixir_expand
     elixir_map
+    elixir_overridable
     elixir_parser.yrl
+    elixir_import
+    elixir_bitstring
     erl_scan
     erts_debug
     erts_internal
