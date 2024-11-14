@@ -159,6 +159,7 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[]);
 static term nif_ets_update_counter(Context *ctx, int argc, term argv[]);
 static term nif_ets_update_element(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup(Context *ctx, int argc, term argv[]);
+static term nif_ets_member(Context *ctx, int argc, term argv[]);
 static term nif_ets_take(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup_element(Context *ctx, int argc, term argv[]);
 static term nif_ets_delete(Context *ctx, int argc, term argv[]);
@@ -709,6 +710,12 @@ static const struct Nif ets_lookup_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_lookup
+};
+
+static const struct Nif ets_member_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_member
 };
 
 static const struct Nif ets_take_nif =
@@ -3420,6 +3427,16 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
         default:
             AVM_ABORT();
     }
+}
+
+static term nif_ets_member(Context *ctx, int argc, term argv[])
+{
+    term result = nif_ets_lookup(ctx, argc, argv);
+    if (term_is_invalid_term(result)) {
+        return result;
+    }
+
+    return term_is_nil(result) ? FALSE_ATOM : TRUE_ATOM;
 }
 
 static term nif_ets_take(Context *ctx, int argc, term argv[])
