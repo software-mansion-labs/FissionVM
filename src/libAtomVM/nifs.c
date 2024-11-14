@@ -159,6 +159,7 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[]);
 static term nif_ets_update_counter(Context *ctx, int argc, term argv[]);
 static term nif_ets_update_element(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup(Context *ctx, int argc, term argv[]);
+static term nif_ets_take(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup_element(Context *ctx, int argc, term argv[]);
 static term nif_ets_delete(Context *ctx, int argc, term argv[]);
 static term nif_ets_delete_object(Context *ctx, int argc, term argv[]);
@@ -708,6 +709,12 @@ static const struct Nif ets_lookup_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_lookup
+};
+
+static const struct Nif ets_take_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_take
 };
 
 static const struct Nif ets_lookup_element_nif =
@@ -3402,6 +3409,30 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
     EtsErrorCode result = ets_lookup(ref, key, &ret, ctx);
+    switch (result) {
+        case EtsOk:
+            return ret;
+        case EtsTableNotFound:
+        case EtsPermissionDenied:
+            RAISE_ERROR(BADARG_ATOM);
+        case EtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_take(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_ets_table_id);
+
+    term key = argv[1];
+
+    term ret = term_invalid_term();
+    EtsErrorCode result = ets_take(ref, key, &ret, ctx);
     switch (result) {
         case EtsOk:
             return ret;
