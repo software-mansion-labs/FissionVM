@@ -158,10 +158,10 @@ update_counter(_Table, _Key, _Params, _Default) ->
 %%-----------------------------------------------------------------------------
 %% @param Table a reference to the ets table
 %% @param Key the key associated with the tuple that needs updating
-%% @param Operation tuple`{Position, Value}` indicating the position to update and new value.
-%%        `Position` should be a positive integer referring to the 1-based index within the tuple.
+%% @param Changes tuple`{Position, Value}` indicating the position to update and new value.
+%%`Position` should be a positive integer referring to the 1-based index within the tuple.
 %% @returns true if the element under specific key was found, otherwise false.
-%% @doc Updates specific elements of a tuple in an ETS table.
+%% @doc Updates specific elements of a tuple in an ets table.
 %% @end
 %%-----------------------------------------------------------------------------
 -spec update_element(

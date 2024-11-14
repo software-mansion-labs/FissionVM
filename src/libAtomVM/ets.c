@@ -556,9 +556,9 @@ EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *
         SMP_UNLOCK(ets_table);
         *ret = FALSE_ATOM;
         return EtsOk;
-    } else {
-        to_insert = term_get_list_head(list);
     }
+
+    to_insert = term_get_list_head(list);
 
     if (!(term_is_tuple(to_insert))) {
         SMP_UNLOCK(ets_table);
@@ -574,7 +574,7 @@ EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *
 
     term_put_tuple_element(to_insert, position, value);
     EtsErrorCode insert_result = ets_table_insert(ets_table, to_insert, ctx);
-    *ret = TRUE_ATOM;
     SMP_UNLOCK(ets_table);
+    *ret = TRUE_ATOM;
     return insert_result;
 }
