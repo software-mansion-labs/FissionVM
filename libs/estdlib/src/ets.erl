@@ -204,8 +204,8 @@ take(_Table, _Key) ->
 
 %%-----------------------------------------------------------------------------
 %% @param   Table a reference to the ets table
-%% @param   Key the key used to lookup one or more entries
-%% @returns true if keys exists in the table, otherwise false
+%% @param   Key the key used to lookup element
+%% @returns true if key exists in the table, otherwise false
 %% @doc Look up an entry in an ets table and returns true if the entry exists.
 %% @end
 %%-----------------------------------------------------------------------------
