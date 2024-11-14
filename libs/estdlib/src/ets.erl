@@ -163,8 +163,8 @@ update_counter(_Table, _Key, _Params, _Default) ->
 %%-----------------------------------------------------------------------------
 
 -spec delete_object(
-Table :: table(),
-Object :: tuple()
+    Table :: table(),
+    Object :: tuple()
 ) -> true.
 delete_object(_Table, _Key) ->
     erlang:nif_error(undefined).
