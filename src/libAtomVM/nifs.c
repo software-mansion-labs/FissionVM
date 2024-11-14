@@ -3442,7 +3442,7 @@ static term nif_ets_member(Context *ctx, int argc, term argv[])
     EtsErrorCode result = ets_lookup(ref, key, &ret, ctx);
     switch (result) {
         case EtsOk:
-            return term_is_nil(ret) ? TRUE_ATOM : FALSE_ATOM;
+            return term_is_nil(ret) ? FALSE_ATOM : TRUE_ATOM;
         case EtsTableNotFound:
         case EtsPermissionDenied:
             RAISE_ERROR(BADARG_ATOM);
