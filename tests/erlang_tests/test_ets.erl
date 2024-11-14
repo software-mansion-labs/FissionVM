@@ -33,8 +33,8 @@ start() ->
     ok = test_lookup_element(),
     ok = test_insert_new(),
     ok = test_update_counter(),
-    ok = test_delete_object(),
     ok = test_update_element(),
+    ok = test_delete_object(),
 
     0.
 
