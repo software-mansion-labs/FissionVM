@@ -31,6 +31,7 @@
     lookup/2,
     lookup_element/3,
     delete/2,
+    delete_object/2,
     update_counter/3,
     update_counter/4,
     update_element/3
@@ -153,6 +154,19 @@ update_counter(_Table, _Key, _Params) ->
     Default :: integer()
 ) -> integer().
 update_counter(_Table, _Key, _Params, _Default) ->
+    erlang:nif_error(undefined).
+%%-----------------------------------------------------------------------------
+%% @param Table a reference to the ets table from which the object will be deleted
+%% @param Object specifies the object to be found and deleted from the table
+%% @returns true
+%% @doc Removes an object from the ets table. Does nothing if object wasn't found.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec delete_object(
+    Table :: table(),
+    Object :: tuple()
+) -> true.
+delete_object(_Table, _Key) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------

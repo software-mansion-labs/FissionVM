@@ -34,6 +34,7 @@ start() ->
     ok = test_insert_new(),
     ok = test_update_counter(),
     ok = test_update_element(),
+    ok = test_delete_object(),
 
     0.
 
@@ -382,13 +383,23 @@ test_update_counter() ->
     0 = ets:update_counter(Tid, patatas, {3, 10, 10, 0}),
     ok.
 
-    test_update_element() ->
-        Tid = ets:new(test_update_element, []),
-        true = ets:insert(Tid, {foo, 1, 2, 3}),
-        true = ets:update_element(Tid, foo, {2, tapas}),
-        [{foo, tapas, 2, 3}] = ets:lookup(Tid, foo),
-        false = ets:update_element(Tid, batat, {2, tapas}),
-        expect_failure(fun() -> ets:update_element(Tid, foo, {300, cow}) end),
-        expect_failure(fun() -> ets:update_element(Tid, foo, {-300, cow}) end),
-        expect_failure(fun() -> ets:update_element(Tid, foo, {1, cow}) end),
-        ok.
+test_update_element() ->
+    Tid = ets:new(test_update_element, []),
+    true = ets:insert(Tid, {foo, 1, 2, 3}),
+    true = ets:update_element(Tid, foo, {2, tapas}),
+    [{foo, tapas, 2, 3}] = ets:lookup(Tid, foo),
+    false = ets:update_element(Tid, batat, {2, tapas}),
+    expect_failure(fun() -> ets:update_element(Tid, foo, {300, cow}) end),
+    expect_failure(fun() -> ets:update_element(Tid, foo, {-300, cow}) end),
+    expect_failure(fun() -> ets:update_element(Tid, foo, {1, cow}) end),
+    ok.
+
+test_delete_object() ->
+    Tid = ets:new(test_delete_object, []),
+    true = ets:insert(Tid, {foo, 1, 2, 3}),
+    true = ets:delete_object(Tid, {foo, 3, 2, 1}),
+    true = ets:delete_object(Tid, {tapas, 3, 2, 1}),
+    [{foo, 1, 2, 3}] = ets:lookup(Tid, foo),
+    true = ets:delete_object(Tid, {foo, 1, 2, 3}),
+    [] = ets:lookup(Tid, foo),
+    ok.
