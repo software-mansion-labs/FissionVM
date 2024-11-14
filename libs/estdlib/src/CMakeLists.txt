@@ -63,6 +63,7 @@ set(ERLANG_MODULES
     elixir_expand
     elixir_map
     elixir_parser.yrl
+    elixir_bistring
     erl_scan
     erts_debug
     erts_internal
