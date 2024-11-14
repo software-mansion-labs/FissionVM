@@ -63,9 +63,10 @@ set(ERLANG_MODULES
     elixir_expand
     elixir_map
     elixir_def
+    elixir_overridable
     elixir_parser.yrl
     elixir_import
-    elixir_bistring
+    elixir_bitstring
     erl_scan
     erts_debug
     erts_internal
