@@ -167,7 +167,7 @@ update_counter(_Table, _Key, _Params, _Default) ->
     Object :: tuple()
 ) -> true.
 delete_object(_Table, _Key) ->
-  erlang:nif_error(undefined).
+    erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
 %% @param Table a reference to the ets table

@@ -36,7 +36,6 @@ start() ->
     ok = test_delete_object(),
     ok = test_update_element(),
 
-
     0.
 
 test_basic() ->
