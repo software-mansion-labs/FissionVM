@@ -404,6 +404,19 @@ EtsErrorCode ets_insert_new(term ref, term tuple, term *ret, Context *ctx)
     return result;
 }
 
+EtsErrorCode ets_table_delete(struct EtsTable *ets_table, term key, term *ret, Context *ctx)
+{
+    if (ets_table->access_type != EtsAccessPublic && ets_table->owner_process_id != ctx->process_id) {
+        return EtsPermissionDenied;
+    }
+
+    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ets_table->keypos, ctx->global);
+    UNUSED(_res);
+
+    *ret = TRUE_ATOM;
+    return EtsOk;
+}
+
 EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
 {
     struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessRead) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessRead);
@@ -411,18 +424,46 @@ EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    if (ets_table->access_type != EtsAccessPublic && ets_table->owner_process_id != ctx->process_id) {
-        SMP_UNLOCK(ets_table);
-        return EtsPermissionDenied;
-    }
-
-    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ets_table->keypos, ctx->global);
-    UNUSED(_res);
+    EtsErrorCode res = ets_table_delete(ets_table, key, ret, ctx);
 
     SMP_UNLOCK(ets_table);
-    *ret = TRUE_ATOM;
+    return res;
+}
 
-    return EtsOk;
+EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
+{
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
+    if (ets_table == NULL) {
+        return EtsTableNotFound;
+    }
+
+    term key = term_get_tuple_element(tuple, 0);
+    term list = term_invalid_term();
+    EtsErrorCode result = ets_table_lookup(ets_table, key, &list, ctx);
+    if (result != EtsOk) {
+        SMP_UNLOCK(ets_table);
+        return result;
+    }
+    if (term_is_nil(list)) {
+        *ret = TRUE_ATOM;
+        SMP_UNLOCK(ets_table);
+        return EtsOk;
+    }
+    term elem = term_get_list_head(list);
+    TermCompareResult cmp_result = term_compare(tuple, elem, TermCompareExact, ctx->global);
+    if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+        SMP_UNLOCK(ets_table);
+        return EtsAllocationFailure;
+    }
+    if (cmp_result != TermEquals) {
+        *ret = TRUE_ATOM;
+        SMP_UNLOCK(ets_table);
+        return EtsOk;
+    }
+    EtsErrorCode res = ets_table_delete(ets_table, key, ret, ctx);
+
+    SMP_UNLOCK(ets_table);
+    return res;
 }
 
 bool operation_to_tuple4(term operation, term *position, term *increment, term *threshold, term *set_value)
@@ -536,5 +577,45 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
         *ret = elem;
     }
     SMP_UNLOCK(ets_table);
+    return insert_result;
+}
+
+EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *ret, Context *ctx)
+{
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
+    if (ets_table == NULL) {
+        return EtsTableNotFound;
+    }
+    term to_insert = term_invalid_term();
+    term list = term_invalid_term();
+    EtsErrorCode result = ets_table_lookup(ets_table, key, &list, ctx);
+    if (result != EtsOk) {
+        SMP_UNLOCK(ets_table);
+        return result;
+    }
+    if (term_is_nil(list)) {
+        SMP_UNLOCK(ets_table);
+        *ret = FALSE_ATOM;
+        return EtsOk;
+    }
+
+    to_insert = term_get_list_head(list);
+
+    if (!(term_is_tuple(to_insert))) {
+        SMP_UNLOCK(ets_table);
+        return EtsBadEntry;
+    }
+
+    int arity = term_get_tuple_arity(to_insert);
+    int position = term_to_int(pos) - 1;
+    if (arity < position || position < 1) {
+        SMP_UNLOCK(ets_table);
+        return EtsBadEntry;
+    }
+
+    term_put_tuple_element(to_insert, position, value);
+    EtsErrorCode insert_result = ets_table_insert(ets_table, to_insert, ctx);
+    SMP_UNLOCK(ets_table);
+    *ret = TRUE_ATOM;
     return insert_result;
 }

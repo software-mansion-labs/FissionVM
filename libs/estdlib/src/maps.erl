@@ -57,7 +57,8 @@
     merge/2,
     merge_with/3,
     remove/2,
-    update/3
+    update/3,
+    without/2
 ]).
 
 -export_type([
@@ -506,6 +507,26 @@ update(Key, Value, Map) ->
     _ = ?MODULE:get(Key, Map),
     Map#{Key => Value}.
 
+%%-----------------------------------------------------------------------------
+%% @param Ks list of keys to be removed from the map
+%% @param Map1 map from which the keys are to be removed
+%% @returns Map2 a new map resulting from the removal of specified keys in Ks from Map1
+%% If Ks is not a list or the second parameter is not a map, an error is raised with details
+%% about the inappropriate types.
+%% @end
+%%-----------------------------------------------------------------------------
+
+-spec without(Ks, Map1) -> Map2 when
+    Ks :: [K],
+    Map1 :: map(),
+    Map2 :: map(),
+    K :: term().
+
+without(Ks, M) when is_list(Ks), is_map(M) ->
+    lists:foldl(fun maps:remove/2, M, Ks);
+without(Ks, M) ->
+    error_with_info(error_type(M), [Ks, M]).
+
 %%
 %% Internal functions
 %%
@@ -602,3 +623,9 @@ iterate_from_list([{Key, Value} | T], Accum) ->
     iterate_from_list(T, Accum#{Key => Value});
 iterate_from_list(_List, _Accum) ->
     error(badarg).
+
+error_with_info(Reason, Args) ->
+    erlang:error(Reason, Args, [{error_info, #{module => erl_stdlib_errors}}]).
+
+error_type(M) when is_map(M) -> badarg;
+error_type(V) -> {badmap, V}.
