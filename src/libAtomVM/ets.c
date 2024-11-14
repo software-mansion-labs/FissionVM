@@ -619,3 +619,28 @@ EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *
     *ret = TRUE_ATOM;
     return insert_result;
 }
+
+EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx)
+{
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
+    if (ets_table == NULL) {
+        return EtsTableNotFound;
+    }
+
+    term to_return = term_invalid_term();
+    EtsErrorCode result = ets_table_lookup(ets_table, key, &to_return, ctx);
+    if (result != EtsOk) {
+        SMP_UNLOCK(ets_table);
+        return result;
+    }
+    *ret = to_return;
+    if (term_is_nil(to_return)) {
+        SMP_UNLOCK(ets_table);
+        return EtsOk;
+    }
+
+    term del_result;
+    EtsErrorCode res = ets_table_delete(ets_table, key, &del_result, ctx);
+    SMP_UNLOCK(ets_table);
+    return res;
+}
