@@ -538,3 +538,43 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
     SMP_UNLOCK(ets_table);
     return insert_result;
 }
+
+EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *ret, Context *ctx)
+{
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
+    if (ets_table == NULL) {
+        return EtsTableNotFound;
+    }
+    term to_insert = term_invalid_term();
+    term list = term_invalid_term();
+    EtsErrorCode result = ets_table_lookup(ets_table, key, &list, ctx);
+    if (result != EtsOk) {
+        SMP_UNLOCK(ets_table);
+        return result;
+    }
+    if (term_is_nil(list)) {
+        SMP_UNLOCK(ets_table);
+        *ret = FALSE_ATOM;
+        return EtsOk;
+    }
+
+    to_insert = term_get_list_head(list);
+
+    if (!(term_is_tuple(to_insert))) {
+        SMP_UNLOCK(ets_table);
+        return EtsBadEntry;
+    }
+
+    int arity = term_get_tuple_arity(to_insert);
+    int position = term_to_int(pos) - 1;
+    if (arity < position || position < 1) {
+        SMP_UNLOCK(ets_table);
+        return EtsBadEntry;
+    }
+
+    term_put_tuple_element(to_insert, position, value);
+    EtsErrorCode insert_result = ets_table_insert(ets_table, to_insert, ctx);
+    SMP_UNLOCK(ets_table);
+    *ret = TRUE_ATOM;
+    return insert_result;
+}
