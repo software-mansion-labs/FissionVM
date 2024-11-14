@@ -157,8 +157,8 @@ update_counter(_Table, _Key, _Params, _Default) ->
 %%-----------------------------------------------------------------------------
 %% @param Table a reference to the ets table from which the object will be deleted
 %% @param Object specifies the object to be found and deleted from the table
-%% @returns true after attempting to delete the object, regardless of whether the object existed in the table
-%% @doc Attempts to remove a specific object from the ets table. The function tries to match and delete the complete object as specified.
+%% @returns true
+%% @doc Removes an object from the ets table. Does nothing if object wasn't found.
 %% @end
 %%-----------------------------------------------------------------------------
 

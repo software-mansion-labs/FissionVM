@@ -424,7 +424,7 @@ EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    term res = ets_table_delete(ets_table, key, ret, ctx);
+    EtsErrorCode res = ets_table_delete(ets_table, key, ret, ctx);
 
     SMP_UNLOCK(ets_table);
     return res;
@@ -460,7 +460,7 @@ EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
         SMP_UNLOCK(ets_table);
         return EtsOk;
     }
-    term res = ets_table_delete(ets_table, key, ret, ctx);
+    EtsErrorCode res = ets_table_delete(ets_table, key, ret, ctx);
 
     SMP_UNLOCK(ets_table);
     return res;
