@@ -35,8 +35,7 @@
     update_counter/3,
     update_counter/4,
     update_element/3,
-    take/2,
-    member/2
+    take/2
 ]).
 
 -export_type([
@@ -200,15 +199,4 @@ update_element(_Table, _Key, _Changes) ->
     Key :: term()
 ) -> term().
 take(_Table, _Key) ->
-    erlang:nif_error(undefined).
-
-%%-----------------------------------------------------------------------------
-%% @param   Table a reference to the ets table
-%% @param   Key the key used to lookup element
-%% @returns true if key exists in the table, otherwise false
-%% @doc Look up an entry in an ets table and returns true if the entry exists.
-%% @end
-%%-----------------------------------------------------------------------------
--spec member(Table :: table(), Key :: term()) -> boolean.
-member(_Table, _Key) ->
     erlang:nif_error(undefined).
