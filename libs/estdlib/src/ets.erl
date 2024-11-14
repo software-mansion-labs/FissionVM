@@ -34,7 +34,9 @@
     delete_object/2,
     update_counter/3,
     update_counter/4,
-    update_element/3
+    update_element/3,
+    take/2,
+    member/2
 ]).
 
 -export_type([
@@ -184,4 +186,29 @@ delete_object(_Table, _Key) ->
     Changes :: [{pos_integer(), Value :: term()}]
 ) -> boolean().
 update_element(_Table, _Key, _Changes) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param Table a reference to the ets table
+%% @param Key the key associated with the object to delete and return.
+%% @returns deleted element.
+%% @doc Removes an object from ets table and returns it.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec take(
+    Table :: table(),
+    Key :: term()
+) -> term().
+take(_Table, _Key) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param   Table a reference to the ets table
+%% @param   Key the key used to lookup element
+%% @returns true if key exists in the table, otherwise false
+%% @doc Look up an entry in an ets table and returns true if the entry exists.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec member(Table :: table(), Key :: term()) -> boolean.
+member(_Table, _Key) ->
     erlang:nif_error(undefined).

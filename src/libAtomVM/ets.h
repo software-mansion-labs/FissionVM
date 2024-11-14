@@ -81,6 +81,7 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
 EtsErrorCode ets_insert_new(term ref, term tuple, term *ret, Context *ctx);
 EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx);
 EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *ret, Context *ctx);
+EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx);
 
 #ifdef __cplusplus
 }
