@@ -157,6 +157,7 @@ static term nif_ets_new(Context *ctx, int argc, term argv[]);
 static term nif_ets_insert(Context *ctx, int argc, term argv[]);
 static term nif_ets_insert_new(Context *ctx, int argc, term argv[]);
 static term nif_ets_update_counter(Context *ctx, int argc, term argv[]);
+static term nif_ets_update_element(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup(Context *ctx, int argc, term argv[]);
 static term nif_ets_lookup_element(Context *ctx, int argc, term argv[]);
 static term nif_ets_delete(Context *ctx, int argc, term argv[]);
@@ -695,6 +696,12 @@ static const struct Nif ets_update_counter_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_update_counter
+};
+
+static const struct Nif ets_update_element_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_update_element
 };
 
 static const struct Nif ets_lookup_nif =
@@ -3453,6 +3460,38 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
     }
     term ret = term_invalid_term();
     EtsErrorCode result = ets_update_counter(ref, key, operation, default_value, &ret, ctx);
+    switch (result) {
+        case EtsOk:
+            return ret;
+        case EtsTableNotFound:
+        case EtsPermissionDenied:
+        case EtsBadEntry:
+            RAISE_ERROR(BADARG_ATOM);
+        case EtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_update_element(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_ets_table_id);
+
+    term key = argv[1];
+    term operation = argv[2];
+    VALIDATE_VALUE(operation, term_is_tuple);
+    if (term_get_tuple_arity(operation) != 2) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    term pos = term_get_tuple_element(operation, 0);
+    VALIDATE_VALUE(pos, term_is_integer);
+    term value = term_get_tuple_element(operation, 1);
+
+    term ret = term_invalid_term();
+    EtsErrorCode result = ets_update_element(ref, key, value, pos, &ret, ctx);
     switch (result) {
         case EtsOk:
             return ret;

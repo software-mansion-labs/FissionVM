@@ -33,7 +33,8 @@
     delete/2,
     delete_object/2,
     update_counter/3,
-    update_counter/4
+    update_counter/4,
+    update_element/3
 ]).
 
 -export_type([
@@ -161,10 +162,26 @@ update_counter(_Table, _Key, _Params, _Default) ->
 %% @doc Removes an object from the ets table. Does nothing if object wasn't found.
 %% @end
 %%-----------------------------------------------------------------------------
-
 -spec delete_object(
     Table :: table(),
     Object :: tuple()
 ) -> true.
 delete_object(_Table, _Key) ->
+  erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param Table a reference to the ets table
+%% @param Key the key associated with the tuple that needs updating
+%% @param Changes tuple `{Position, Value}` indicating the position to update and new value.
+%%`Position` should be a positive integer referring to the 1-based index within the tuple.
+%% @returns true if the element under specific key was found, otherwise false.
+%% @doc Updates specific elements of a tuple in an ets table.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec update_element(
+    Table :: table(),
+    Key :: term(),
+    Changes :: [{pos_integer(), Value :: term()}]
+) -> boolean().
+update_element(_Table, _Key, _Changes) ->
     erlang:nif_error(undefined).
