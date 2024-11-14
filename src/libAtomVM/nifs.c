@@ -3431,12 +3431,26 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
 
 static term nif_ets_member(Context *ctx, int argc, term argv[])
 {
-    term result = nif_ets_lookup(ctx, argc, argv);
-    if (term_is_invalid_term(result)) {
-        return result;
-    }
+    UNUSED(argc);
 
-    return term_is_nil(result) ? FALSE_ATOM : TRUE_ATOM;
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_ets_table_id);
+
+    term key = argv[1];
+
+    term ret = term_invalid_term();
+    EtsErrorCode result = ets_lookup(ref, key, &ret, ctx);
+    switch (result) {
+        case EtsOk:
+            return term_is_nil(ret) ? TRUE_ATOM : FALSE_ATOM;
+        case EtsTableNotFound:
+        case EtsPermissionDenied:
+            RAISE_ERROR(BADARG_ATOM);
+        case EtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
 }
 
 static term nif_ets_take(Context *ctx, int argc, term argv[])
