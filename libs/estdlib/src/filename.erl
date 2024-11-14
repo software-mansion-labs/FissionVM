@@ -67,7 +67,7 @@
 %% could be changed.
 %%
 
--export([basename/1, basename/2, dirname/1]).
+-export([basename/1, basename/2, dirname/1, absname/1, join/1, join/2,split/1, pathtype/1]).
 
 %% Undocumented and unsupported exports.
 -export([append/2]).
@@ -394,3 +394,370 @@ filename_string_to_binary(List) ->
     end.
 
 separators() -> {false, false}.
+
+%% Converts a relative filename to an absolute filename
+%% or the filename itself if it already is an absolute filename
+%% Note that no attempt is made to create the most beatiful
+%% absolute name since this can give incorrect results on
+%% file systems which allows links.
+%% Examples:
+%% Assume (for UNIX) current directory "/usr/local"
+%% Assume (for WIN32) current directory "D:/usr/local"
+%%
+%% (for Unix) : absname("foo") -> "/usr/local/foo"
+%% (for WIN32): absname("foo") -> "D:/usr/local/foo"
+%% (for Unix) : absname("../x") -> "/usr/local/../x"
+%% (for WIN32): absname("../x") -> "D:/usr/local/../x"
+%% (for Unix) : absname("/") -> "/"
+%% (for WIN32): absname("/") -> "D:/"
+
+-spec absname(Filename) -> file:filename_all() when
+    Filename :: file:name_all().
+absname(Name) ->
+    {ok, Cwd} = file:get_cwd(),
+    absname(Name, Cwd).
+
+-spec absname(Filename, Dir) -> file:filename_all() when
+    Filename :: file:name_all(),
+    Dir :: file:name_all().
+absname(Name, AbsBase) when is_binary(Name), is_list(AbsBase) ->
+    absname(Name, filename_string_to_binary(AbsBase));
+absname(Name, AbsBase) when is_list(Name), is_binary(AbsBase) ->
+    absname(filename_string_to_binary(Name), AbsBase);
+absname(Name, AbsBase) ->
+    case pathtype(Name) of
+        relative ->
+            absname_join(AbsBase, Name);
+        absolute ->
+            %% We must flatten the filename before passing it into join/1,
+            %% or we will get slashes inserted into the wrong places.
+            join([flatten(Name)]);
+        volumerelative ->
+            absname_vr(split(Name), split(AbsBase), AbsBase)
+    end.
+
+%% Handles volumerelative names (on Windows only).
+
+absname_vr([<<"/">> | Rest1], [Volume | _], _AbsBase) ->
+    %% Absolute path on current drive.
+    join([Volume | Rest1]);
+absname_vr([<<X, $:>> | Rest1], [<<X, _/binary>> | _], AbsBase) ->
+    %% Relative to current directory on current drive.
+    absname(join(Rest1), AbsBase);
+absname_vr([<<X, $:>> | Name], _, _AbsBase) ->
+    %% Relative to current directory on another drive.
+    Dcwd =
+        case file:get_cwd([X, $:]) of
+            {ok, Dir} -> filename_string_to_binary(Dir);
+            {error, _} -> <<X, $:, $/>>
+        end,
+    absname(join(Name), Dcwd);
+absname_vr(["/" | Rest1], [Volume | _], _AbsBase) ->
+    %% Absolute path on current drive.
+    join([Volume | Rest1]);
+absname_vr([[X, $:] | Rest1], [[X | _] | _], AbsBase) ->
+    %% Relative to current directory on current drive.
+    absname(join(Rest1), AbsBase);
+absname_vr([[X, $:] | Name], _, _AbsBase) ->
+    %% Relative to current directory on another drive.
+    Dcwd =
+        case file:get_cwd([X, $:]) of
+            {ok, Dir} -> Dir;
+            {error, _} -> [X, $:, $/]
+        end,
+    absname(join(Name), Dcwd).
+
+%% Joins a relative filename to an absolute base.
+%% This is just a join/2, but assumes that
+%% AbsBase must be absolute and Name must be relative.
+
+-spec absname_join(Dir, Filename) -> file:filename_all() when
+    Dir :: file:name_all(),
+    Filename :: file:name_all().
+absname_join(AbsBase, Name) ->
+    join(AbsBase, flatten(Name)).
+
+-spec join(Components) -> file:filename_all() when
+    Components :: [file:name_all()].
+join([Name1, Name2 | Rest]) ->
+    join([join(Name1, Name2) | Rest]);
+join([Name]) when is_list(Name) ->
+    join1(Name, [], [], major_os_type());
+join([Name]) when is_binary(Name) ->
+    join1b(Name, <<>>, [], major_os_type());
+join([Name]) when is_atom(Name) ->
+    join([atom_to_list(Name)]).
+
+%% Joins two filenames with directory separators.
+
+-spec join(Name1, Name2) -> file:filename_all() when
+    Name1 :: file:name_all(),
+    Name2 :: file:name_all().
+join(Name1, Name2) when is_list(Name1), is_list(Name2) ->
+    OsType = major_os_type(),
+    case pathtype(Name2) of
+        relative -> join1(Name1, Name2, [], OsType);
+        _Other -> join1(Name2, [], [], OsType)
+    end;
+join(Name1, Name2) when is_binary(Name1), is_list(Name2) ->
+    join(Name1, filename_string_to_binary(Name2));
+join(Name1, Name2) when is_list(Name1), is_binary(Name2) ->
+    join(filename_string_to_binary(Name1), Name2);
+join(Name1, Name2) when is_binary(Name1), is_binary(Name2) ->
+    OsType = major_os_type(),
+    case pathtype(Name2) of
+        relative -> join1b(Name1, Name2, [], OsType);
+        _Other -> join1b(Name2, <<>>, [], OsType)
+    end;
+join(Name1, Name2) when is_atom(Name1) ->
+    join(atom_to_list(Name1), Name2);
+join(Name1, Name2) when is_atom(Name2) ->
+    join(Name1, atom_to_list(Name2)).
+
+%% Internal function to join an absolute name and a relative name.
+%% It is the responsibility of the caller to ensure that RelativeName
+%% is relative.
+
+join1([UcLetter, $: | Rest], RelativeName, [], win32) when
+    is_integer(UcLetter), UcLetter >= $A, UcLetter =< $Z
+->
+    join1(Rest, RelativeName, [$:, UcLetter + $a - $A], win32);
+join1([$\\, $\\ | Rest], RelativeName, [], win32) ->
+    join1([$/, $/ | Rest], RelativeName, [], win32);
+join1([$/, $/ | Rest], RelativeName, [], win32) ->
+    join1(Rest, RelativeName, [$/, $/], win32);
+join1([$\\ | Rest], RelativeName, Result, win32) ->
+    join1([$/ | Rest], RelativeName, Result, win32);
+join1([$/ | Rest], RelativeName, [$., $/ | Result], OsType) ->
+    join1(Rest, RelativeName, [$/ | Result], OsType);
+join1([$/ | Rest], RelativeName, [$/ | Result], OsType) ->
+    join1(Rest, RelativeName, [$/ | Result], OsType);
+join1([], [], Result, OsType) ->
+    maybe_remove_dirsep(Result, OsType);
+join1([], RelativeName, [$: | Rest], win32) ->
+    join1(RelativeName, [], [$: | Rest], win32);
+join1([], RelativeName, [$/ | Result], OsType) ->
+    join1(RelativeName, [], [$/ | Result], OsType);
+join1([], RelativeName, [$., $/ | Result], OsType) ->
+    join1(RelativeName, [], [$/ | Result], OsType);
+join1([], RelativeName, Result, OsType) ->
+    join1(RelativeName, [], [$/ | Result], OsType);
+join1([[_ | _] = List | Rest], RelativeName, Result, OsType) ->
+    join1(List ++ Rest, RelativeName, Result, OsType);
+join1([[] | Rest], RelativeName, Result, OsType) ->
+    join1(Rest, RelativeName, Result, OsType);
+join1([Char | Rest], RelativeName, Result, OsType) when is_integer(Char) ->
+    join1(Rest, RelativeName, [Char | Result], OsType);
+join1([Atom | Rest], RelativeName, Result, OsType) when is_atom(Atom) ->
+    join1(atom_to_list(Atom) ++ Rest, RelativeName, Result, OsType).
+
+join1b(<<UcLetter, $:, Rest/binary>>, RelativeName, [], win32) when
+    is_integer(UcLetter), UcLetter >= $A, UcLetter =< $Z
+->
+    join1b(Rest, RelativeName, [$:, UcLetter + $a - $A], win32);
+join1b(<<$\\, $\\, Rest/binary>>, RelativeName, [], win32) ->
+    join1b(<<$/, $/, Rest/binary>>, RelativeName, [], win32);
+join1b(<<$/, $/, Rest/binary>>, RelativeName, [], win32) ->
+    join1b(Rest, RelativeName, [$/, $/], win32);
+join1b(<<$\\, Rest/binary>>, RelativeName, Result, win32) ->
+    join1b(<<$/, Rest/binary>>, RelativeName, Result, win32);
+join1b(<<$/, Rest/binary>>, RelativeName, [$., $/ | Result], OsType) ->
+    join1b(Rest, RelativeName, [$/ | Result], OsType);
+join1b(<<$/, Rest/binary>>, RelativeName, [$/ | Result], OsType) ->
+    join1b(Rest, RelativeName, [$/ | Result], OsType);
+join1b(<<>>, <<>>, Result, OsType) ->
+    list_to_binary(maybe_remove_dirsep(Result, OsType));
+join1b(<<>>, RelativeName, [$: | Rest], win32) ->
+    join1b(RelativeName, <<>>, [$: | Rest], win32);
+join1b(<<>>, RelativeName, [$/, $/ | Result], win32) ->
+    join1b(RelativeName, <<>>, [$/, $/ | Result], win32);
+join1b(<<>>, RelativeName, [$/ | Result], OsType) ->
+    join1b(RelativeName, <<>>, [$/ | Result], OsType);
+join1b(<<>>, RelativeName, [$., $/ | Result], OsType) ->
+    join1b(RelativeName, <<>>, [$/ | Result], OsType);
+join1b(<<>>, RelativeName, Result, OsType) ->
+    join1b(RelativeName, <<>>, [$/ | Result], OsType);
+join1b(<<Char, Rest/binary>>, RelativeName, Result, OsType) when is_integer(Char) ->
+    join1b(Rest, RelativeName, [Char | Result], OsType).
+
+maybe_remove_dirsep([$/, $:, Letter], win32) ->
+    [Letter, $:, $/];
+maybe_remove_dirsep([$/], _) ->
+    [$/];
+maybe_remove_dirsep([$/, $/], win32) ->
+    [$/, $/];
+maybe_remove_dirsep([$/ | Name], _) ->
+    lists:reverse(Name);
+maybe_remove_dirsep(Name, _) ->
+    lists:reverse(Name).
+
+major_os_type() ->
+    {OsT, _} = os:type(),
+    OsT.
+
+
+%% Returns one of absolute, relative or volumerelative.
+%%
+%% absolute	The pathname refers to a specific file on a specific
+%%		volume.  Example: /usr/local/bin/ (on Unix),
+%%		h:/port_test (on Windows).
+%% relative	The pathname is relative to the current working directory
+%%		on the current volume.  Example:  foo/bar, ../src
+%% volumerelative  The pathname is relative to the current working directory
+%%		on the specified volume, or is a specific file on the
+%%		current working volume.  (Windows only)
+%%		Example: a:bar.erl, /temp/foo.erl
+
+-spec pathtype(Path) -> 'absolute' | 'relative' | 'volumerelative' when
+      Path :: file:name_all().
+pathtype(Atom) when is_atom(Atom) ->
+    pathtype(atom_to_list(Atom));
+pathtype(Name) when is_list(Name) or is_binary(Name) ->
+    case os:type() of
+	{win32, _} ->
+	    win32_pathtype(Name);
+	{_, _}  ->
+	    unix_pathtype(Name)
+    end.
+
+unix_pathtype(<<$/,_/binary>>) ->
+    absolute;
+unix_pathtype([$/|_]) ->
+    absolute;
+unix_pathtype([List|Rest]) when is_list(List) ->
+    unix_pathtype(List++Rest);
+unix_pathtype([Atom|Rest]) when is_atom(Atom) ->
+    unix_pathtype(atom_to_list(Atom)++Rest);
+unix_pathtype(_) ->
+    relative.
+
+win32_pathtype([List|Rest]) when is_list(List) ->
+    win32_pathtype(List++Rest);
+win32_pathtype([Atom|Rest]) when is_atom(Atom) ->
+    win32_pathtype(atom_to_list(Atom)++Rest);
+win32_pathtype([Char, List|Rest]) when is_list(List) ->
+    win32_pathtype([Char|List++Rest]);
+win32_pathtype(<<$/, $/, _/binary>>) -> absolute;
+win32_pathtype(<<$\\, $/, _/binary>>) -> absolute;
+win32_pathtype(<<$/, $\\, _/binary>>) -> absolute;
+win32_pathtype(<<$\\, $\\, _/binary>>) -> absolute;
+win32_pathtype(<<$/, _/binary>>) -> volumerelative;
+win32_pathtype(<<$\\, _/binary>>) -> volumerelative;
+win32_pathtype(<<_Letter, $:, $/, _/binary>>) -> absolute;
+win32_pathtype(<<_Letter, $:, $\\, _/binary>>) -> absolute;
+win32_pathtype(<<_Letter, $:, _/binary>>) -> volumerelative;
+win32_pathtype([$/, $/|_]) -> absolute;
+win32_pathtype([$\\, $/|_]) -> absolute;
+win32_pathtype([$/, $\\|_]) -> absolute;
+win32_pathtype([$\\, $\\|_]) -> absolute;
+win32_pathtype([$/|_]) -> volumerelative;
+win32_pathtype([$\\|_]) -> volumerelative;
+win32_pathtype([C1, C2, List|Rest]) when is_list(List) ->
+    pathtype([C1, C2|List++Rest]);
+win32_pathtype([_Letter, $:, $/|_]) -> absolute;
+win32_pathtype([_Letter, $:, $\\|_]) -> absolute;
+win32_pathtype([_Letter, $:|_]) -> volumerelative;
+win32_pathtype(_) 		  -> relative.
+
+%% Returns a list whose elements are the path components in the filename.
+%%
+%% Examples:	
+%% split("/usr/local/bin") -> ["/", "usr", "local", "bin"]
+%% split("foo/bar") -> ["foo", "bar"]
+%% split("a:\\msdev\\include") -> ["a:/", "msdev", "include"]
+
+-spec split(Filename) -> Components when
+      Filename :: file:name_all(),
+      Components :: [file:name_all()].
+split(Name) when is_binary(Name) ->
+    case os:type() of
+	{win32, _} -> win32_splitb(Name);
+	_  -> unix_splitb(Name)
+    end;
+
+split(Name0) ->
+    Name = flatten(Name0),
+    case os:type() of
+	{win32, _} -> win32_split(Name);
+	_  -> unix_split(Name)
+    end.
+
+
+unix_splitb(Name) ->
+    L = binary:split(Name,[<<"/">>],[global]),
+    LL = case L of
+	     [<<>>|Rest] when Rest =/= [] ->
+		 [<<"/">>|Rest];
+	     _ ->
+		 L
+	 end,
+    [ X || X <- LL, X =/= <<>>].
+
+
+fix_driveletter(Letter0) ->
+    if
+	Letter0 >= $A, Letter0 =< $Z ->  
+	    Letter0+$a-$A;
+	true ->
+	    Letter0
+    end.
+win32_splitb(<<Letter0,$:, Slash, Rest/binary>>) when (((Slash =:= $\\) orelse (Slash =:= $/)) andalso
+							 ?IS_DRIVELETTER(Letter0)) ->
+    Letter = fix_driveletter(Letter0),
+    L = binary:split(Rest,[<<"/">>,<<"\\">>],[global]),
+    [<<Letter,$:,$/>> | [ X || X <- L, X =/= <<>> ]]; 
+win32_splitb(<<Letter0,$:,Rest/binary>>) when ?IS_DRIVELETTER(Letter0) ->
+    Letter = fix_driveletter(Letter0),
+    L = binary:split(Rest,[<<"/">>,<<"\\">>],[global]),
+    [<<Letter,$:>> | [ X || X <- L, X =/= <<>> ]];
+win32_splitb(<<Slash,Slash,Rest/binary>>) when ((Slash =:= $\\) orelse (Slash =:= $/)) ->
+    L = binary:split(Rest,[<<"/">>,<<"\\">>],[global]),
+    [<<"//">> | [ X || X <- L, X =/= <<>> ]];
+win32_splitb(<<Slash,Rest/binary>>) when ((Slash =:= $\\) orelse (Slash =:= $/)) ->
+    L = binary:split(Rest,[<<"/">>,<<"\\">>],[global]),
+    [<<$/>> | [ X || X <- L, X =/= <<>> ]];
+win32_splitb(Name) ->
+    L = binary:split(Name,[<<"/">>,<<"\\">>],[global]),
+    [ X || X <- L, X =/= <<>> ].
+    
+
+unix_split(Name) ->
+    split(Name, [], unix).
+
+win32_split([Slash,Slash|Rest]) when ((Slash =:= $\\) orelse (Slash =:= $/)) ->
+    split(Rest, [[$/,$/]], win32);
+win32_split([$\\|Rest]) ->
+    win32_split([$/|Rest]);
+win32_split([X, $\\|Rest]) when is_integer(X) ->
+    win32_split([X, $/|Rest]);
+win32_split([X, Y, $\\|Rest]) when is_integer(X), is_integer(Y) ->
+    win32_split([X, Y, $/|Rest]);
+win32_split([UcLetter, $:|Rest])
+  when is_integer(UcLetter), $A =< UcLetter, UcLetter =< $Z ->
+    win32_split([UcLetter+$a-$A, $:|Rest]);
+win32_split([Letter, $:, $/|Rest]) ->
+    split(Rest, [], [[Letter, $:, $/]], win32);
+win32_split([Letter, $:|Rest]) ->
+    split(Rest, [], [[Letter, $:]], win32);
+win32_split(Name) ->
+    split(Name, [], win32).
+
+split([$/|Rest], Components, OsType) ->
+    split(Rest, [], [[$/]|Components], OsType);
+split([$\\|Rest], Components, win32) ->
+    split(Rest, [], [[$/]|Components], win32);
+split(RelativeName, Components, OsType) ->
+    split(RelativeName, [], Components, OsType).
+
+split([$\\|Rest], Comp, Components, win32) ->
+    split([$/|Rest], Comp, Components, win32);
+split([$/|Rest], [], Components, OsType) ->
+    split(Rest, [], Components, OsType);
+split([$/|Rest], Comp, Components, OsType) ->
+    split(Rest, [], [lists:reverse(Comp)|Components], OsType);
+split([Char|Rest], Comp, Components, OsType) when is_integer(Char) ->
+    split(Rest, [Char|Comp], Components, OsType);
+split([], [], Components, _OsType) ->
+    lists:reverse(Components);
+split([], Comp, Components, OsType) ->
+    split([], [], [lists:reverse(Comp)|Components], OsType).

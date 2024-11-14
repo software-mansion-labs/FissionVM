@@ -62,6 +62,7 @@ set(ERLANG_MODULES
     elixir_dispatch
     elixir_expand
     elixir_map
+    elixir_def
     elixir_parser.yrl
     elixir_import
     elixir_bistring
@@ -93,6 +94,7 @@ set(ERLANG_MODULES
     orddict
     ordsets
     otp_internal
+    os
     logger
     logger_std_h
     proplists
