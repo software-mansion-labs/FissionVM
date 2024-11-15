@@ -66,6 +66,7 @@ set(ERLANG_MODULES
     elixir_overridable
     elixir_parser.yrl
     elixir_import
+    elixir_locals
     elixir_bitstring
     erl_scan
     erts_debug
