@@ -91,6 +91,8 @@ set(ELIXIR_MODULES
     String.Chars.Float
     String.Chars.Integer
     String.Chars.List
+
+    Module.LocalsTracker
 )
 
 pack_archive(exavmlib ${ELIXIR_MODULES})
