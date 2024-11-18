@@ -3356,9 +3356,9 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
     const char *to_replace_data = term_binary_data(to_replace);
     const char *replacement_data = term_binary_data(replacement);
 
-    size_t new_size = 0;
+    size_t new_size = 0, i;
 
-    for (size_t i = 0; i <= bin_size - to_replace_size;) {
+    for (i = 0; i <= bin_size - to_replace_size;) {
         if (memcmp(bin_data + i, to_replace_data, to_replace_size) == 0) {
             new_size += replacement_size;
             i += to_replace_size;
@@ -3366,14 +3366,13 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
                 new_size += bin_size - i;
                 break;
             }
-        } else if (i == bin_size - to_replace_size) {
-            new_size += to_replace_size;
-            ++i;
         } else {
             ++new_size;
             ++i;
         }
     }
+    
+    new_size += bin_size - i;
 
     char *result_data = malloc(new_size);
     if (UNLIKELY(IS_NULL_PTR(result_data))) {
