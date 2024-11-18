@@ -3366,6 +3366,9 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
                 new_size += bin_size - i;
                 break;
             }
+        } else if (i == bin_size - to_replace_size) {
+            new_size += to_replace_size;
+            ++i;
         } else {
             ++new_size;
             ++i;
@@ -3398,7 +3401,8 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
 
     term result_binary = term_nil();
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, result_index, 1, &result_binary, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    size_t size_binary = term_binary_data_size_in_terms(new_size);
+    if (UNLIKELY(memory_ensure_free_opt(ctx, size_binary, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
