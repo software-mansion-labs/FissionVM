@@ -68,6 +68,7 @@ set(ERLANG_MODULES
     elixir_import
     elixir_locals
     elixir_bitstring
+    elixir_errors
     erl_scan
     erts_debug
     erts_internal
