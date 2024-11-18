@@ -132,6 +132,11 @@ if (ADVANCED_TRACING)
     target_compile_definitions(libAtomVM PUBLIC ENABLE_ADVANCED_TRACE)
 endif()
 
+if(ENABLE_ASAN)
+    target_compile_options(libAtomVM PUBLIC -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(libAtomVM PUBLIC -fsanitize=address)
+endif()
+
 target_link_libraries(libAtomVM PUBLIC m)
 include(CheckCSourceCompiles)
 set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -Werror=unknown-pragmas")
