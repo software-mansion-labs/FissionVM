@@ -123,7 +123,7 @@ split(_Binary, _Pattern, _Option) ->
 %% @param   Binary      binary where the replacements should occur
 %% @param   Pattern     binary pattern which is to be replaced
 %% @param   Replacement binary which will replace the pattern
-%% @return  binary      resulting binary after replacements
+%% @return  resulting binary after replacements
 %% @doc     Replaces first occurrence of Pattern in Binary with Replacement.
 %%          If Pattern is not found, returns the original binary unchanged.
 %%          Pattern and Replacement must be binaries.
@@ -138,7 +138,7 @@ replace(_Binary, _Pattern, _Replacement) ->
 %% @param   Pattern     binary pattern which is to be replaced
 %% @param   Replacement binary which will replace the pattern
 %% @param   Options     list of options for the replacement operations.
-%% @return  binary      resulting binary after replacements
+%% @return  resulting binary after replacements
 %% @doc     Replaces occurrences of Pattern in Binary with Replacement.
 %%          If Options includes `global`, replaces all occurrences; otherwise, replaces just the first occurrence.
 %%          If Pattern is not found, returns the original binary unchanged.

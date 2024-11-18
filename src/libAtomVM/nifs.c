@@ -3340,9 +3340,13 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
     VALIDATE_VALUE(to_replace, term_is_binary);
     VALIDATE_VALUE(replacement, term_is_binary);
 
-    int bin_size = term_binary_size(bin_term);
-    int to_replace_size = term_binary_size(to_replace);
-    int replacement_size = term_binary_size(replacement);
+    size_t bin_size = term_binary_size(bin_term);
+    size_t to_replace_size = term_binary_size(to_replace);
+    size_t replacement_size = term_binary_size(replacement);
+
+    if (bin_size < to_replace_size) {
+        return bin_term;
+    }
 
     if (UNLIKELY(to_replace_size == 0)) {
         RAISE_ERROR(BADARG_ATOM);
@@ -3352,27 +3356,28 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
     const char *to_replace_data = term_binary_data(to_replace);
     const char *replacement_data = term_binary_data(replacement);
 
-    int index = 0, new_size = 0;
+    size_t new_size = 0;
 
-    while (index <= bin_size - to_replace_size) {
-        if (memcmp(bin_data + index, to_replace_data, to_replace_size) == 0) {
+    for (size_t i = 0; i <= bin_size - to_replace_size;) {
+        if (memcmp(bin_data + i, to_replace_data, to_replace_size) == 0) {
             new_size += replacement_size;
-            index += to_replace_size;
-            if (!global) { // If not global, count first occurrence only
+            i += to_replace_size;
+            if (!global) {
+                new_size += bin_size - i;
                 break;
             }
         } else {
-            new_size += sizeof(bin_data[index]);
-            index++;
+            ++new_size;
+            ++i;
         }
     }
 
-    char *result_data = (char *) malloc(new_size);
-    if (!result_data) {
+    char *result_data = malloc(new_size);
+    if (UNLIKELY(IS_NULL_PTR(result_data))) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    int current_bin_index = 0, result_index = 0;
+    size_t current_bin_index = 0, result_index = 0;
 
     while (current_bin_index <= bin_size - to_replace_size) {
         if (memcmp(bin_data + current_bin_index, to_replace_data, to_replace_size) == 0) {
@@ -3391,7 +3396,13 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
         result_data[result_index++] = bin_data[current_bin_index++];
     }
 
-    term result_binary = term_from_literal_binary(result_data, result_index, &ctx->heap, ctx->global);
+    term result_binary = term_nil();
+
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, result_index, 1, &result_binary, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    result_binary = term_from_literal_binary(result_data, result_index, &ctx->heap, ctx->global);
     free(result_data);
     return result_binary;
 }

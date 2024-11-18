@@ -31,6 +31,8 @@ test_basic_replace() ->
     <<"barbar">> = binary:replace(<<"foobar">>, <<"foo">>, <<"bar">>),
     <<"foooobar">> = binary:replace(<<"foobar">>, <<"o">>, <<"ooo">>),
     <<"fobar">> = binary:replace(<<"foobar">>, <<"oo">>, <<"o">>),
+    <<"o">> = binary:replace(<<"o">>, <<"foobar">>, <<"o">>),
+    <<"foobar">> = binary:replace(<<"o">>, <<"o">>, <<"foobar">>),
     <<"fobar">> = binary:replace(<<"foobar">>, <<"oo">>, <<"o">>, []),
     ok.
 
