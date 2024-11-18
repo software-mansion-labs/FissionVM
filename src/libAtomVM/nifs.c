@@ -5566,7 +5566,7 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    term *cons = malloc(len * sizeof(term_get_list_head));
+    term *cons = malloc(len * sizeof(term));
     if (UNLIKELY(IS_NULL_PTR(cons))) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
