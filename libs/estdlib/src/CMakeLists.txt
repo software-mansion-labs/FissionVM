@@ -61,6 +61,7 @@ set(ERLANG_MODULES
     elixir_quote
     elixir_dispatch
     elixir_expand
+    elixir_code_server
     elixir_map
     elixir_def
     elixir_overridable
