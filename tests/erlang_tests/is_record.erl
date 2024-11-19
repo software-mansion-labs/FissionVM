@@ -20,19 +20,27 @@
 
 -module(is_record).
 
--export([start/0]).
+-export([start/0, get_person/0, get_foo/0]).
 
 start() ->
     ok = test_is_record(),
     ok.
 
+get_person() ->
+    person.
+
+get_foo() -> foo.
+
+-record(person, {id, name, age}).
 
 test_is_record() ->
-    Person = person,
-    Foo = foo,
-    true = erlang:is_record({Person , 1 , 2 ,3 ,4}, Person),
+    Person = ?MODULE:get_person(),
+    Foo = ?MODULE:get_foo(),
+    Mike = #person{id = 1, name = "Mike", age = 32},
+    true = erlang:is_record({Person, 1, 2, 3, 4}, Person),
     true = erlang:is_record({person}, Person),
+    true = erlang:is_record(Mike, Person),
+    false = erlang:is_record(Mike, Foo),
     false = erlang:is_record([], Person),
-    false = erlang:is_record({person, 1 ,2 ,3}, Foo),
+    false = erlang:is_record({person, 1, 2, 3}, Foo),
     ok.
-

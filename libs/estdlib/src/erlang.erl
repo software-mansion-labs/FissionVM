@@ -402,14 +402,13 @@ is_map(_Map) ->
 %%-----------------------------------------------------------------------------
 %% @param   Term  tuple to check if its record.
 %% @param   RecordTag    atom to check if is the first element of tuple
-%% @returns Returns true if Term is a tuple and its first element is RecordTag. Otherwise returns false.
 %% @doc     Returns true if Term is a tuple and its first element is RecordTag. Otherwise returns false.
 %%
 %% This function may be used in a guard expression.
 %% @end
 %%-----------------------------------------------------------------------------
--spec is_record(Term :: tuple(), RecordTag :: atom()) -> boolean().
-is_record(_ , _) ->
+-spec is_record(Term :: term(), RecordTag :: atom()) -> boolean().
+is_record(_Term, _RecordTag) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
