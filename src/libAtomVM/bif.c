@@ -197,6 +197,22 @@ term bif_erlang_is_tuple_1(Context *ctx, uint32_t fail_label, term arg1)
     return term_is_tuple(arg1) ? TRUE_ATOM : FALSE_ATOM;
 }
 
+term bif_erlang_is_record(Context *ctx, uint32_t fail_label, term arg1, term arg2)
+{
+    if (!term_is_tuple(arg1) || !term_is_atom(arg2) || term_get_tuple_arity(arg1) < 1) {
+        return FALSE_ATOM;
+    }
+
+    term elem = term_get_tuple_element(arg1, 0);
+
+    TermCompareResult cmp_result = term_compare(elem, arg2, TermCompareExact, ctx->global);
+
+    if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+        RAISE_ERROR_BIF(fail_label, OUT_OF_MEMORY_ATOM);
+    }
+    return cmp_result == TermEquals ? TRUE_ATOM : FALSE_ATOM;
+}
+
 term bif_erlang_is_map_1(Context *ctx, uint32_t fail_label, term arg1)
 {
     UNUSED(ctx);
