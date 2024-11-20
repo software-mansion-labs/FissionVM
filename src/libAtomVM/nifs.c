@@ -3363,7 +3363,6 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
             new_size += replacement_size;
             i += to_replace_size;
             if (!global) {
-                new_size += bin_size - i;
                 break;
             }
         } else {
