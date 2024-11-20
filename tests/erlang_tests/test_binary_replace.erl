@@ -30,6 +30,9 @@ start() ->
 test_basic_replace() ->
     <<"barbar">> = binary:replace(<<"foobar">>, <<"foo">>, <<"bar">>),
     <<"foooobar">> = binary:replace(<<"foobar">>, <<"o">>, <<"ooo">>),
+    <<"">> = binary:replace(<<"foobar">>, <<"foobar">>, <<"">>),
+    <<"foobar">> = binary:replace(<<"o">>, <<"o">>, <<"foobar">>),
+    <<"fof">> = binary:replace(<<"foobar">>, <<"obar">>, <<"f">>),
     <<"fobar">> = binary:replace(<<"foobar">>, <<"oo">>, <<"o">>),
     <<"o">> = binary:replace(<<"o">>, <<"foobar">>, <<"o">>),
     <<"foobar">> = binary:replace(<<"o">>, <<"o">>, <<"foobar">>),
@@ -39,4 +42,6 @@ test_basic_replace() ->
 test_global_replace() ->
     <<"foobar">> = binary:replace(<<"foooobar">>, <<"oo">>, <<"o">>, [global]),
     <<"foooobar">> = binary:replace(<<"foobar">>, <<"o">>, <<"oo">>, [global]),
+    <<"">> = binary:replace(<<"foofoo">>, <<"foo">>, <<"">>, [global]),
+    <<"foofoo">> = binary:replace(<<"oo">>, <<"o">>, <<"foo">>, [global]),
     ok.

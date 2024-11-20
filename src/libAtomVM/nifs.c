@@ -3316,7 +3316,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 static term nif_binary_replace(Context *ctx, int argc, term argv[])
 {
     term bin_term = argv[0];
-    term to_replace = argv[1];
+    term pattern = argv[1];
     term replacement = argv[2];
     bool global = false;
 
@@ -3337,41 +3337,38 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
     }
 
     VALIDATE_VALUE(bin_term, term_is_binary);
-    VALIDATE_VALUE(to_replace, term_is_binary);
+    VALIDATE_VALUE(pattern, term_is_binary);
     VALIDATE_VALUE(replacement, term_is_binary);
 
     size_t bin_size = term_binary_size(bin_term);
-    size_t to_replace_size = term_binary_size(to_replace);
+    size_t pattern_size = term_binary_size(pattern);
     size_t replacement_size = term_binary_size(replacement);
 
-    if (bin_size < to_replace_size) {
+    if (bin_size < pattern_size) {
         return bin_term;
     }
 
-    if (UNLIKELY(to_replace_size == 0)) {
+    if (UNLIKELY(pattern_size == 0)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
     const char *bin_data = term_binary_data(bin_term);
-    const char *to_replace_data = term_binary_data(to_replace);
+    const char *pattern_data = term_binary_data(pattern);
     const char *replacement_data = term_binary_data(replacement);
 
-    size_t new_size = 0, i;
-
-    for (i = 0; i <= bin_size - to_replace_size;) {
-        if (memcmp(bin_data + i, to_replace_data, to_replace_size) == 0) {
-            new_size += replacement_size;
-            i += to_replace_size;
+    int n = 0;
+    for (size_t i = 0; i < bin_size - pattern_size + 1;) {
+        bool found = memcmp(bin_data + i, pattern_data, pattern_size) == 0;
+        if (found) {
+            ++n;
             if (!global) {
                 break;
             }
-        } else {
-            ++new_size;
-            ++i;
         }
+
+        i += found ? pattern_size : 1;
     }
-    
-    new_size += bin_size - i;
+    size_t new_size = bin_size + n * (replacement_size - pattern_size);
 
     char *result_data = malloc(new_size);
     if (UNLIKELY(IS_NULL_PTR(result_data))) {
@@ -3380,11 +3377,11 @@ static term nif_binary_replace(Context *ctx, int argc, term argv[])
 
     size_t current_bin_index = 0, result_index = 0;
 
-    while (current_bin_index <= bin_size - to_replace_size) {
-        if (memcmp(bin_data + current_bin_index, to_replace_data, to_replace_size) == 0) {
+    while (current_bin_index <= bin_size - pattern_size) {
+        if (memcmp(bin_data + current_bin_index, pattern_data, pattern_size) == 0) {
             memcpy(result_data + result_index, replacement_data, replacement_size);
             result_index += replacement_size;
-            current_bin_index += to_replace_size;
+            current_bin_index += pattern_size;
             if (!global) {
                 break;
             }

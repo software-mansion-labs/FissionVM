@@ -147,7 +147,7 @@ replace(_Binary, _Pattern, _Replacement) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec replace(
-    Binary :: binary(), Pattern :: binary(), Replacement :: binary(), Options :: [global]
+    Binary :: binary(), Pattern :: binary(), Replacement :: binary(), Options :: [global] | []
 ) -> binary().
 replace(_Binary, _Pattern, _Replacement, _Options) ->
     erlang:nif_error(undefined).
