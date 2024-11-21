@@ -25,7 +25,7 @@
 start() ->
     ok = test_basic_replace(),
     ok = test_global_replace(),
-    ok.
+    0.
 
 test_basic_replace() ->
     <<"barbar">> = binary:replace(<<"foobar">>, <<"foo">>, <<"bar">>),
