@@ -95,6 +95,7 @@ static term nif_binary_first_1(Context *ctx, int argc, term argv[]);
 static term nif_binary_last_1(Context *ctx, int argc, term argv[]);
 static term nif_binary_part_3(Context *ctx, int argc, term argv[]);
 static term nif_binary_split(Context *ctx, int argc, term argv[]);
+static term nif_binary_replace(Context *ctx, int argc, term argv[]);
 static term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_delete_element_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_atom_to_binary(Context *ctx, int argc, term argv[]);
@@ -260,6 +261,12 @@ static const struct Nif binary_split_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_split
+};
+
+static const struct Nif binary_replace_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_binary_replace
 };
 
 static const struct Nif make_ref_nif =
@@ -3304,6 +3311,99 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     } while (!term_is_nil(list_cursor));
 
     return result_list;
+}
+
+static term nif_binary_replace(Context *ctx, int argc, term argv[])
+{
+    term bin_term = argv[0];
+    term pattern = argv[1];
+    term replacement = argv[2];
+    bool global = false;
+
+    if (argc == 4 && !term_is_nil(argv[3])) {
+        term options = argv[3];
+        if (UNLIKELY(!term_is_list(options))) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
+        term head = term_get_list_head(options);
+        term tail = term_get_list_tail(options);
+        if (UNLIKELY(head != GLOBAL_ATOM)) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
+        if (UNLIKELY(!term_is_nil(tail))) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
+        global = true;
+    }
+
+    VALIDATE_VALUE(bin_term, term_is_binary);
+    VALIDATE_VALUE(pattern, term_is_binary);
+    VALIDATE_VALUE(replacement, term_is_binary);
+
+    size_t bin_size = term_binary_size(bin_term);
+    size_t pattern_size = term_binary_size(pattern);
+    size_t replacement_size = term_binary_size(replacement);
+
+    if (bin_size < pattern_size) {
+        return bin_term;
+    }
+
+    if (UNLIKELY(pattern_size == 0)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    const char *bin_data = term_binary_data(bin_term);
+    const char *pattern_data = term_binary_data(pattern);
+    const char *replacement_data = term_binary_data(replacement);
+
+    int n = 0;
+    for (size_t i = 0; i < bin_size - pattern_size + 1;) {
+        bool found = memcmp(bin_data + i, pattern_data, pattern_size) == 0;
+        if (found) {
+            ++n;
+            if (!global) {
+                break;
+            }
+        }
+
+        i += found ? pattern_size : 1;
+    }
+    size_t new_size = bin_size + n * (replacement_size - pattern_size);
+
+    char *result_data = malloc(new_size);
+    if (UNLIKELY(IS_NULL_PTR(result_data))) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    size_t current_bin_index = 0, result_index = 0;
+
+    while (current_bin_index <= bin_size - pattern_size) {
+        if (memcmp(bin_data + current_bin_index, pattern_data, pattern_size) == 0) {
+            memcpy(result_data + result_index, replacement_data, replacement_size);
+            result_index += replacement_size;
+            current_bin_index += pattern_size;
+            if (!global) {
+                break;
+            }
+        } else {
+            result_data[result_index++] = bin_data[current_bin_index++];
+        }
+    }
+
+    while (current_bin_index < bin_size) {
+        result_data[result_index++] = bin_data[current_bin_index++];
+    }
+
+    term result_binary = term_nil();
+
+    size_t size_binary = term_binary_data_size_in_terms(new_size);
+    if (UNLIKELY(memory_ensure_free_opt(ctx, size_binary, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    result_binary = term_from_literal_binary(result_data, result_index, &ctx->heap, ctx->global);
+    free(result_data);
+    return result_binary;
 }
 
 static term nif_erlang_throw(Context *ctx, int argc, term argv[])
