@@ -27,6 +27,7 @@
 #include "defaultatoms.h"
 #include "dictionary.h"
 #include "overflow_helpers.h"
+#include "smp.h"
 #include "term.h"
 #include "trace.h"
 #include "utils.h"
@@ -354,6 +355,136 @@ term bif_erlang_map_get_2(Context *ctx, uint32_t fail_label, term arg1, term arg
         RAISE_ERROR_BIF(fail_label, OUT_OF_MEMORY_ATOM);
     }
     return term_get_map_value(arg2, pos);
+}
+
+#ifndef AVM_NO_SMP
+
+static int64_t get_unique_monotonic_integer()
+{
+#if ATOMIC_LLONG_LOCK_FREE == 2
+    static int64_t ATOMIC unique = 0;
+#else
+    static int64_t unique = 0;
+    static SpinLock unique_spinlock;
+#endif
+
+    if (UNLIKELY(unique == INT64_MAX)) {
+        AVM_ABORT();
+    }
+#if ATOMIC_LLONG_LOCK_FREE == 2
+    return unique++;
+#else
+    smp_spinlock_lock(unique_spinlock);
+    int64_t value = unique++;
+    smp_spinlock_unlock(unique_spinlock);
+    return value;
+#endif
+}
+
+// scheduler_id is 4 bits
+#define MAX_SCHEDULERS 16
+#define UNIQUE_MASK ~(((1ULL << 4) - 1) << 60)
+#define UNIQUE_POSITIVE_MASK ~(((1ULL << 5) - 1) << 59)
+
+inline static bool counter_overflow(int64_t value, bool positive)
+{
+    int64_t mask = positive ? UNIQUE_POSITIVE_MASK : UNIQUE_MASK;
+    return (value & mask) == 0;
+}
+
+inline static int64_t make_unique_integer(int64_t unique, size_t scheduler_id)
+{
+    return unique << 4 | scheduler_id;
+}
+
+inline static int64_t read_counter(int64_t data)
+{
+    return data >> 4;
+}
+
+static int64_t get_unique_integer(size_t scheduler_id, bool positive)
+{
+    static int64_t unique_data[MAX_SCHEDULERS] = { 0 };
+
+    if (UNLIKELY(scheduler_id >= MAX_SCHEDULERS)) {
+        AVM_ABORT();
+    }
+
+    int64_t counter = read_counter(unique_data[scheduler_id]);
+    if (UNLIKELY(counter_overflow(counter + 1, positive))) {
+        AVM_ABORT();
+    }
+    unique_data[scheduler_id] = make_unique_integer(counter + 1, scheduler_id);
+
+    return unique_data[scheduler_id];
+}
+
+#else
+static int64_t get_unique_monotonic_integer()
+{
+    static int64_t unique = 0;
+
+    if (UNLIKELY(unique == INT64_MAX)) {
+        AVM_ABORT();
+    }
+    return unique++;
+}
+
+static int64_t get_unique_integer(size_t scheduler_id, bool positive)
+{
+    static int64_t unique = 0;
+
+    UNUSED(scheduler_id);
+    UNUSED(positive);
+
+    if (UNLIKELY(unique == INT64_MAX)) {
+        AVM_ABORT();
+    }
+    return unique++;
+}
+#endif
+
+term bif_erlang_unique_integer_0(Context *ctx)
+{
+    int64_t value = get_unique_integer(ctx->scheduler_id, false);
+
+    return term_make_maybe_boxed_int64(value, &ctx->heap);
+}
+
+term bif_erlang_unique_integer_1(Context *ctx, uint32_t fail_label, term arg1)
+{
+    int proper = 0;
+    if (UNLIKELY(!term_is_list(arg1))) {
+        RAISE_ERROR_BIF(fail_label, BADARG_ATOM);
+    }
+    size_t _len = term_list_length(arg1, &proper);
+    UNUSED(_len);
+    if (UNLIKELY(!proper)) {
+        RAISE_ERROR_BIF(fail_label, BADARG_ATOM);
+    }
+
+    bool positive = false;
+    bool monotonic = false;
+    while (term_is_nil(arg1)) {
+        term option = term_get_list_head(arg1);
+
+        if (option == MONOTONIC_ATOM) {
+            monotonic = true;
+        } else if (option == POSITIVE_ATOM) {
+            positive = true;
+        }
+
+        arg1 = term_get_list_tail(arg1);
+    }
+
+    int64_t value;
+    if (monotonic) {
+        value = get_unique_monotonic_integer();
+    } else {
+        value = get_unique_integer(ctx->scheduler_id, positive);
+    }
+
+    return term_make_maybe_boxed_int64(value, &ctx->heap);
 }
 
 static inline term make_boxed_int(Context *ctx, uint32_t fail_label, uint32_t live, avm_int_t value)
