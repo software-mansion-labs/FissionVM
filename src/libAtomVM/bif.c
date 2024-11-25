@@ -55,6 +55,11 @@
         RAISE_ERROR_BIF(fail_label, BADARG_ATOM);              \
     }
 
+#define SCHEDULER_ID_BITS 4
+#define MAX_SCHEDULERS 16
+#define UNIQUE_MASK ((1ULL << (64 - SCHEDULER_ID_BITS)) - 1)
+#define UNIQUE_POSITIVE_MASK ((1ULL << (64 - SCHEDULER_ID_BITS - 1)) - 1)
+
 const struct ExportedFunction *bif_registry_get_handler(AtomString module, AtomString function, int arity)
 {
     char bifname[MAX_BIF_NAME_LEN];
@@ -359,32 +364,32 @@ term bif_erlang_map_get_2(Context *ctx, uint32_t fail_label, term arg1, term arg
 
 #ifndef AVM_NO_SMP
 
-static int64_t get_unique_monotonic_integer()
-{
 #if ATOMIC_LLONG_LOCK_FREE == 2
+static int64_t get_unique_monotonic_integer(void)
+{
     static int64_t ATOMIC unique = 0;
-#else
-    static int64_t unique = 0;
-    static SpinLock unique_spinlock;
-#endif
 
     if (UNLIKELY(unique == INT64_MAX)) {
         AVM_ABORT();
     }
-#if ATOMIC_LLONG_LOCK_FREE == 2
     return unique++;
+}
 #else
+static int64_t get_unique_monotonic_integer(void)
+{
+    static int64_t unique = 0;
+    static SpinLock unique_spinlock;
+
+    if (UNLIKELY(unique == INT64_MAX)) {
+        AVM_ABORT();
+    }
+
     smp_spinlock_lock(unique_spinlock);
     int64_t value = unique++;
     smp_spinlock_unlock(unique_spinlock);
     return value;
-#endif
 }
-
-// scheduler_id is 4 bits
-#define MAX_SCHEDULERS 16
-#define UNIQUE_MASK ~(((1ULL << 4) - 1) << 60)
-#define UNIQUE_POSITIVE_MASK ~(((1ULL << 5) - 1) << 59)
+#endif
 
 inline static bool counter_overflow(int64_t value, bool positive)
 {
@@ -411,6 +416,8 @@ static int64_t get_unique_integer(size_t scheduler_id, bool positive)
     }
 
     int64_t counter = read_counter(unique_data[scheduler_id]);
+    // counter is shared between positive and negative values, positive is
+    // exhausted first
     if (UNLIKELY(counter_overflow(counter + 1, positive))) {
         AVM_ABORT();
     }
@@ -420,7 +427,7 @@ static int64_t get_unique_integer(size_t scheduler_id, bool positive)
 }
 
 #else
-static int64_t get_unique_monotonic_integer()
+static int64_t get_unique_monotonic_integer(void)
 {
     static int64_t unique = 0;
 
