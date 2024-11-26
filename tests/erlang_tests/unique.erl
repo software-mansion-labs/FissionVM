@@ -27,6 +27,7 @@ start() ->
     ok = unique_positive(),
     ok = unique_monotonic(),
     ok = unique_positive_monotonic(),
+    ok = unique_monotonic_processes(),
 
     Self = self(),
     N = length([
@@ -37,13 +38,6 @@ start() ->
     ]),
     receive_messages(N),
     0.
-
-receive_messages(0) ->
-    ok;
-receive_messages(N) ->
-    receive
-        _Msg -> receive_messages(N - 1)
-    end.
 
 unique_0() ->
     A = erlang:unique_integer(),
@@ -76,3 +70,47 @@ unique_positive_monotonic() ->
     Valid = (A > 0) and (A < B) and (B < C),
     true = Valid,
     ok.
+
+unique_monotonic_processes() ->
+    Self = self(),
+    spawn_opt(
+        fun() ->
+            n_times(50, fun() -> Self ! {a, erlang:unique_integer([monotonic])} end)
+        end,
+        []
+    ),
+    spawn_opt(
+        fun() ->
+            n_times(100, fun() -> Self ! {b, erlang:unique_integer([monotonic])} end)
+        end,
+        []
+    ),
+    Msgs = receive_messages(150),
+    NumA = [Num || {a, Num} <- Msgs],
+    NumB = [Num || {b, Num} <- Msgs],
+    true = increasing(NumA),
+    true = increasing(NumB),
+    ok.
+
+receive_messages(N) ->
+    receive_messages(N, []).
+receive_messages(0, Msgs) ->
+    reverse(Msgs);
+receive_messages(N, Msgs) ->
+    receive
+        Msg -> receive_messages(N - 1, [Msg | Msgs])
+    end.
+
+reverse(List) -> reverse(List, []).
+reverse([], Acc) -> Acc;
+reverse([H | T], Acc) -> reverse(T, [H | Acc]).
+
+n_times(0, _F) ->
+    ok;
+n_times(N, F) ->
+    F(),
+    n_times(N - 1, F).
+
+increasing([_]) -> true;
+increasing([A, B | T]) when A < B -> increasing([B | T]);
+increasing(_) -> false.
