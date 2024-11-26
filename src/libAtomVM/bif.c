@@ -362,7 +362,30 @@ term bif_erlang_map_get_2(Context *ctx, uint32_t fail_label, term arg1, term arg
     return term_get_map_value(arg2, pos);
 }
 
-#ifndef AVM_NO_SMP
+#ifdef AVM_NO_SMP
+static int64_t get_unique_monotonic_integer(void)
+{
+    static int64_t unique = 0;
+
+    if (UNLIKELY(unique == INT64_MAX)) {
+        AVM_ABORT();
+    }
+    return unique++;
+}
+
+static int64_t get_unique_integer(size_t scheduler_id, bool positive)
+{
+    static int64_t unique = 0;
+
+    UNUSED(scheduler_id);
+    UNUSED(positive);
+
+    if (UNLIKELY(unique == INT64_MAX)) {
+        AVM_ABORT();
+    }
+    return unique++;
+}
+#else
 
 #if ATOMIC_LLONG_LOCK_FREE == 2
 static int64_t get_unique_monotonic_integer(void)
@@ -426,29 +449,6 @@ static int64_t get_unique_integer(size_t scheduler_id, bool positive)
     return unique_data[scheduler_id];
 }
 
-#else
-static int64_t get_unique_monotonic_integer(void)
-{
-    static int64_t unique = 0;
-
-    if (UNLIKELY(unique == INT64_MAX)) {
-        AVM_ABORT();
-    }
-    return unique++;
-}
-
-static int64_t get_unique_integer(size_t scheduler_id, bool positive)
-{
-    static int64_t unique = 0;
-
-    UNUSED(scheduler_id);
-    UNUSED(positive);
-
-    if (UNLIKELY(unique == INT64_MAX)) {
-        AVM_ABORT();
-    }
-    return unique++;
-}
 #endif
 
 term bif_erlang_unique_integer_0(Context *ctx)
@@ -472,7 +472,7 @@ term bif_erlang_unique_integer_1(Context *ctx, uint32_t fail_label, term arg1)
 
     bool positive = false;
     bool monotonic = false;
-    while (term_is_nil(arg1)) {
+    while (!term_is_nil(arg1)) {
         term option = term_get_list_head(arg1);
 
         if (option == MONOTONIC_ATOM) {
