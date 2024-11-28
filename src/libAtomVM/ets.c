@@ -546,7 +546,7 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
     }
     int arity = term_get_tuple_arity(to_insert);
     int position = term_to_int(position_term) - 1;
-    if (arity < position || position < 1) {
+    if (arity <= position || position < 1) {
         SMP_UNLOCK(ets_table);
         return EtsBadEntry;
     }
