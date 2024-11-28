@@ -354,6 +354,8 @@ test_lookup_element() ->
     true = ets:insert(Tid, {foo, tapas}),
     foo = ets:lookup_element(Tid, foo, 1),
     tapas = ets:lookup_element(Tid, foo, 2),
+    tapas = ets:lookup_element(Tid, foo, 2, batat),
+    batat = ets:lookup_element(Tid, bar, 1, batat),
     expect_failure(fun() -> ets:lookup_element(Tid, bar, 1) end),
     expect_failure(fun() -> ets:lookup_element(Tid, foo, 3) end),
     expect_failure(fun() -> ets:lookup_element(Tid, foo, 0) end),
