@@ -376,29 +376,88 @@ EtsErrorCode ets_lookup_element(term ref, term key, size_t pos, term *ret, Conte
 
     return EtsOk;
 }
-EtsErrorCode ets_insert_new(term ref, term tuple, term *ret, Context *ctx)
-{
-    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
-    if (ets_table == NULL) {
-        return EtsTableNotFound;
-    }
 
+EtsErrorCode ets_insert_new_tuple(struct EtsTable *ets_table, term tuple, term *ret, Context *ctx)
+{
+    if (ets_table->access_type == EtsAccessPrivate && ets_table->owner_process_id != ctx->process_id) {
+        return EtsPermissionDenied;
+    }
     term key = term_get_tuple_element(tuple, 0);
     term list = term_invalid_term();
     EtsErrorCode result = ets_table_lookup(ets_table, key, &list, ctx);
     if (result != EtsOk) {
-        SMP_UNLOCK(ets_table);
         return result;
     }
     if (!term_is_nil(list)) {
         *ret = FALSE_ATOM;
-        SMP_UNLOCK(ets_table);
         return EtsOk;
     }
 
     result = ets_table_insert(ets_table, tuple, ctx);
     if (result == EtsOk) {
         *ret = TRUE_ATOM;
+    }
+
+    return result;
+}
+
+EtsErrorCode ets_insert_new_list(struct EtsTable *ets_table, term list, term *ret, Context *ctx)
+{
+    if (ets_table->access_type == EtsAccessPrivate && ets_table->owner_process_id != ctx->process_id) {
+        return EtsPermissionDenied;
+    }
+    term elem = list;
+    while (term_is_nonempty_list(elem)) {
+        term tuple = term_get_list_head(elem);
+
+        if (!term_is_tuple(tuple) || term_get_tuple_arity(tuple) < 1) {
+            return EtsBadEntry;
+        }
+
+        term key = term_get_tuple_element(tuple, 0);
+        term res = term_invalid_term();
+        EtsErrorCode result = ets_table_lookup(ets_table, key, &res, ctx);
+        if (result != EtsOk) {
+            return result;
+        }
+        if (!term_is_nil(res)) {
+            *ret = FALSE_ATOM;
+            return EtsOk;
+        }
+
+        elem = term_get_list_tail(elem);
+    }
+
+    term to_insert = list;
+
+    while (term_is_nonempty_list(to_insert)) {
+        term tuple = term_get_list_head(to_insert);
+        EtsErrorCode result = ets_table_insert(ets_table, tuple, ctx);
+        if (result != EtsOk) {
+            AVM_ABORT(); // Abort because operation might not be atomic.
+            return result;
+        }
+
+        to_insert = term_get_list_tail(to_insert);
+    }
+
+    *ret = TRUE_ATOM;
+    SMP_UNLOCK(ets_table);
+    return EtsOk;
+}
+
+EtsErrorCode ets_insert_new(term ref, term to_insert, term *ret, Context *ctx)
+{
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
+    if (ets_table == NULL) {
+        return EtsTableNotFound;
+    }
+    EtsErrorCode result = EtsBadEntry; // Raises badarg if to_insert is neither tuple nor list
+
+    if (term_is_tuple(to_insert) && term_get_tuple_arity(to_insert) > 0) {
+        result = ets_insert_new_tuple(ets_table, to_insert, ret, ctx);
+    } else if (term_is_list(to_insert)) {
+        result = ets_insert_new_list(ets_table, to_insert, ret, ctx);
     }
     SMP_UNLOCK(ets_table);
     return result;
