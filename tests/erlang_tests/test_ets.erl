@@ -365,6 +365,10 @@ test_insert_new() ->
     tapas = ets:lookup_element(Tid, foo, 2),
     false = ets:insert_new(Tid, {foo, tapas}),
     expect_failure(fun() -> ets:insert_new(Tid, {}) end),
+    true = ets:insert_new(Tid, [{tapas, tapas}, {batat, batat}, {parapet, parapet}]),
+    [{batat, batat}] = ets:lookup(Tid, batat),
+    false = ets:insert_new(Tid, [{tapas, tapas}, {batat, batat}, {foo, parapet}]),
+    expect_failure(fun() -> ets:insert_new(Tid, [{}, {}, {}]) end),
     ok.
 
 test_update_counter() ->

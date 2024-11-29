@@ -3584,14 +3584,10 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
     term ref = argv[0];
     VALIDATE_VALUE(ref, is_ets_table_id);
 
-    term tuple = argv[1];
-    VALIDATE_VALUE(tuple, term_is_tuple);
-    if (term_get_tuple_arity(tuple) < 1) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
-
+    term to_insert = argv[1];
     term ret = term_invalid_term();
-    EtsErrorCode result = ets_insert_new(ref, tuple, &ret, ctx);
+
+    EtsErrorCode result = ets_insert_new(ref, to_insert, &ret, ctx);
 
     switch (result) {
         case EtsOk:
