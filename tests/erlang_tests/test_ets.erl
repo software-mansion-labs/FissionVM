@@ -37,6 +37,7 @@ start() ->
     ok = test_delete_object(),
     ok = test_take(),
     ok = test_member(),
+    ok = test_insert_list(),
 
     0.
 
@@ -426,4 +427,11 @@ test_member() ->
     true = ets:insert(Tid, {foo, tapas}),
     true = ets:member(Tid, foo),
     false = ets:member(Tid, cow),
+    ok.
+
+test_insert_list() ->
+    Tid = ets:new(test_insert_list, []),
+    true = ets:insert(Tid, [{foo, tapas}, {batat, batat}, {patat, patat}]),
+    [{patat, patat}] = ets:lookup(Tid, patat),
+    [{batat, batat}] = ets:lookup(Tid, batat),
     ok.
