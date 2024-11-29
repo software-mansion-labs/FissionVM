@@ -435,14 +435,12 @@ EtsErrorCode ets_insert_new_list(struct EtsTable *ets_table, term list, term *re
         EtsErrorCode result = ets_table_insert(ets_table, tuple, ctx);
         if (result != EtsOk) {
             AVM_ABORT(); // Abort because operation might not be atomic.
-            return result;
         }
 
         to_insert = term_get_list_tail(to_insert);
     }
 
     *ret = TRUE_ATOM;
-    SMP_UNLOCK(ets_table);
     return EtsOk;
 }
 
