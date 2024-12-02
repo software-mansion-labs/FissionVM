@@ -285,14 +285,37 @@ EtsErrorCode ets_table_insert(struct EtsTable *ets_table, term entry, Context *c
     return result;
 }
 
+EtsErrorCode ets_table_insert_list(struct EtsTable *ets_table, term list, Context *ctx)
+{
+    while (term_is_nonempty_list(list)) {
+        term tuple = term_get_list_head(list);
+        if (!term_is_tuple(tuple) && term_get_tuple_arity(tuple) < 1) {
+            return EtsBadEntry;
+        }
+        EtsErrorCode result = ets_table_insert(ets_table, tuple, ctx);
+        if (result != EtsOk) {
+            AVM_ABORT(); // Abort because operation might not be atomic.
+        }
+
+        list = term_get_list_tail(list);
+    }
+
+    return EtsOk;
+}
+
 EtsErrorCode ets_insert(term ref, term entry, Context *ctx)
 {
     struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
     if (ets_table == NULL) {
         return EtsTableNotFound;
     }
+    EtsErrorCode result = EtsBadEntry;
 
-    EtsErrorCode result = ets_table_insert(ets_table, entry, ctx);
+    if (term_is_tuple(entry) && term_get_tuple_arity(entry) > 0) {
+        result = ets_table_insert(ets_table, entry, ctx);
+    } else if (term_is_list(entry)) {
+        result = ets_table_insert_list(ets_table, entry, ctx);
+    }
 
     SMP_UNLOCK(ets_table);
 
