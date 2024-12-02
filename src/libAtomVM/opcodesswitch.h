@@ -5252,13 +5252,14 @@ wait_timeout_trap_handler:
                 DECODE_LABEL(label, pc)
                 term arg1;
                 DECODE_COMPACT_TERM(arg1, pc)
-                unsigned int arity;
-                DECODE_INTEGER(arity, pc)
+                term arity_term;
+                DECODE_COMPACT_TERM(arity_term, pc)
 
                 #ifdef IMPL_EXECUTE_LOOP
-                    TRACE("is_function2/3, label=%i, arg1=%lx, arity=%i\n", label, arg1, arity);
+                TRACE("is_function2/3, label=%i, arg1=%lx, arity=%i\n", label, arg1, term_is_function(arg1) ? term_to_int(arity_term) : -1);
 
                     if (term_is_function(arg1)) {
+                        const uint32_t arity = term_to_int(arity_term);
                         const term *boxed_value = term_to_const_term_ptr(arg1);
 
                         Module *fun_module = (Module *) boxed_value[1];
