@@ -5751,11 +5751,12 @@ static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[])
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    unsigned int cwd_length = strlen(cwd);
+
+    if (UNLIKELY(memory_ensure_free_opt(ctx, cwd_length, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(cwd);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-    unsigned int cwd_length = strlen(cwd);
 
     term result = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
     free(cwd);
