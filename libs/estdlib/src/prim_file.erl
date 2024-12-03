@@ -19,15 +19,7 @@
 %
 -module(prim_file).
 
--export([get_cwd/0, get_cwd_nif/0]).
-
-get_cwd() ->
-    try get_cwd_nif() of
-        {ok, RawPath} -> {ok, RawPath};
-        {error, Reason} -> {error, Reason}
-    catch
-        error:badarg -> {error, badarg}
-    end.
+-export([get_cwd_nif/0]).
 
 get_cwd_nif() ->
     erlang:nif_error(undef).

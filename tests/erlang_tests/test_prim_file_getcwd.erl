@@ -23,11 +23,11 @@
 -export([start/0]).
 
 start() ->
-    ok = test_getcwd(),
+    ok = test_getcwd_nif(),
     0.
 
-test_getcwd() ->
-    Path = prim_file:get_cwd(),
+test_getcwd_nif() ->
+    Path = prim_file:get_cwd_nif(),
     true = is_valid_path(Path),
     ok.
 
