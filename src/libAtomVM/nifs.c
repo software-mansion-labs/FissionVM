@@ -31,6 +31,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <limits.h>
 
 #include "atom_table.h"
 #include "avm_version.h"
@@ -96,6 +98,7 @@ static term nif_binary_last_1(Context *ctx, int argc, term argv[]);
 static term nif_binary_part_3(Context *ctx, int argc, term argv[]);
 static term nif_binary_split(Context *ctx, int argc, term argv[]);
 static term nif_binary_replace(Context *ctx, int argc, term argv[]);
+static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[]);
 static term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_delete_element_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_atom_to_binary(Context *ctx, int argc, term argv[]);
@@ -267,6 +270,12 @@ static const struct Nif binary_replace_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_replace
+};
+
+static const struct Nif prim_file_getcwd_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_prim_file_getcwd
 };
 
 static const struct Nif make_ref_nif =
@@ -5724,6 +5733,32 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     }
 
     free(cons);
+    return result;
+}
+
+static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    UNUSED(argv)
+    const unsigned int size = PATH_MAX;
+    char *cwd = malloc(size);
+    if (UNLIKELY(IS_NULL_PTR(cwd))) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    if (getcwd(cwd, size) == NULL) {
+        free(cwd);
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        free(cwd);
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    unsigned int cwd_length = strlen(cwd);
+
+    term result = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
+    free(cwd);
     return result;
 }
 //

@@ -98,6 +98,7 @@ set(ERLANG_MODULES
     ordsets
     otp_internal
     os
+    prim_file
     logger
     logger_std_h
     proplists
