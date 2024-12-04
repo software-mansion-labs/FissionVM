@@ -5745,40 +5745,41 @@ static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[])
     if (UNLIKELY(IS_NULL_PTR(cwd))) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
+    term status_atom = UNDEFINED_ATOM;
+    term result = term_invalid_term();
 
-    if (UNLIKELY(getcwd(cwd, size) == NULL)) {
-        term error_tuple = term_alloc_tuple(2, &ctx->heap);
-        term reason = UNDEFINED_ATOM;
-        term_put_tuple_element(error_tuple, 0, ERROR_ATOM);
+    if (UNLIKELY(IS_NULL_PTR(getcwd(cwd, size)))) {
+        status_atom = ERROR_ATOM;
         switch (errno) {
             case EACCES:
-                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\x11", "permission_denied"));
+                result = globalcontext_make_atom(ctx->global, ATOM_STR("\x11", "permission_denied"));
                 break;
             case EINVAL:
-                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "negative_size"));
+                result = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "negative_size"));
                 break;
             case ERANGE:
-                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\x10", "buffer_too_small"));
+                result = globalcontext_make_atom(ctx->global, ATOM_STR("\x10", "buffer_too_small"));
                 break;
             default:
-                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "unknown_error"));
+                result = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "unknown_error"));
                 break;
         }
-        term_put_tuple_element(error_tuple, 1, reason);
-        free(cwd);
-        return error_tuple;
+    } else {
+        unsigned int cwd_length = strlen(cwd);
+        if (UNLIKELY(memory_ensure_free_opt(ctx, cwd_length, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            free(cwd);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+        status_atom = OK_ATOM;
+        result = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
     }
 
-    unsigned int cwd_length = strlen(cwd);
-
-    if (UNLIKELY(memory_ensure_free_opt(ctx, cwd_length, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        free(cwd);
+    if (UNLIKELY(memory_ensure_free(ctx, TUPLE_SIZE(2)) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    term result = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
     term result_tuple = term_alloc_tuple(2, &ctx->heap);
-    term_put_tuple_element(result_tuple, 0, OK_ATOM);
+    term_put_tuple_element(result_tuple, 0, status_atom);
     term_put_tuple_element(result_tuple, 1, result);
     free(cwd);
     return result_tuple;

@@ -19,7 +19,7 @@
 %
 -module(prim_file).
 
--export([get_cwd_nif/0]).
+-export([get_cwd/0]).
 
-get_cwd_nif() ->
+get_cwd() ->
     erlang:nif_error(undef).
