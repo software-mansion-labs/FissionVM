@@ -26,57 +26,10 @@ set(ERLANG_MODULES
     base64
     binary
     calendar
-    cerl_clauses
-    cerl_trees
-    cerl
     code
-    compile
-    core_lib
     crypto
-    persistent_term
-    erl_anno
-    erl_bifs
-    erl_bits
-    erl_error
-    erl_eval
-    erl_expand_records
-    erl_features
-    erl_internal
-    erl_lint
-    erl_parse.yrl
-    elixir_config
-    elixir_utils
-    elixir_tokenizer
-    elixir_interpolation
-    elixir_erl_var
-    elixir_fn
-    elixir_erl_pass
-    elixir_erl_try
-    elixir_erl_clauses
-    elixir_erl_for
-    elixir_sup
-    elixir_aliases
-    elixir_env
-    elixir_clauses
-    elixir_quote
-    elixir_dispatch
-    elixir_expand
-    elixir_code_server
-    elixir_map
-    elixir_def
-    elixir_overridable
-    elixir_parser.yrl
-    elixir_import
-    elixir_locals
-    elixir_bitstring
-    erl_scan
     erts_debug
-    erts_internal
     ets
-    eval_bits
-    file
-    filename
-    gb_sets
     gen_event
     gen_server
     gen_statem
@@ -94,24 +47,16 @@ set(ERLANG_MODULES
     maps
     math
     net
-    orddict
-    ordsets
-    otp_internal
-    os
     logger
     logger_std_h
     proplists
     queue
     sets
     socket
-    sofs
     ssl
     string
-    sys_core_fold
     timer
     unicode
-    unicode_util
-    v3_core
     erlang
 )
 
