@@ -5746,9 +5746,27 @@ static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[])
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    if (getcwd(cwd, size) == NULL) {
+    if (UNLIKELY(getcwd(cwd, size) == NULL)) {
+        term error_tuple = term_alloc_tuple(2, &ctx->heap);
+        term reason = UNDEFINED_ATOM;
+        term_put_tuple_element(error_tuple, 0, ERROR_ATOM);
+        switch (errno) {
+            case EACCES:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\x11", "permission_denied"));
+                break;
+            case EINVAL:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "negative_size"));
+                break;
+            case ERANGE:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\x10", "buffer_too_small"));
+                break;
+            default:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "unknown_error"));
+                break;
+        }
+        term_put_tuple_element(error_tuple, 1, reason);
         free(cwd);
-        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        return error_tuple;
     }
 
     unsigned int cwd_length = strlen(cwd);
@@ -5759,8 +5777,11 @@ static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[])
     }
 
     term result = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(result_tuple, 0, OK_ATOM);
+    term_put_tuple_element(result_tuple, 1, result);
     free(cwd);
-    return result;
+    return result_tuple;
 }
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math

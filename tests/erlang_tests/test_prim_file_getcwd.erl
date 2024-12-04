@@ -27,7 +27,7 @@ start() ->
     0.
 
 test_getcwd_nif() ->
-    Path = prim_file:get_cwd_nif(),
+    {ok, Path} = prim_file:get_cwd_nif(),
     true = is_valid_path(Path),
     ok.
 
