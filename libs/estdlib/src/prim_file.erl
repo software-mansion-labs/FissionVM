@@ -22,4 +22,4 @@
 -export([get_cwd/0]).
 
 get_cwd() ->
-    erlang:nif_error(undef).
+    erlang:nif_error(undefined).

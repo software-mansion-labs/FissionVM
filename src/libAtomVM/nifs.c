@@ -98,7 +98,7 @@ static term nif_binary_last_1(Context *ctx, int argc, term argv[]);
 static term nif_binary_part_3(Context *ctx, int argc, term argv[]);
 static term nif_binary_split(Context *ctx, int argc, term argv[]);
 static term nif_binary_replace(Context *ctx, int argc, term argv[]);
-static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[]);
+static term nif_prim_file_get_cwd(Context *ctx, int argc, term argv[]);
 static term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_delete_element_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_atom_to_binary(Context *ctx, int argc, term argv[]);
@@ -272,10 +272,10 @@ static const struct Nif binary_replace_nif =
     .nif_ptr = nif_binary_replace
 };
 
-static const struct Nif prim_file_getcwd_nif =
+static const struct Nif prim_file_get_cwd_nif =
 {
     .base.type = NIFFunctionType,
-    .nif_ptr = nif_prim_file_getcwd
+    .nif_ptr = nif_prim_file_get_cwd
 };
 
 static const struct Nif make_ref_nif =
@@ -5736,17 +5736,15 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     return result;
 }
 
-static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[])
+static term nif_prim_file_get_cwd(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc)
     UNUSED(argv)
-    const unsigned int size = PATH_MAX;
-    char *cwd = malloc(size);
+    size_t size = PATH_MAX;
+    char cwd[PATH_MAX];
     if (UNLIKELY(IS_NULL_PTR(cwd))) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-
-    term status_atom = UNDEFINED_ATOM;
 
     if (UNLIKELY(memory_ensure_free(ctx, TUPLE_SIZE(2)) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
@@ -5754,7 +5752,6 @@ static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[])
     term result_tuple = term_alloc_tuple(2, &ctx->heap);
 
     if (UNLIKELY(IS_NULL_PTR(getcwd(cwd, size)))) {
-        status_atom = ERROR_ATOM;
         term reason = UNDEFINED_ATOM;
         switch (errno) {
             case EACCES:
@@ -5770,22 +5767,19 @@ static term nif_prim_file_getcwd(Context *ctx, int argc, term argv[])
                 reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "unknown_error"));
                 break;
         }
-        term_put_tuple_element(result_tuple, 0, status_atom);
+        term_put_tuple_element(result_tuple, 0, ERROR_ATOM);
         term_put_tuple_element(result_tuple, 1, reason);
         return result_tuple;
     }
 
-    status_atom = OK_ATOM;
-    unsigned int cwd_length = strlen(cwd);
+    size_t cwd_length = strlen(cwd);
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, cwd_length, 1, &result_tuple, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        free(cwd);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     term result = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
 
-    term_put_tuple_element(result_tuple, 0, status_atom);
+    term_put_tuple_element(result_tuple, 0, OK_ATOM);
     term_put_tuple_element(result_tuple, 1, result);
-    free(cwd);
     return result_tuple;
 }
 //

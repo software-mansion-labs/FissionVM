@@ -142,7 +142,7 @@ ets:insert/2, &ets_insert_nif
 ets:lookup/2, &ets_lookup_nif
 ets:lookup_element/3, &ets_lookup_element_nif
 ets:lookup_element/4, &ets_lookup_element_nif
-prim_file:get_cwd/0, &prim_file_getcwd_nif
+prim_file:get_cwd/0, &prim_file_get_cwd_nif
 ets:delete/2, &ets_delete_nif
 ets:delete_object/2, &ets_delete_object_nif
 atomvm:add_avm_pack_binary/2, &atomvm_add_avm_pack_binary_nif
