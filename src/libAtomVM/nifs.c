@@ -5848,7 +5848,7 @@ static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
     UNUSED(argc)
     UNUSED(argv)
     UNUSED(ctx)
-    printf("Compilation Error: 'WITH_ZLIB' macro not defined. Please ensure that 'WITH_ZLIB' is defined to enable zlib support.");
+    printf("Error: zlib library needed to use zlib:compress/1\n");
     RAISE_ERROR(UNDEFINED_ATOM);
 }
 #endif
