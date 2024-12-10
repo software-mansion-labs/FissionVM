@@ -491,6 +491,11 @@ static uint16_t *parse_line_refs(uint8_t **data, size_t num_refs, size_t len)
                 uint8_t next_byte = *pos;
                 uint16_t line_idx = ((next_byte & 0xF0) >> 4);
                 ++pos;
+                if(file_idx == 0) {
+                    fprintf(stderr, "Invalid line_ref: expected correct file_idx for extended atom.\n");
+                    free(ref_table);
+                    return NULL;
+                }
                 ref_table[file_idx - 1] = line_idx;
                 break;
             }
