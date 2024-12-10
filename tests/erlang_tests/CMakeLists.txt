@@ -282,6 +282,7 @@ compile_erlang(test_binary_split)
 compile_erlang(test_binary_replace)
 
 compile_erlang(test_prim_file_getcwd)
+compile_erlang(test_zlib_compress)
 
 compile_erlang(plusone)
 compile_erlang(plusone2)
@@ -761,6 +762,7 @@ add_custom_target(erlang_test_modules DEPENDS
     test_binary_replace.beam
 
     test_prim_file_getcwd.beam
+    test_zlib_compress.beam
 
     plusone.beam
     plusone2.beam
