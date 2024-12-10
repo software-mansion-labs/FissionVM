@@ -59,7 +59,9 @@
 #include "term.h"
 #include "unicode.h"
 #include "utils.h"
+#ifdef WITH_ZLIB
 #include "zlib.h"
+#endif
 
 #define MAX_NIF_NAME_LEN 260
 #define FLOAT_BUF_SIZE 64
@@ -5804,6 +5806,7 @@ static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
     return result_tuple;
 }
 
+#ifdef WITH_ZLIB
 static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc)
@@ -5838,6 +5841,17 @@ static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
     free(compressed);
     return bin_res;
 }
+#endif
+#ifndef WITH_ZLIB
+static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    UNUSED(argv)
+    UNUSED(ctx)
+    printf("Compilation Error: 'WITH_ZLIB' macro not defined. Please ensure that 'WITH_ZLIB' is defined to enable zlib support.");
+    RAISE_ERROR(UNDEFINED_ATOM);
+}
+#endif
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math
 // error handling is designed to be thread-safe, as errors are specified
