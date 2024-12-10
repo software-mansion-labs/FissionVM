@@ -30,7 +30,7 @@ start() ->
 test_zlib_compress_binary() ->
     ToCompress =
         <<"Actually, this sentence could be a bit shorter. We definitelly need to compress it.">>,
-    % Data from orginal erlang implementation
+    % Data from original erlang implementation
     ProperlyCompressed =
         <<120, 156, 13, 203, 203, 13, 128, 32, 16, 4, 208, 86, 166, 0, 67, 15, 86, 225, 153, 207,
             24, 54, 65, 48, 236, 112, 176, 123, 185, 191, 119, 102, 173, 216, 218, 119, 64, 213, 28,
@@ -50,7 +50,7 @@ test_zlib_compress_iolist() ->
         "to compress ",
         <<"it.">>
     ],
-    % Data from orginal erlang implementation
+    % Data from original erlang implementation
     ProperlyCompressed =
         <<120, 156, 13, 202, 219, 13, 128, 32, 12, 5, 208, 85, 238, 0, 134, 29, 28, 133, 199, 53,
             52, 169, 197, 208, 18, 195, 246, 122, 190, 207, 89, 99, 101, 213, 125, 32, 186, 56, 156,
