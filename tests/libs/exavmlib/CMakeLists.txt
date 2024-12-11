@@ -23,4 +23,4 @@ project(test_exavmlib)
 include(BuildElixir)
 
 pack_runnable(Tests Tests estdlib eavmlib exavmlib etest)
-pack_runnable(StringTokenizerTest StringTokenizerTest estdlib eavmlib exavmlib etest)
+
