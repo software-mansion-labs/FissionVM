@@ -2603,7 +2603,7 @@ static term nif_erlang_float_to_list(Context *ctx, int argc, term argv[])
     return make_list_from_ascii_buf((uint8_t *) float_buf, len, ctx);
 }
 
-static term list_to_binary(term list, term *ret, Context *ctx, term argv[])
+static term list_to_binary(term list, term *ret, Context *ctx)
 {
     size_t bin_size;
     switch (interop_iolist_size(list, &bin_size)) {
@@ -2638,7 +2638,7 @@ static term list_to_binary(term list, term *ret, Context *ctx, term argv[])
         buf_allocated = false;
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, term_binary_heap_size(bin_size), 1, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free(ctx, term_binary_heap_size(bin_size)) != MEMORY_GC_OK)) {
         if (buf_allocated) {
             free(bin_buf);
         }
@@ -2661,7 +2661,7 @@ static term nif_erlang_list_to_binary_1(Context *ctx, int argc, term argv[])
     term t = argv[0];
     VALIDATE_VALUE(t, term_is_list);
     term ret = term_invalid_term();
-    term result = list_to_binary(t, &ret, ctx, argv);
+    term result = list_to_binary(t, &ret, ctx);
     if (result != OK_ATOM) {
         RAISE_ERROR(result);
     }
@@ -5812,22 +5812,23 @@ static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
     UNUSED(argc)
     term to_compress = argv[0];
     if (term_is_list(to_compress)) {
-        term result = list_to_binary(to_compress, &to_compress, ctx, argv);
+        term result = list_to_binary(to_compress, &to_compress, ctx);
         if (result != OK_ATOM) {
             RAISE_ERROR(result);
         }
-    } else if (!term_is_binary(to_compress)) {
+    }
+    if (!term_is_binary(to_compress)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    size_t b_size = term_binary_size(to_compress);
-    size_t to_allocate = compressBound(b_size);
+    size_t size = term_binary_size(to_compress);
+    size_t to_allocate = compressBound(size);
     uint8_t *to_compress_data = (uint8_t *) term_binary_data(to_compress);
     char *compressed = malloc(to_allocate);
     if (UNLIKELY(IS_NULL_PTR(compressed))) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-    int z_ret = compress((Bytef *) compressed, &to_allocate, (const Bytef *) to_compress_data, b_size);
+    int z_ret = compress((Bytef *) compressed, &to_allocate, (const Bytef *) to_compress_data, size);
     if (z_ret != Z_OK) {
         free(compressed);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
