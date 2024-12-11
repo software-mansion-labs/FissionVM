@@ -5771,7 +5771,7 @@ static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
         return result_tuple;
     }
 
-    size_t cwd_length = term_binary_heap_size(strlen(cwd));
+    size_t cwd_length = strlen(cwd);
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, term_binary_heap_size(cwd_length), 1, &result_tuple, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
