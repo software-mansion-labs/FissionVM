@@ -31,6 +31,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <limits.h>
 
 #include "atom_table.h"
 #include "avm_version.h"
@@ -96,6 +98,7 @@ static term nif_binary_last_1(Context *ctx, int argc, term argv[]);
 static term nif_binary_part_3(Context *ctx, int argc, term argv[]);
 static term nif_binary_split(Context *ctx, int argc, term argv[]);
 static term nif_binary_replace(Context *ctx, int argc, term argv[]);
+static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[]);
 static term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_delete_element_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_atom_to_binary(Context *ctx, int argc, term argv[]);
@@ -267,6 +270,12 @@ static const struct Nif binary_replace_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_replace
+};
+
+static const struct Nif prim_file_get_cwd_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_prim_file_get_cwd_0
 };
 
 static const struct Nif make_ref_nif =
@@ -5729,6 +5738,52 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
 
     free(cons);
     return result;
+}
+
+static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    UNUSED(argv)
+    char cwd[PATH_MAX];
+    if (UNLIKELY(IS_NULL_PTR(cwd))) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    if (UNLIKELY(memory_ensure_free(ctx, TUPLE_SIZE(2)) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
+
+    if (UNLIKELY(IS_NULL_PTR(getcwd(cwd, PATH_MAX)))) {
+        term reason = UNDEFINED_ATOM;
+        switch (errno) {
+            case EACCES:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\x11", "permission_denied"));
+                break;
+            case EINVAL:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "negative_size"));
+                break;
+            case ERANGE:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\x10", "buffer_too_small"));
+                break;
+            default:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "unknown_error"));
+                break;
+        }
+        term_put_tuple_element(result_tuple, 0, ERROR_ATOM);
+        term_put_tuple_element(result_tuple, 1, reason);
+        return result_tuple;
+    }
+
+    size_t cwd_length = strlen(cwd);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, term_binary_heap_size(cwd_length), 1, &result_tuple, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term result = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
+
+    term_put_tuple_element(result_tuple, 0, OK_ATOM);
+    term_put_tuple_element(result_tuple, 1, result);
+    return result_tuple;
 }
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math
