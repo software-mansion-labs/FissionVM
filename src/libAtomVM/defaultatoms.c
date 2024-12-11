@@ -166,6 +166,7 @@ static const char *const name_atom = "\x4" "name";
 static const char *const arity_atom = "\x5" "arity";
 static const char *const external_atom = "\x8" "external";
 static const char *const local_atom = "\x5" "local";
+static const char *const env_atom = "\x3" "env";
 
 static const char *const positive_atom = "\x8" "positive";
 static const char *const monotonic_atom = "\x9" "monotonic";
@@ -321,6 +322,7 @@ void defaultatoms_init(GlobalContext *glb)
     ok &= globalcontext_insert_atom(glb, arity_atom) == ARITY_ATOM_INDEX;
     ok &= globalcontext_insert_atom(glb, external_atom) == EXTERNAL_ATOM_INDEX;
     ok &= globalcontext_insert_atom(glb, local_atom) == LOCAL_ATOM_INDEX;
+    ok &= globalcontext_insert_atom(glb, env_atom) == ENV_ATOM_INDEX;
 
     ok &= globalcontext_insert_atom(glb, positive_atom) == POSITIVE_ATOM_INDEX;
     ok &= globalcontext_insert_atom(glb, monotonic_atom) == MONOTONIC_ATOM_INDEX;
