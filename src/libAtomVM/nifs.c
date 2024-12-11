@@ -2662,7 +2662,7 @@ static term nif_erlang_list_to_binary_1(Context *ctx, int argc, term argv[])
     VALIDATE_VALUE(t, term_is_list);
     term ret = term_invalid_term();
     term result = list_to_binary(t, &ret, ctx);
-    if (result != OK_ATOM) {
+    if (UNLIKELY(result != OK_ATOM)) {
         RAISE_ERROR(result);
     }
     return ret;
@@ -5817,7 +5817,7 @@ static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
             RAISE_ERROR(result);
         }
     }
-    if (!term_is_binary(to_compress)) {
+    if (UNLIKELY(!term_is_binary(to_compress))) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
@@ -5829,7 +5829,7 @@ static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     int z_ret = compress((Bytef *) compressed, &to_allocate, (const Bytef *) to_compress_data, size);
-    if (z_ret != Z_OK) {
+    if (UNLIKELY(z_ret != Z_OK)) {
         free(compressed);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
