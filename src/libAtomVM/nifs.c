@@ -98,7 +98,7 @@ static term nif_binary_last_1(Context *ctx, int argc, term argv[]);
 static term nif_binary_part_3(Context *ctx, int argc, term argv[]);
 static term nif_binary_split(Context *ctx, int argc, term argv[]);
 static term nif_binary_replace(Context *ctx, int argc, term argv[]);
-static term nif_prim_file_get_cwd(Context *ctx, int argc, term argv[]);
+static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[]);
 static term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_delete_element_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_atom_to_binary(Context *ctx, int argc, term argv[]);
@@ -275,7 +275,7 @@ static const struct Nif binary_replace_nif =
 static const struct Nif prim_file_get_cwd_nif =
 {
     .base.type = NIFFunctionType,
-    .nif_ptr = nif_prim_file_get_cwd
+    .nif_ptr = nif_prim_file_get_cwd_0
 };
 
 static const struct Nif make_ref_nif =
@@ -5736,11 +5736,10 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     return result;
 }
 
-static term nif_prim_file_get_cwd(Context *ctx, int argc, term argv[])
+static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc)
     UNUSED(argv)
-    size_t size = PATH_MAX;
     char cwd[PATH_MAX];
     if (UNLIKELY(IS_NULL_PTR(cwd))) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
@@ -5751,7 +5750,7 @@ static term nif_prim_file_get_cwd(Context *ctx, int argc, term argv[])
     }
     term result_tuple = term_alloc_tuple(2, &ctx->heap);
 
-    if (UNLIKELY(IS_NULL_PTR(getcwd(cwd, size)))) {
+    if (UNLIKELY(IS_NULL_PTR(getcwd(cwd, PATH_MAX)))) {
         term reason = UNDEFINED_ATOM;
         switch (errno) {
             case EACCES:
@@ -5772,8 +5771,8 @@ static term nif_prim_file_get_cwd(Context *ctx, int argc, term argv[])
         return result_tuple;
     }
 
-    size_t cwd_length = strlen(cwd);
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, cwd_length, 1, &result_tuple, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    size_t cwd_length = term_binary_heap_size(strlen(cwd));
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, term_binary_heap_size(cwd_length), 1, &result_tuple, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     term result = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
