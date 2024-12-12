@@ -86,6 +86,21 @@ static bool is_module_member(Module *mod, Module **mods, unsigned long len)
     return false;
 }
 
+static void handle_module_memory_impact(Module *mod, Module **mods, unsigned long *num_mods,
+    unsigned int *filename_lens, unsigned int *num_aux_terms)
+{
+    if (module_has_line_chunk(mod)) {
+        if (!is_module_member(mod, mods, *num_mods)) {
+            mods[*num_mods] = mod;
+            for (u_int32_t i = 0; i < mod->num_filenames; i++) {
+                *filename_lens += mod->filenames[i].len;
+            }
+            *num_mods += 1;
+        }
+        *num_aux_terms += 1;
+    }
+}
+
 term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term exception_class)
 {
     unsigned int num_frames = 0;
@@ -118,14 +133,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
                 ++num_frames;
                 prev_mod = cp_mod;
                 prev_mod_offset = mod_offset;
-                if (module_has_line_chunk(cp_mod)) {
-                    if (!is_module_member(cp_mod, modules, num_mods)) {
-                        modules[num_mods] = cp_mod;
-                        filename_lens += cp_mod->filenames[0].len;
-                        num_mods++;
-                    }
-                    num_aux_terms++;
-                }
+                handle_module_memory_impact(cp_mod, modules, &num_mods, &filename_lens, &num_aux_terms);
             }
         } else if (term_is_catch_label(*ct)) {
             int module_index;
@@ -139,28 +147,14 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
                 ++num_frames;
                 prev_mod = cl_mod;
                 prev_mod_offset = mod_offset;
-                if (module_has_line_chunk(cl_mod)) {
-                    if (!is_module_member(cl_mod, modules, num_mods)) {
-                        modules[num_mods] = cl_mod;
-                        filename_lens += cl_mod->filenames[0].len;
-                        num_mods++;
-                    }
-                    num_aux_terms++;
-                }
+                handle_module_memory_impact(cl_mod, modules, &num_mods, &filename_lens, &num_aux_terms);
             }
         }
         ct++;
     }
 
     num_frames++;
-    if (module_has_line_chunk(mod)) {
-        if (!is_module_member(mod, modules, num_mods)) {
-            filename_lens += mod->filenames[0].len;
-            num_mods++;
-        }
-        num_aux_terms++;
-    }
-
+    handle_module_memory_impact(mod, modules, &num_mods, &filename_lens, &num_aux_terms);
     free(modules);
 
     // {num_frames, num_aux_terms, filename_lens, num_mods, [{module, offset}, ...]}
@@ -314,8 +308,8 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
         if (module_has_line_chunk(cp_mod)) {
             term line_tuple = term_alloc_tuple(2, &ctx->heap);
             term_put_tuple_element(line_tuple, 0, globalcontext_make_atom(glb, ATOM_STR("\x4", "line")));
-            int line = module_find_line(cp_mod, (unsigned int) mod_offset);
-            term_put_tuple_element(line_tuple, 1, line == -1 ? UNDEFINED_ATOM : term_from_int(line));
+            struct LineRef line_ref = module_find_line(cp_mod, (unsigned int) mod_offset);
+            term_put_tuple_element(line_tuple, 1, line_ref.line_idx == -1 ? UNDEFINED_ATOM : term_from_int(line_ref.line_idx));
             aux_data = term_list_prepend(line_tuple, aux_data, &ctx->heap);
 
             term file_tuple = term_alloc_tuple(2, &ctx->heap);
@@ -323,7 +317,8 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
 
             term path = find_path_created(module_name, module_paths, module_path_idx);
             if (term_is_invalid_term(path)) {
-                path = term_from_string((const uint8_t *) cp_mod->filenames[0].data, cp_mod->filenames[0].len, &ctx->heap);
+                struct ModuleFilename filename = cp_mod->filenames[line_ref.filename_idx];
+                path = term_from_string((const uint8_t *) filename.data, filename.len, &ctx->heap);
                 module_paths[module_path_idx].module = module_name;
                 module_paths[module_path_idx].path = path;
                 module_path_idx++;
