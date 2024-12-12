@@ -39,6 +39,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
  */
 term stacktrace_build(Context *ctx, term *stack_info, uint32_t live);
 term stacktrace_exception_class(term stack_info);
+void stacktrace_print(FILE *fd, term stacktrace, const Context *ctx);
 
 #ifdef __cplusplus
 }

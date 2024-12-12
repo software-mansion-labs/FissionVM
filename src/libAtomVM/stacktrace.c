@@ -21,6 +21,7 @@
 #include "stacktrace.h"
 #include "defaultatoms.h"
 #include "globalcontext.h"
+#include "interop.h"
 #include "memory.h"
 
 #ifndef AVM_CREATE_STACKTRACES
@@ -346,6 +347,36 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
     free(module_paths);
 
     return stacktrace;
+}
+
+void stacktrace_print(FILE *fd, term stacktrace, const Context *ctx)
+{
+    fprintf(stderr, "\nStacktrace:\n");
+    while (!term_is_nil(stacktrace)) {
+        term frame = term_get_list_head(stacktrace);
+        term location = term_get_tuple_element(frame, 3);
+        term file_tuple = term_get_list_head(location);
+        int ok = 0;
+        char *file = interop_term_to_string(term_get_tuple_element(file_tuple, 1), &ok);
+        assert(ok == 1);
+        term line_tuple = term_get_list_head(term_get_list_tail(location));
+        term line = term_get_tuple_element(line_tuple, 1);
+        term module = term_get_tuple_element(frame, 0);
+        term fun = term_get_tuple_element(frame, 1);
+        term arity = term_get_tuple_element(frame, 2);
+        fprintf(fd, "\t%s:", file);
+        term_display(fd, line, ctx);
+        fprintf(fd, ": ");
+        term_display(fd, module, ctx);
+        fprintf(fd, ":");
+        term_display(fd, fun, ctx);
+        fprintf(fd, "/");
+        term_display(fd, arity, ctx);
+        fprintf(fd, "\n");
+        free(file);
+        stacktrace = term_get_list_tail(stacktrace);
+    }
+    fprintf(fd, "\n");
 }
 
 #endif

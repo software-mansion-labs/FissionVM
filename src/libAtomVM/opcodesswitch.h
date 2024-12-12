@@ -1339,9 +1339,7 @@ COLD_FUNC static void dump(Context *ctx)
     term_display(stderr, term_from_local_process_id(ctx->process_id), ctx);
     fprintf(stderr, "\n");
 
-    fprintf(stderr, "\nStacktrace:\n");
-    term_display(stderr, stacktrace_build(ctx, &ctx->x[2], 3), ctx);
-    fprintf(stderr, "\n\n");
+    stacktrace_print(stderr, stacktrace_build(ctx, &ctx->x[2], 3), ctx);
 
     {
         Module *cp_mod;
