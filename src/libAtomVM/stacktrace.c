@@ -77,64 +77,39 @@ static void cp_to_mod_lbl_off(term cp, Context *ctx, Module **cp_mod, int *label
     *l_off = *mod_offset - (mod->labels[*label] - code);
 }
 
-static bool is_module_member(Module *mod, Module **mods, unsigned long len)
+struct ModuleOffsetPair
 {
-    for (unsigned long i = 0; i < len; ++i) {
-        if (mods[i] == mod) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static void handle_module_memory_impact(Module *mod, Module **mods, unsigned long *num_mods,
-    unsigned int *filename_lens, unsigned int *num_aux_terms)
-{
-    if (module_has_line_chunk(mod)) {
-        if (!is_module_member(mod, mods, *num_mods)) {
-            mods[*num_mods] = mod;
-            for (u_int32_t i = 0; i < mod->num_filenames; i++) {
-                *filename_lens += mod->filenames[i].len;
-            }
-            *num_mods += 1;
-        }
-        *num_aux_terms += 1;
-    }
-}
+    Module *module;
+    int offset;
+};
 
 term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term exception_class)
 {
-    unsigned int num_frames = 0;
-    unsigned int num_aux_terms = 0;
-    unsigned int filename_lens = 0;
-    Module *prev_mod = NULL;
-    long prev_mod_offset = -1;
-    term *ct = ctx->e;
     term *stack_base = context_stack_base(ctx);
 
     unsigned long stack_size = context_stack_size(ctx);
-    Module **modules = malloc(stack_size * sizeof(Module *));
-    if (IS_NULL_PTR(modules)) {
+    struct ModuleOffsetPair *frames_modules = malloc(stack_size * sizeof(struct ModuleOffsetPair));
+    if (IS_NULL_PTR(frames_modules)) {
         fprintf(stderr, "Unable to allocate space for modules list.  No stacktrace will be created\n");
         return UNDEFINED_ATOM;
     }
 
-    size_t num_mods = 0;
+    frames_modules[0] = (struct ModuleOffsetPair){ .module = mod, .offset = current_offset };
 
-    while (ct != stack_base) {
+    unsigned int num_frames = 1;
+    Module *prev_mod = NULL;
+    long prev_mod_offset = -1;
+    for (term *ct = ctx->e; ct < stack_base; ct++) {
+        Module *mod = NULL;
+        long mod_offset = -1;
         if (term_is_cp(*ct)) {
-
             Module *cp_mod;
             int label;
             int offset;
-            long mod_offset;
 
             cp_to_mod_lbl_off(*ct, ctx, &cp_mod, &label, &offset, &mod_offset);
             if (mod_offset != cp_mod->end_instruction_ii && !(prev_mod == cp_mod && mod_offset == prev_mod_offset)) {
-                ++num_frames;
-                prev_mod = cp_mod;
-                prev_mod_offset = mod_offset;
-                handle_module_memory_impact(cp_mod, modules, &num_mods, &filename_lens, &num_aux_terms);
+                mod = cp_mod;
             }
         } else if (term_is_catch_label(*ct)) {
             int module_index;
@@ -142,21 +117,20 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
 
             Module *cl_mod = globalcontext_get_module_by_index(ctx->global, module_index);
             uint8_t *code = &cl_mod->code->code[0];
-            int mod_offset = cl_mod->labels[label] - code;
+            mod_offset = cl_mod->labels[label] - code;
 
             if (!(prev_mod == cl_mod && mod_offset == prev_mod_offset)) {
-                ++num_frames;
-                prev_mod = cl_mod;
-                prev_mod_offset = mod_offset;
-                handle_module_memory_impact(cl_mod, modules, &num_mods, &filename_lens, &num_aux_terms);
+                mod = cl_mod;
             }
         }
-        ct++;
-    }
 
-    num_frames++;
-    handle_module_memory_impact(mod, modules, &num_mods, &filename_lens, &num_aux_terms);
-    free(modules);
+        if (mod) {
+            frames_modules[num_frames] = (struct ModuleOffsetPair){ .module = mod, .offset = mod_offset };
+            prev_mod = mod;
+            prev_mod_offset = mod_offset;
+            ++num_frames;
+        }
+    }
 
     // {num_frames, num_aux_terms, filename_lens, num_mods, [{module, offset}, ...]}
     size_t requested_size = TUPLE_SIZE(6) + num_frames * (2 + TUPLE_SIZE(2));
@@ -168,57 +142,40 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
 
     term raw_stacktrace = term_nil();
 
-    term frame_info = term_alloc_tuple(2, &ctx->heap);
-    term_put_tuple_element(frame_info, 0, term_from_int(mod->module_index));
-    term_put_tuple_element(frame_info, 1, term_from_int(current_offset));
-    raw_stacktrace = term_list_prepend(frame_info, raw_stacktrace, &ctx->heap);
-
-    prev_mod = NULL;
-    prev_mod_offset = -1;
-    // GC may have moved stack
-    ct = ctx->e;
-    stack_base = context_stack_base(ctx);
-    while (ct != stack_base) {
-        if (term_is_cp(*ct)) {
-            Module *cp_mod;
-            int label;
-            int offset;
-            long mod_offset;
-
-            cp_to_mod_lbl_off(*ct, ctx, &cp_mod, &label, &offset, &mod_offset);
-            if (mod_offset != cp_mod->end_instruction_ii && !(prev_mod == cp_mod && mod_offset == prev_mod_offset)) {
-
-                prev_mod = cp_mod;
-                prev_mod_offset = mod_offset;
-
-                term frame_info = term_alloc_tuple(2, &ctx->heap);
-                term_put_tuple_element(frame_info, 0, term_from_int(cp_mod->module_index));
-                term_put_tuple_element(frame_info, 1, term_from_int(mod_offset));
-
-                raw_stacktrace = term_list_prepend(frame_info, raw_stacktrace, &ctx->heap);
-            }
-        } else if (term_is_catch_label(*ct)) {
-
-            int module_index;
-            int label = term_to_catch_label_and_module(*ct, &module_index);
-            Module *cl_mod = globalcontext_get_module_by_index(ctx->global, module_index);
-            uint8_t *code = &cl_mod->code->code[0];
-            int mod_offset = cl_mod->labels[label] - code;
-
-            if (!(prev_mod == cl_mod && mod_offset == prev_mod_offset)) {
-
-                prev_mod = cl_mod;
-                prev_mod_offset = mod_offset;
-
-                term frame_info = term_alloc_tuple(2, &ctx->heap);
-                term_put_tuple_element(frame_info, 0, term_from_int(module_index));
-                term_put_tuple_element(frame_info, 1, term_from_int(mod_offset));
-
-                raw_stacktrace = term_list_prepend(frame_info, raw_stacktrace, &ctx->heap);
-            }
-        }
-        ct++;
+    for (unsigned int i = 0; i < num_frames; i++) {
+        term frame_info = term_alloc_tuple(2, &ctx->heap);
+        term_put_tuple_element(frame_info, 0, term_from_int(frames_modules[i].module->module_index));
+        term_put_tuple_element(frame_info, 1, term_from_int(frames_modules[i].offset));
+        raw_stacktrace = term_list_prepend(frame_info, raw_stacktrace, &ctx->heap);
     }
+
+    // Needed for heap memory allocation
+    unsigned int num_aux_terms = 0;
+    unsigned int filename_lens = 0;
+    unsigned int num_mods = 0;
+    for (unsigned int i = 0; i < num_frames; i++) {
+        Module *mod = frames_modules[i].module;
+        if (module_has_line_chunk(mod)) {
+            // If module occurs more than once in the stacktrace
+            // the path term is reused
+            bool module_already_counted = false;
+            for (unsigned int j = 0; j < i; j++) {
+                if (frames_modules[j].module == mod) {
+                    module_already_counted = true;
+                    break;
+                }
+            }
+            if (!module_already_counted) {
+                for (u_int32_t j = 0; j < mod->num_filenames; j++) {
+                    filename_lens += mod->filenames[j].len;
+                }
+                num_mods += 1;
+            }
+            num_aux_terms += 1;
+        }
+    }
+
+    free(frames_modules);
 
     term stack_info = term_alloc_tuple(6, &ctx->heap);
     term_put_tuple_element(stack_info, 0, term_from_int(num_frames));
@@ -238,14 +195,14 @@ term stacktrace_exception_class(term stack_info)
 
 struct ModulePathPair
 {
-    term module;
+    struct ModuleFilename *module_filename;
     term path;
 };
 
-static term find_path_created(term module_name, struct ModulePathPair *module_paths, int len)
+static term find_path_created(struct ModuleFilename *module_filename, struct ModulePathPair *module_paths, int len)
 {
     for (int i = 0; i < len; ++i) {
-        if (module_paths[i].module == module_name) {
+        if (module_paths[i].module_filename == module_filename) {
             return module_paths[i].path;
         }
     }
@@ -316,11 +273,12 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
             term file_tuple = term_alloc_tuple(2, &ctx->heap);
             term_put_tuple_element(file_tuple, 0, globalcontext_make_atom(glb, ATOM_STR("\x4", "file")));
 
-            term path = find_path_created(module_name, module_paths, module_path_idx);
+            struct ModuleFilename *filename = cp_mod->filenames + line_ref.filename_idx;
+            // Reuse path term if already created
+            term path = find_path_created(filename, module_paths, module_path_idx);
             if (term_is_invalid_term(path)) {
-                struct ModuleFilename filename = cp_mod->filenames[line_ref.filename_idx];
-                path = term_from_string((const uint8_t *) filename.data, filename.len, &ctx->heap);
-                module_paths[module_path_idx].module = module_name;
+                path = term_from_string((const uint8_t *) filename->data, filename->len, &ctx->heap);
+                module_paths[module_path_idx].module_filename = filename;
                 module_paths[module_path_idx].path = path;
                 module_path_idx++;
             }
@@ -355,6 +313,7 @@ void stacktrace_print(FILE *fd, term stacktrace, const Context *ctx)
     while (!term_is_nil(stacktrace)) {
         term frame = term_get_list_head(stacktrace);
         term location = term_get_tuple_element(frame, 3);
+        // The following code assumes the shape of the 'location' list
         term file_tuple = term_get_list_head(location);
         int ok = 0;
         char *file = interop_term_to_string(term_get_tuple_element(file_tuple, 1), &ok);

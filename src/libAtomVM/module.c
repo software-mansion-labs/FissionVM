@@ -439,18 +439,22 @@ const struct ExportedFunction *module_resolve_function0(Module *mod, int import_
 
 static struct LineRef *parse_line_refs(uint8_t **data, size_t num_refs, size_t len)
 {
-    struct LineRef *ref_table = malloc((num_refs + 1) * sizeof(struct LineRef));
+    struct LineRef *ref_table = malloc(num_refs * sizeof(struct LineRef));
     if (IS_NULL_PTR(ref_table)) {
         return NULL;
     }
 
     uint8_t filename_idx = 0;
+
+    // The line ref 0 represents 'undefined location'
     ref_table[0].line_idx = 0;
     ref_table[0].filename_idx = filename_idx;
 
+    // From this point, the blob contains line indices (integers) mixed with 'a' atoms.
+    // Each occurence of the 'a' atom increases the filename index that further line indices refer to.
     uint8_t *pos = *data;
     size_t i = 1;
-    while (i < num_refs + 1) {
+    while (i < num_refs) {
         if ((size_t) (pos - *data) > len) {
             fprintf(stderr, "Invalid line_ref: expected tag.\n");
             goto parse_line_refs_error;
@@ -484,7 +488,7 @@ static struct LineRef *parse_line_refs(uint8_t **data, size_t num_refs, size_t l
                 break;
             }
             default: {
-                // TODO handle integer compact encodings > 2^64
+                // TODO handle integer compact encodings > 2048
                 fprintf(stderr, "Unsupported line_ref tag: %u\n", *pos);
                 goto parse_line_refs_error;
             }
@@ -506,6 +510,7 @@ struct ModuleFilename *parse_filename_table(uint8_t **data, size_t num_filenames
         return NULL;
     }
 
+    // Default file name, ERTS puts module name followed by .erl here
     const char *unknown = "unknown";
     filenames[0].data = (uint8_t *) unknown;
     filenames[0].len = strlen(unknown);
@@ -534,6 +539,7 @@ struct ModuleFilename *parse_filename_table(uint8_t **data, size_t num_filenames
 
 static void parse_line_table(struct LineRef **line_refs, struct ModuleFilename **filenames, uint32_t *num_filenames, uint8_t *data, size_t len)
 {
+    // See parse_line_chunk function in beam_file.c in ERTS
 
     *line_refs = NULL;
     *filenames = NULL;
@@ -563,10 +569,12 @@ static void parse_line_table(struct LineRef **line_refs, struct ModuleFilename *
     pos += 4;
 
     CHECK_FREE_SPACE(4, "Error reading Line chunk: num_refs\n");
-    uint32_t num_refs = READ_32_UNALIGNED(pos);
+    // +1 for default line ref
+    uint32_t num_refs = READ_32_UNALIGNED(pos) + 1;
     pos += 4;
 
     CHECK_FREE_SPACE(4, "Error reading Line chunk: num_filenames\n");
+    // +1 for default file name
     *num_filenames = READ_32_UNALIGNED(pos) + 1;
     pos += 4;
 
