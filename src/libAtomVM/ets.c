@@ -507,8 +507,10 @@ EtsErrorCode ets_drop_table(term ref, term *ret, Context *ctx)
         return EtsPermissionDenied;
     }
 
+    synclist_wrlock(&ctx->global->ets.ets_tables);
     list_remove(&ets_table->head);
     ets_table_destroy(ets_table, ctx->global);
+    synclist_unlock(&ctx->global->ets.ets_tables);
 
     *ret = TRUE_ATOM;
     return EtsOk;
