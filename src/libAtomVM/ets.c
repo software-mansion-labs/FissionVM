@@ -497,6 +497,20 @@ EtsErrorCode ets_table_delete(struct EtsTable *ets_table, term key, term *ret, C
     return EtsOk;
 }
 
+EtsErrorCode ets_drop_table(term ref, term *ret, Context *ctx)
+{
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessNone) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessNone);
+    if (ets_table == NULL) {
+        return EtsTableNotFound;
+    }
+
+    list_remove(&ets_table->head);
+    ets_table_destroy(ets_table, ctx->global);
+
+    *ret = TRUE_ATOM;
+    return EtsOk;
+}
+
 EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
 {
     struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessRead) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessRead);
