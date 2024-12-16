@@ -499,7 +499,7 @@ EtsErrorCode ets_table_delete(struct EtsTable *ets_table, term key, term *ret, C
 
 EtsErrorCode ets_drop_table(term ref, term *ret, Context *ctx)
 {
-    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessNone) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessNone);
+    struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
     if (ets_table == NULL) {
         return EtsTableNotFound;
     }
@@ -508,6 +508,7 @@ EtsErrorCode ets_drop_table(term ref, term *ret, Context *ctx)
     }
 
     synclist_wrlock(&ctx->global->ets.ets_tables);
+    SMP_UNLOCK(ets_table);
     list_remove(&ets_table->head);
     ets_table_destroy(ets_table, ctx->global);
     synclist_unlock(&ctx->global->ets.ets_tables);
