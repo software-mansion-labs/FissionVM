@@ -503,6 +503,9 @@ EtsErrorCode ets_drop_table(term ref, term *ret, Context *ctx)
     if (ets_table == NULL) {
         return EtsTableNotFound;
     }
+    if (ets_table->access_type != EtsAccessPublic && ets_table->owner_process_id != ctx->process_id) {
+        return EtsPermissionDenied;
+    }
 
     list_remove(&ets_table->head);
     ets_table_destroy(ets_table, ctx->global);
