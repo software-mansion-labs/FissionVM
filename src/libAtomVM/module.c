@@ -45,10 +45,8 @@
 
 // TODO Constants similar to these are defined in opcodesswitch.h and should
 // be refactored so they can be used here, as well.
-#define TAG_COMPACT_INT 0x01
-#define TAG_COMPACT_ATOM 0x02
-#define TAG_EXTENDED_INT 0x09
-#define TAG_EXTENDED_ATOM 0x0A
+#define TAG_INT 0x01
+#define TAG_ATOM 0x02
 
 #define CHECK_FREE_SPACE(space, error)           \
     if ((size_t) ((pos + space) - data) > len) { \
@@ -437,7 +435,39 @@ const struct ExportedFunction *module_resolve_function0(Module *mod, int import_
     }
 }
 
-static struct LineRef *parse_line_refs(uint8_t **data, size_t num_refs, size_t len)
+static bool parse_line_ref_value(int32_t *value, uint8_t **data, size_t len)
+{
+    // For reference see beam_disasm:decode_int/3 in ERTS
+    uint8_t *pos = *data;
+    if ((*pos & 0x08) == 0) {
+        // Value < 16
+        *value = *pos >> 4;
+        ++pos;
+        fprintf(stderr, "ci %d\n", *value);
+    } else if ((*pos & 0x10) == 0) {
+        // Value < 2048
+        if ((size_t) (pos + 1 - *data) > len) {
+            return false;
+        }
+        uint16_t high_order_3_bits = (*pos & 0xE0);
+        ++pos;
+        *value = (high_order_3_bits << 3) | *pos;
+        ++pos;
+    } else {
+        // Value < 2^16
+        uint8_t int_length_header = *pos >> 5;
+        if (int_length_header != 0 || ((size_t) (pos + 2 - *data)) > len) {
+            return false;
+        }
+        *value = ((int16_t) * (pos + 1)) << 8 | *(pos + 2);
+        pos += 3;
+    }
+
+    *data = pos;
+    return true;
+}
+
+static struct LineRef *parse_line_refs(uint8_t **data, size_t num_refs, size_t num_filenames, size_t len)
 {
     struct LineRef *ref_table = malloc(num_refs * sizeof(struct LineRef));
     if (IS_NULL_PTR(ref_table)) {
@@ -460,38 +490,25 @@ static struct LineRef *parse_line_refs(uint8_t **data, size_t num_refs, size_t l
             goto parse_line_refs_error;
         }
 
-        switch (*pos & 0x0F) {
-            case TAG_COMPACT_ATOM: {
-                ++filename_idx;
-                ++pos;
-                break;
-            }
-            case TAG_COMPACT_INT: {
-                ref_table[i].line_idx = ((*pos & 0xF0) >> 4);
-                ref_table[i].filename_idx = filename_idx;
-                ++pos;
-                ++i;
-                break;
-            }
-            case TAG_EXTENDED_INT: {
-                uint16_t high_order_3_bits = (*pos & 0xE0);
-                ++pos;
-                if ((size_t) (pos - *data) > len) {
-                    fprintf(stderr, "Invalid line_ref: expected extended int.\n");
-                    goto parse_line_refs_error;
-                }
-                uint8_t next_byte = *pos;
-                ref_table[i].line_idx = ((high_order_3_bits << 3) | next_byte);
-                ref_table[i].filename_idx = filename_idx;
-                ++pos;
-                ++i;
-                break;
-            }
-            default: {
-                // TODO handle integer compact encodings > 2048
-                fprintf(stderr, "Unsupported line_ref tag: %u\n", *pos);
+        uint8_t tag = *pos & 0x07;
+        if (tag & TAG_ATOM) {
+            ++filename_idx;
+            if (filename_idx >= num_filenames) {
+                fprintf(stderr, "Invalid file name index: %u, expected int\n", filename_idx);
                 goto parse_line_refs_error;
             }
+            ++pos;
+        } else if (tag & TAG_INT) {
+            if (parse_line_ref_value(&ref_table[i].line_idx, &pos, *data + len - pos)) {
+                ref_table[i].filename_idx = filename_idx;
+                i++;
+            } else {
+                fprintf(stderr, "Invalid line_ref value: %u, expected int\n", *pos);
+                goto parse_line_refs_error;
+            }
+        } else {
+            fprintf(stderr, "Invalid line_ref value %u\n", *pos);
+            goto parse_line_refs_error;
         }
     }
 
@@ -578,7 +595,7 @@ static void parse_line_table(struct LineRef **line_refs, struct ModuleFilename *
     *num_filenames = READ_32_UNALIGNED(pos) + 1;
     pos += 4;
 
-    *line_refs = parse_line_refs(&pos, num_refs, len - (pos - data));
+    *line_refs = parse_line_refs(&pos, num_refs, *num_filenames, len - (pos - data));
     if (IS_NULL_PTR(*line_refs)) {
         return;
     }

@@ -90,7 +90,7 @@ struct ModuleFilename
 
 struct LineRef
 {
-    int16_t line_idx;
+    int32_t line_idx;
     uint8_t filename_idx;
 };
 
