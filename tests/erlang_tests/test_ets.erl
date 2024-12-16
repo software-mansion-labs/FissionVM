@@ -38,6 +38,7 @@ start() ->
     ok = test_take(),
     ok = test_member(),
     ok = test_insert_list(),
+    ok = test_delete_table(),
 
     0.
 
@@ -434,4 +435,14 @@ test_insert_list() ->
     true = ets:insert(Tid, [{foo, tapas}, {batat, batat}, {patat, patat}]),
     [{patat, patat}] = ets:lookup(Tid, patat),
     [{batat, batat}] = ets:lookup(Tid, batat),
+    ok.
+
+test_delete_table() ->
+    Tid = ets:new(test_delete_table, []),
+    true = ets:insert(Tid, {foo, tapas}),
+    [{foo, tapas}] = ets:lookup(Tid, foo),
+    true = ets:delete(Tid),
+    ok = expect_failure(
+        fun() -> ets:insert(Tid, {gnu, gnat}) end
+    ),
     ok.
