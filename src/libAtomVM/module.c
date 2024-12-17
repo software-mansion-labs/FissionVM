@@ -100,7 +100,7 @@ static enum ModuleLoadResult module_build_imported_functions_table(Module *this_
         return MODULE_ERROR_FAILED_ALLOCATION;
     }
 
-    for (int i = 0; i < functions_count; i++) {
+    for (int i = 0; i < functions_count; ++i) {
         int local_module_atom_index = READ_32_ALIGNED(table_data + i * 12 + 12);
         int local_function_atom_index = READ_32_ALIGNED(table_data + i * 12 + 4 + 12);
         AtomString module_atom = module_get_atom_string_by_id(this_module, local_module_atom_index, glb);
@@ -196,7 +196,7 @@ uint32_t module_search_exported_function(Module *this_module, AtomString func_na
     size_t functions_count = module_get_exported_functions_count(this_module);
 
     const uint8_t *table_data = (const uint8_t *) this_module->export_table;
-    for (unsigned int i = 0; i < functions_count; i++) {
+    for (unsigned int i = 0; i < functions_count; ++i) {
         AtomString function_atom = module_get_atom_string_by_id(this_module, READ_32_ALIGNED(table_data + i * 12 + 12), glb);
         int32_t arity = READ_32_ALIGNED(table_data + i * 12 + 4 + 12);
         if ((func_arity == arity) && atom_are_equals(func_name, function_atom)) {
@@ -214,7 +214,7 @@ term module_get_exported_functions(Module *this_module, Heap *heap, GlobalContex
     term result_list = term_nil();
 
     const uint8_t *table_data = (const uint8_t *) this_module->export_table;
-    for (unsigned int i = 0; i < functions_count; i++) {
+    for (unsigned int i = 0; i < functions_count; ++i) {
         AtomString function_atom = module_get_atom_string_by_id(this_module, READ_32_ALIGNED(table_data + i * 12 + 12), glb);
         int32_t arity = READ_32_ALIGNED(table_data + i * 12 + 4 + 12);
         term function_tuple = term_alloc_tuple(2, heap);
@@ -378,7 +378,7 @@ static struct LiteralEntry *module_build_literals_table(const void *literalsBuf)
         fprintf(stderr, "Failed to allocate memory: %s:%i.\n", __FILE__, __LINE__);
         return NULL;
     }
-    for (uint32_t i = 0; i < terms_count; i++) {
+    for (uint32_t i = 0; i < terms_count; ++i) {
         uint32_t term_size = READ_32_UNALIGNED(pos);
         literals_table[i].size = term_size;
         literals_table[i].data = pos + sizeof(uint32_t);
@@ -448,6 +448,7 @@ static bool decode_int(int32_t *value, uint8_t **data_ptr, size_t len)
         ++pos;
     } else if ((*pos & 0x10) == 0) {
         // Value < 2048
+        // 0000 0000 | vvv0 0000
         uint16_t high_order_3_bits = (*pos & 0xE0);
         ++pos;
         if (FREE_SPACE() < 1) {
@@ -504,7 +505,7 @@ static struct LineRef *parse_line_refs(uint8_t **data_ptr, size_t num_refs, uint
                     fprintf(stderr, "Invalid file name index: %u, expected atom\n", *pos);
                     goto parse_line_refs_error;
                 } else if (filename_idx >= (int32_t) num_filenames) {
-                    fprintf(stderr, "Invalid file name index: %d, max is %u\n", filename_idx, num_filenames - 1);
+                    fprintf(stderr, "File name index: %d exceeds expected number of filenames %u\n", filename_idx, num_filenames);
                     goto parse_line_refs_error;
                 } else {
                     current_filename_idx = filename_idx;
@@ -513,7 +514,7 @@ static struct LineRef *parse_line_refs(uint8_t **data_ptr, size_t num_refs, uint
             case TAG_INT:
                 if (decode_int(&ref_table[ref_num].line_idx, &pos, FREE_SPACE())) {
                     ref_table[ref_num].filename_idx = current_filename_idx;
-                    ref_num++;
+                    ++ref_num;
                 } else {
                     fprintf(stderr, "Invalid line_ref value: %u, expected int\n", *pos);
                     goto parse_line_refs_error;

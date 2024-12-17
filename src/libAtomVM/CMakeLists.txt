@@ -21,8 +21,6 @@
 cmake_minimum_required (VERSION 3.13)
 project (libAtomVM)
 
-
-set(ADVANCED_TRACING 1)
 set(HEADER_FILES
     md5.h
     atom.h

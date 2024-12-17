@@ -47,6 +47,13 @@ term stacktrace_exception_class(term stack_info)
     return stack_info;
 }
 
+void stacktrace_print(FILE *fd, term stacktrace, const Context *ctx)
+{
+    UNUSED(stacktrace);
+    UNUSED(ctx);
+    fprintf(fd, "No stacktrace created, enable with AVM_CREATE_STACKTRACES\n");
+}
+
 #else
 
 static void cp_to_mod_lbl_off(term cp, Context *ctx, Module **cp_mod, int *label, int *l_off, long *mod_offset)
@@ -63,7 +70,7 @@ static void cp_to_mod_lbl_off(term cp, Context *ctx, Module **cp_mod, int *label
     int i = 1;
     const uint8_t *l = mod->labels[1];
     while (*mod_offset > l - code) {
-        i++;
+        ++i;
         if (i >= labels_count) {
             // last label + 1 is reserved for end of module.
             *label = i;
@@ -99,7 +106,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
     unsigned int num_frames = 1;
     Module *prev_mod = NULL;
     long prev_mod_offset = -1;
-    for (term *ct = ctx->e; ct < stack_base; ct++) {
+    for (term *ct = ctx->e; ct < stack_base; ++ct) {
         Module *mod = NULL;
         long mod_offset = -1;
         if (term_is_cp(*ct)) {
@@ -142,7 +149,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
 
     term raw_stacktrace = term_nil();
 
-    for (unsigned int i = 0; i < num_frames; i++) {
+    for (size_t i = 0; i < num_frames; ++i) {
         term frame_info = term_alloc_tuple(2, &ctx->heap);
         term_put_tuple_element(frame_info, 0, term_from_int(frames_modules[i].module->module_index));
         term_put_tuple_element(frame_info, 1, term_from_int(frames_modules[i].offset));
@@ -153,20 +160,20 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
     unsigned int num_aux_terms = 0;
     unsigned int filename_lens = 0;
     unsigned int num_mods = 0;
-    for (unsigned int i = 0; i < num_frames; i++) {
+    for (size_t i = 0; i < num_frames; ++i) {
         Module *mod = frames_modules[i].module;
         if (module_has_line_chunk(mod)) {
             // If module occurs more than once in the stacktrace
             // the path term is reused
-            bool module_already_counted = false;
-            for (unsigned int j = 0; j < i; j++) {
+            bool module_reused = false;
+            for (size_t j = 0; j < i; ++j) {
                 if (frames_modules[j].module == mod) {
-                    module_already_counted = true;
+                    module_reused = true;
                     break;
                 }
             }
-            if (!module_already_counted) {
-                for (u_int32_t j = 0; j < mod->num_filenames; j++) {
+            if (!module_reused) {
+                for (size_t j = 0; j < mod->num_filenames; ++j) {
                     filename_lens += mod->filenames[j].len;
                 }
                 num_mods += 1;
@@ -273,14 +280,14 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
             term file_tuple = term_alloc_tuple(2, &ctx->heap);
             term_put_tuple_element(file_tuple, 0, globalcontext_make_atom(glb, ATOM_STR("\x4", "file")));
 
-            struct ModuleFilename *filename = cp_mod->filenames + line_ref.filename_idx;
+            struct ModuleFilename *filename = &cp_mod->filenames[line_ref.filename_idx];
             // Reuse path term if already created
             term path = find_path_created(filename, module_paths, module_path_idx);
             if (term_is_invalid_term(path)) {
                 path = term_from_string((const uint8_t *) filename->data, filename->len, &ctx->heap);
                 module_paths[module_path_idx].module_filename = filename;
                 module_paths[module_path_idx].path = path;
-                module_path_idx++;
+                ++module_path_idx;
             }
             term_put_tuple_element(file_tuple, 1, path);
             aux_data = term_list_prepend(file_tuple, aux_data, &ctx->heap);
