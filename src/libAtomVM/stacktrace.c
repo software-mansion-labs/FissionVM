@@ -94,7 +94,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
 {
     term *stack_base = context_stack_base(ctx);
 
-    unsigned long stack_size = context_stack_size(ctx);
+    unsigned long stack_size = context_stack_size(ctx) + 1;
     struct ModuleOffsetPair *frames_modules = malloc(stack_size * sizeof(struct ModuleOffsetPair));
     if (IS_NULL_PTR(frames_modules)) {
         fprintf(stderr, "Unable to allocate space for modules list.  No stacktrace will be created\n");
