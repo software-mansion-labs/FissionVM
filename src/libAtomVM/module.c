@@ -48,6 +48,8 @@
 #define TAG_INT 0x01
 #define TAG_ATOM 0x02
 
+#define FREE_SPACE() ((size_t) (data + len - pos))
+
 #define CHECK_FREE_SPACE(space, error)           \
     if ((size_t) ((pos + space) - data) > len) { \
         fprintf(stderr, error);                  \
@@ -435,84 +437,95 @@ const struct ExportedFunction *module_resolve_function0(Module *mod, int import_
     }
 }
 
-static bool parse_line_ref_value(int32_t *value, uint8_t **data, size_t len)
+static bool decode_int(int32_t *value, uint8_t **data_ptr, size_t len)
 {
     // For reference see beam_disasm:decode_int/3 in ERTS
-    uint8_t *pos = *data;
+    uint8_t *data = *data_ptr;
+    uint8_t *pos = data;
     if ((*pos & 0x08) == 0) {
         // Value < 16
         *value = *pos >> 4;
         ++pos;
-        fprintf(stderr, "ci %d\n", *value);
     } else if ((*pos & 0x10) == 0) {
         // Value < 2048
-        if ((size_t) (pos + 1 - *data) > len) {
-            return false;
-        }
         uint16_t high_order_3_bits = (*pos & 0xE0);
         ++pos;
+        if (FREE_SPACE() < 1) {
+            return false;
+        }
         *value = (high_order_3_bits << 3) | *pos;
         ++pos;
     } else {
         // Value < 2^16
-        uint8_t int_length_header = *pos >> 5;
-        if (int_length_header != 0 || ((size_t) (pos + 2 - *data)) > len) {
+        uint8_t value_size_bytes = (*pos >> 5) + 2;
+        ++pos;
+        // Line refs >= 2^16 are not supported in ERTS
+        if (value_size_bytes != 2 || FREE_SPACE() < 2) {
             return false;
         }
-        *value = ((int16_t) * (pos + 1)) << 8 | *(pos + 2);
-        pos += 3;
+        *value = ((int16_t) *pos << 8 | *(pos + 1));
+        pos += 2;
     }
 
-    *data = pos;
+    *data_ptr = pos;
     return true;
 }
 
-static struct LineRef *parse_line_refs(uint8_t **data, size_t num_refs, size_t num_filenames, size_t len)
+static struct LineRef *parse_line_refs(uint8_t **data_ptr, size_t num_refs, uint32_t num_filenames, size_t len)
 {
     struct LineRef *ref_table = malloc(num_refs * sizeof(struct LineRef));
     if (IS_NULL_PTR(ref_table)) {
         return NULL;
     }
 
-    uint8_t filename_idx = 0;
+    uint8_t current_filename_idx = 0;
 
     // The line ref 0 represents 'undefined location'
     ref_table[0].line_idx = 0;
-    ref_table[0].filename_idx = filename_idx;
+    ref_table[0].filename_idx = current_filename_idx;
 
-    // From this point, the blob contains line indices (integers) mixed with 'a' atoms.
-    // Each occurence of the 'a' atom increases the filename index that further line indices refer to.
-    uint8_t *pos = *data;
-    size_t i = 1;
-    while (i < num_refs) {
-        if ((size_t) (pos - *data) > len) {
+    // From this point, the blob contains line indices (integers) mixed with pseudo-atoms.
+    // Each pseudo-atom is encoded as an atom but its ID doesn't correspond to a real atom,
+    // instead it contains the filename index that further line indices refer to.
+    uint8_t *data = *data_ptr;
+    uint8_t *pos = data;
+    for (size_t ref_num = 1; ref_num < num_refs;) {
+        if (FREE_SPACE() < 1) {
             fprintf(stderr, "Invalid line_ref: expected tag.\n");
             goto parse_line_refs_error;
         }
 
         uint8_t tag = *pos & 0x07;
-        if (tag & TAG_ATOM) {
-            ++filename_idx;
-            if (filename_idx >= num_filenames) {
-                fprintf(stderr, "Invalid file name index: %u, expected int\n", filename_idx);
+        int32_t filename_idx;
+        switch (tag) {
+            case TAG_ATOM:
+                // Atom ID is encoded as an integer, so we decode it with decode_int
+                if (!decode_int(&filename_idx, &pos, FREE_SPACE())) {
+                    fprintf(stderr, "Invalid file name index: %u, expected atom\n", *pos);
+                    goto parse_line_refs_error;
+                } else if (filename_idx >= (int32_t) num_filenames) {
+                    fprintf(stderr, "Invalid file name index: %d, max is %u\n", filename_idx, num_filenames - 1);
+                    goto parse_line_refs_error;
+                } else {
+                    current_filename_idx = filename_idx;
+                }
+                break;
+            case TAG_INT:
+                if (decode_int(&ref_table[ref_num].line_idx, &pos, FREE_SPACE())) {
+                    ref_table[ref_num].filename_idx = current_filename_idx;
+                    ref_num++;
+                } else {
+                    fprintf(stderr, "Invalid line_ref value: %u, expected int\n", *pos);
+                    goto parse_line_refs_error;
+                }
+                break;
+            default:
+                fprintf(stderr, "Invalid line_ref value %u\n", *pos);
                 goto parse_line_refs_error;
-            }
-            ++pos;
-        } else if (tag & TAG_INT) {
-            if (parse_line_ref_value(&ref_table[i].line_idx, &pos, *data + len - pos)) {
-                ref_table[i].filename_idx = filename_idx;
-                i++;
-            } else {
-                fprintf(stderr, "Invalid line_ref value: %u, expected int\n", *pos);
-                goto parse_line_refs_error;
-            }
-        } else {
-            fprintf(stderr, "Invalid line_ref value %u\n", *pos);
-            goto parse_line_refs_error;
         }
     }
 
-    *data = pos;
+    *data_ptr = pos;
     return ref_table;
 
 parse_line_refs_error:
