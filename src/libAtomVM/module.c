@@ -62,7 +62,7 @@ static void *module_uncompress_literals(const uint8_t *litT, int size);
 static struct LiteralEntry *module_build_literals_table(const void *literalsBuf);
 static void module_add_label(Module *mod, int index, const uint8_t *ptr);
 static enum ModuleLoadResult module_build_imported_functions_table(Module *this_module, uint8_t *table_data, GlobalContext *glb);
-static void parse_line_table(struct LineRef **line_refs, struct ModuleFilename **filenames, uint32_t *num_filenames, uint8_t *data, size_t len);
+static void parse_line_table(GlobalContext *global, Module *mod, uint8_t *data, size_t len);
 
 #define IMPL_CODE_LOADER 1
 #include "opcodesswitch.h"
@@ -281,7 +281,7 @@ Module *module_new_from_iff_binary(GlobalContext *global, const void *iff_binary
         return NULL;
     }
 
-    parse_line_table(&mod->line_refs, &mod->filenames, &mod->num_filenames, beam_file + offsets[LINT] + 8, sizes[LINT]);
+    parse_line_table(global, mod, beam_file + offsets[LINT] + 8, sizes[LINT]);
     list_init(&mod->line_ref_offsets);
 
     if (offsets[LITT]) {
@@ -534,17 +534,16 @@ parse_line_refs_error:
     return NULL;
 }
 
-struct ModuleFilename *parse_filename_table(uint8_t **data, size_t num_filenames, size_t len)
+struct ModuleFilename *parse_filename_table(uint8_t **data, AtomString mod_name, size_t num_filenames, size_t len)
 {
     struct ModuleFilename *filenames = malloc(num_filenames * sizeof(struct ModuleFilename));
     if (IS_NULL_PTR(filenames)) {
         return NULL;
     }
 
-    // Default file name, ERTS puts module name followed by .erl here
-    const char *unknown = "unknown";
-    filenames[0].data = (uint8_t *) unknown;
-    filenames[0].len = strlen(unknown);
+    // Use module name as a default file name
+    filenames[0].data = (uint8_t *) atom_string_data(mod_name);
+    filenames[0].len = atom_string_len(mod_name);
     uint8_t *pos = *data;
     for (size_t i = 1; i < num_filenames; ++i) {
         if ((size_t) ((pos + 2) - *data) > len) {
@@ -568,12 +567,15 @@ struct ModuleFilename *parse_filename_table(uint8_t **data, size_t num_filenames
     return filenames;
 }
 
-static void parse_line_table(struct LineRef **line_refs, struct ModuleFilename **filenames, uint32_t *num_filenames, uint8_t *data, size_t len)
+static void parse_line_table(GlobalContext *global, Module *mod, uint8_t *data, size_t len)
 {
     // See parse_line_chunk function in beam_file.c in ERTS
 
-    *line_refs = NULL;
-    *filenames = NULL;
+    term mod_name_term = module_get_name(mod);
+    AtomString mod_name = atom_table_get_atom_string(global->atom_table, term_to_atom_index(mod_name_term));
+
+    mod->line_refs = NULL;
+    mod->filenames = NULL;
 
     if (len == 0) {
         return;
@@ -606,17 +608,18 @@ static void parse_line_table(struct LineRef **line_refs, struct ModuleFilename *
 
     CHECK_FREE_SPACE(4, "Error reading Line chunk: num_filenames\n");
     // +1 for default file name
-    *num_filenames = READ_32_UNALIGNED(pos) + 1;
+    mod->num_filenames = READ_32_UNALIGNED(pos) + 1;
     pos += 4;
 
-    *line_refs = parse_line_refs(&pos, num_refs, *num_filenames, len - (pos - data));
-    if (IS_NULL_PTR(*line_refs)) {
+    mod->line_refs = parse_line_refs(&pos, num_refs, mod->num_filenames, FREE_SPACE());
+    if (IS_NULL_PTR(mod->line_refs)) {
         return;
     }
 
-    *filenames = parse_filename_table(&pos, *num_filenames, len - (pos - data));
-    if (IS_NULL_PTR(*filenames)) {
-        free(*line_refs);
+    mod->filenames = parse_filename_table(&pos, mod_name, mod->num_filenames, FREE_SPACE());
+    if (IS_NULL_PTR(mod->filenames)) {
+        free(mod->line_refs);
+        mod->line_refs = NULL;
         return;
     }
 }
