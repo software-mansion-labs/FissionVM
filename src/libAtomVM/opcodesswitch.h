@@ -1583,12 +1583,18 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
 }
 
 #ifdef ENABLE_ADVANCED_TRACE
+    #ifdef ADVANCED_TRACING_STDERR
+        #define ADVANCED_TRACING_TARGET stderr
+    #else
+        #define ADVANCED_TRACING_TARGET stdout
+    #endif
+
     static void print_function_args(const Context *ctx, int arity)
     {
         for (int i = 0; i < arity; i++) {
-            printf("DBG: <0.%i.0> -- arg%i: ", ctx->process_id, i);
-            term_display(stdout, ctx->x[i], ctx);
-            printf("\n");
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> -- arg%i: ", ctx->process_id, i);
+            term_display(ADVANCED_TRACING_TARGET, ctx->x[i], ctx);
+            fprintf(ADVANCED_TRACING_TARGET, "\n");
         }
     }
 
@@ -1601,10 +1607,10 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
             atom_string_to_c(function_name, func_string, 255);
 
             if (ctx->trace_call_args && (arity != 0)) {
-                printf("DBG: <0.%i.0> - %s %s:%s/%i:\n", ctx->process_id, call_type, module_string, func_string, arity);
+                fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %s:%s/%i:\n", ctx->process_id, call_type, module_string, func_string, arity);
                 print_function_args(ctx, arity);
             } else {
-                printf("DBG: <0.%i.0> - %s %s:%s/%i.\n", ctx->process_id, call_type, module_string, func_string, arity);
+                fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %s:%s/%i.\n", ctx->process_id, call_type, module_string, func_string, arity);
             }
         }
     }
@@ -1613,10 +1619,10 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
     {
         if (UNLIKELY(ctx->trace_calls)) {
             if (ctx->trace_call_args && (arity != 0)) {
-                printf("DBG: <0.%i.0> - %s %i:%i/%i:\n", ctx->process_id, call_type, mod->module_index, label, arity);
+                fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %i:%i/%i:\n", ctx->process_id, call_type, mod->module_index, label, arity);
                 print_function_args(ctx, arity);
             } else {
-                printf("DBG: <0.%i.0> - %s %i:%i/%i.\n", ctx->process_id, call_type, mod->module_index, label, arity);
+                fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %i:%i/%i.\n", ctx->process_id, call_type, mod->module_index, label, arity);
             }
         }
     }
@@ -1634,29 +1640,29 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
     static void trace_return(const Context *ctx)
     {
         if (UNLIKELY(ctx->trace_returns)) {
-            printf("DBG: <0.%i.0> - return, value: ", ctx->process_id);
-            term_display(stdout, ctx->x[0], ctx);
-            printf(".\n");
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - return, value: ", ctx->process_id);
+            term_display(ADVANCED_TRACING_TARGET, ctx->x[0], ctx);
+            fprintf(ADVANCED_TRACING_TARGET, ".\n");
         }
     }
 
     static void trace_send(const Context *ctx, term pid, term message)
     {
         if (UNLIKELY(ctx->trace_send)) {
-            printf("DBG: <0.%i.0> - send, pid: ", ctx->process_id);
-            term_display(stdout, pid, ctx);
-            printf(" message: ");
-            term_display(stdout, message, ctx);
-            printf(".\n");
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - send, pid: ", ctx->process_id);
+            term_display(ADVANCED_TRACING_TARGET, pid, ctx);
+            fprintf(ADVANCED_TRACING_TARGET, " message: ");
+            term_display(ADVANCED_TRACING_TARGET, message, ctx);
+            fprintf(ADVANCED_TRACING_TARGET, ".\n");
         }
     }
 
     static void trace_receive(const Context *ctx, term message)
     {
         if (UNLIKELY(ctx->trace_send)) {
-            printf("DBG: <0.%i.0> - receive, message: ", ctx->process_id);
-            term_display(stdout, message, ctx);
-            printf(".\n");
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - receive, message: ", ctx->process_id);
+            term_display(ADVANCED_TRACING_TARGET, message, ctx);
+            fprintf(ADVANCED_TRACING_TARGET, ".\n");
         }
     }
 
