@@ -50,10 +50,10 @@
 
 #define FREE_SPACE() ((size_t) (data + len - pos))
 
-#define CHECK_FREE_SPACE(space, error)           \
-    if ((size_t) ((pos + space) - data) > len) { \
-        fprintf(stderr, error);                  \
-        return;                                  \
+#define CHECK_FREE_SPACE(space, error)                     \
+    if (UNLIKELY((size_t) ((pos + space) - data) > len)) { \
+        fprintf(stderr, error);                            \
+        return;                                            \
     }
 
 #ifdef WITH_ZLIB
@@ -451,7 +451,7 @@ static bool decode_int(int32_t *value, uint8_t **data_ptr, size_t len)
         // 0000 0000 | vvv0 0000
         uint16_t high_order_3_bits = (*pos & 0xE0);
         ++pos;
-        if (FREE_SPACE() < 1) {
+        if (UNLIKELY(FREE_SPACE() < 1)) {
             return false;
         }
         *value = (high_order_3_bits << 3) | *pos;
@@ -461,7 +461,7 @@ static bool decode_int(int32_t *value, uint8_t **data_ptr, size_t len)
         uint8_t value_size_bytes = (*pos >> 5) + 2;
         ++pos;
         // Line refs >= 2^16 are not supported in ERTS
-        if (value_size_bytes != 2 || FREE_SPACE() < 2) {
+        if (UNLIKELY(value_size_bytes != 2 || FREE_SPACE() < 2)) {
             return false;
         }
         *value = ((int16_t) *pos << 8 | *(pos + 1));
@@ -491,7 +491,7 @@ static struct LineRef *parse_line_refs(uint8_t **data_ptr, size_t num_refs, uint
     uint8_t *data = *data_ptr;
     uint8_t *pos = data;
     for (size_t ref_num = 1; ref_num < num_refs;) {
-        if (FREE_SPACE() < 1) {
+        if (UNLIKELY(FREE_SPACE() < 1)) {
             fprintf(stderr, "Invalid line_ref: expected tag.\n");
             goto parse_line_refs_error;
         }

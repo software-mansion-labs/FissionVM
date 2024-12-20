@@ -206,16 +206,6 @@ struct ModulePathPair
     term path;
 };
 
-static term find_path_created(struct ModuleFilename *module_filename, struct ModulePathPair *module_paths, int len)
-{
-    for (int i = 0; i < len; ++i) {
-        if (module_paths[i].module_filename == module_filename) {
-            return module_paths[i].path;
-        }
-    }
-    return term_invalid_term();
-}
-
 term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
 {
     GlobalContext *glb = ctx->global;
@@ -282,7 +272,13 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
 
             struct ModuleFilename *filename = &cp_mod->filenames[line_ref.filename_idx];
             // Reuse path term if already created
-            term path = find_path_created(filename, module_paths, module_path_idx);
+            term path = term_invalid_term();
+            for (int i = 0; i < module_path_idx; ++i) {
+                if (module_paths[i].module_filename == filename) {
+                    path = module_paths[i].path;
+                    break;
+                }
+            }
             if (term_is_invalid_term(path)) {
                 path = term_from_string((const uint8_t *) filename->data, filename->len, &ctx->heap);
                 module_paths[module_path_idx].module_filename = filename;
