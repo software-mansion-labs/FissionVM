@@ -195,10 +195,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
     result = stack_info;
 
 stacktrace_create_raw_cleanup:
-    if (frames_modules) {
-        free(frames_modules);
-    }
-
+    free(frames_modules);
     return result;
 }
 
@@ -321,10 +318,7 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
     result = stacktrace;
 
 stacktrace_build_cleanup:
-    if (modules_paths) {
-        free(modules_paths);
-    }
-
+    free(modules_paths);
     return result;
 }
 
