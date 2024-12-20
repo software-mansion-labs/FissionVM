@@ -639,7 +639,7 @@ void module_insert_line_ref_offset(Module *mod, int line_ref, int offset)
     list_append(&mod->line_ref_offsets, &ref_offset->head);
 }
 
-struct LineRef module_find_line(Module *mod, unsigned int offset)
+struct LineRef module_find_line(const Module *mod, unsigned int offset)
 {
     int i = 0;
     struct LineRefOffset *head = GET_LIST_ENTRY(&mod->line_ref_offsets, struct LineRefOffset, head);
@@ -666,7 +666,7 @@ struct LineRef module_find_line(Module *mod, unsigned int offset)
 
         ++i;
     }
-    // should never occur, but return is needed to squelch compiler warnings
-    AVM_ABORT();
-    return (struct LineRef){};
+    // For some reason this happens for prim_eval.erl
+    // It may be because it's compiled from an asm (.S) file
+    return (struct LineRef){ .line_idx = -1, .filename_idx = 0 };
 }

@@ -412,12 +412,12 @@ void module_insert_line_ref_offset(Module *mod, int line_ref, int offset);
  * @param offset
  * @return the line reference
  */
-struct LineRef module_find_line(Module *mod, unsigned int offset);
+struct LineRef module_find_line(const Module *mod, unsigned int offset);
 
 /**
  * @return true if the module has line information, false, otherwise.
  */
-static inline bool module_has_line_chunk(Module *mod)
+static inline bool module_has_line_chunk(const Module *mod)
 {
     return mod->line_refs != NULL;
 }
