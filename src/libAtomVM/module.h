@@ -88,6 +88,12 @@ struct ModuleFilename
     size_t len;
 };
 
+struct LineRef
+{
+    int32_t line_idx;
+    uint8_t filename_idx;
+};
+
 struct LineRefOffset
 {
     struct ListHead head;
@@ -109,8 +115,9 @@ struct Module
     void *str_table;
     size_t str_table_len;
 
-    uint16_t *line_refs;
+    struct LineRef *line_refs;
     struct ModuleFilename *filenames;
+    uint32_t num_filenames;
     struct ListHead line_ref_offsets;
 
     const struct ExportedFunction **imported_funcs;
@@ -405,7 +412,7 @@ void module_insert_line_ref_offset(Module *mod, int line_ref, int offset);
  * @param offset
  * @return the line reference
  */
-int module_find_line(Module *mod, unsigned int offset);
+struct LineRef module_find_line(Module *mod, unsigned int offset);
 
 /**
  * @return true if the module has line information, false, otherwise.

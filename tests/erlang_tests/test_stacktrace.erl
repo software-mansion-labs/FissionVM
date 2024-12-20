@@ -22,6 +22,7 @@
 -export([start/0, maybe_crash/1]).
 
 start() ->
+    ok = load_crappy_module(),
     ok = test_local_throw(),
     ok = test_local_error(),
     ok = test_badmatch(),
@@ -34,6 +35,46 @@ start() ->
     ok = test_catch(),
     ok = maybe_test_filelineno(),
     0.
+
+load_crappy_module() ->
+    % The module below is modified to contain 3 filenames (foo.erl, file1.erl and file2.erl)
+    % and line numbers >= 2048. Both of these features make it trigger specific code paths
+    % in parsing the BEAM LINE chunk. Apart from that, the module code is the following:
+    %
+    % -module(crappy_module).
+    % -export([make_error/1, bar/0]).
+    % make_error(Term) -> error(Term), error.
+    % bar() -> ok.
+
+    CrappyModuleBeam =
+        <<70, 79, 82, 49, 0, 0, 2, 52, 66, 69, 65, 77, 65, 116, 85, 56, 0, 0, 0, 77, 0, 0, 0, 8, 13,
+            99, 114, 97, 112, 112, 121, 95, 109, 111, 100, 117, 108, 101, 10, 109, 97, 107, 101, 95,
+            101, 114, 114, 111, 114, 6, 101, 114, 108, 97, 110, 103, 5, 101, 114, 114, 111, 114, 3,
+            102, 111, 111, 2, 111, 107, 11, 109, 111, 100, 117, 108, 101, 95, 105, 110, 102, 111,
+            15, 103, 101, 116, 95, 109, 111, 100, 117, 108, 101, 95, 105, 110, 102, 111, 0, 0, 0,
+            67, 111, 100, 101, 0, 0, 0, 85, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 169, 0, 0, 0, 9, 0, 0,
+            0, 4, 1, 16, 153, 16, 2, 18, 34, 16, 1, 32, 153, 32, 78, 16, 0, 1, 48, 153, 48, 2, 18,
+            82, 0, 1, 64, 64, 98, 3, 19, 1, 80, 153, 0, 2, 18, 114, 0, 1, 96, 64, 18, 3, 78, 16, 16,
+            1, 112, 153, 0, 2, 18, 114, 16, 1, 128, 64, 3, 19, 64, 18, 3, 78, 32, 32, 3, 0, 0, 0,
+            83, 116, 114, 84, 0, 0, 0, 0, 73, 109, 112, 84, 0, 0, 0, 40, 0, 0, 0, 3, 0, 0, 0, 3, 0,
+            0, 0, 4, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 8, 0, 0,
+            0, 2, 69, 120, 112, 84, 0, 0, 0, 52, 0, 0, 0, 4, 0, 0, 0, 7, 0, 0, 0, 1, 0, 0, 0, 8, 0,
+            0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0,
+            0, 1, 0, 0, 0, 2, 76, 111, 99, 84, 0, 0, 0, 4, 0, 0, 0, 0, 65, 116, 116, 114, 0, 0, 0,
+            39, 131, 108, 0, 0, 0, 1, 104, 2, 119, 3, 118, 115, 110, 108, 0, 0, 0, 1, 110, 16, 0,
+            86, 218, 176, 105, 192, 66, 90, 202, 116, 113, 109, 86, 199, 94, 207, 115, 106, 106, 0,
+            67, 73, 110, 102, 0, 0, 0, 54, 131, 108, 0, 0, 0, 2, 104, 2, 119, 7, 118, 101, 114, 115,
+            105, 111, 110, 107, 0, 5, 56, 46, 51, 46, 50, 104, 2, 119, 7, 111, 112, 116, 105, 111,
+            110, 115, 108, 0, 0, 0, 1, 119, 9, 102, 114, 111, 109, 95, 99, 111, 114, 101, 106, 106,
+            0, 0, 68, 98, 103, 105, 0, 0, 0, 46, 131, 104, 3, 119, 13, 100, 101, 98, 117, 103, 95,
+            105, 110, 102, 111, 95, 118, 49, 119, 17, 101, 114, 108, 95, 97, 98, 115, 116, 114, 97,
+            99, 116, 95, 99, 111, 100, 101, 104, 2, 119, 4, 110, 111, 110, 101, 106, 0, 0, 76, 105,
+            110, 101, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 3, 0, 0, 0, 2, 18,
+            25, 8, 88, 25, 8, 89, 34, 145, 0, 9, 102, 105, 108, 101, 49, 46, 101, 114, 108, 0, 9,
+            102, 105, 108, 101, 50, 46, 101, 114, 108, 0, 84, 121, 112, 101, 0, 0, 0, 10, 0, 0, 0,
+            2, 0, 0, 0, 1, 31, 255, 0, 0>>,
+    {module, crappy_module} = code:load_binary(crappy_module, "", CrappyModuleBeam),
+    ok.
 
 test_local_throw() ->
     ok =
@@ -62,7 +103,7 @@ test_local_error() ->
                 expect_stacktrace(
                     Stacktrace,
                     [
-                        {?MODULE, maybe_crash, 1},
+                        {crappy_module, make_error, 1, [{file, "file1.erl"}, {line, 2137}]},
                         {?MODULE, test_local_error, 0},
                         {?MODULE, start, 0}
                     ]
@@ -222,7 +263,7 @@ test_catch() ->
     Result = expect_stacktrace(
         Stacktrace,
         [
-            {?MODULE, maybe_crash, 1},
+            {crappy_module, make_error, 1, [{file, "file1.erl"}, {line, 2137}]},
             {?MODULE, test_catch, 0},
             {?MODULE, start, 0}
         ]
@@ -276,7 +317,7 @@ maybe_crash(Term) ->
         throw_me ->
             throw(Term);
         error_me ->
-            error(Term)
+            crappy_module:make_error(Term)
     end.
 
 maybe_badmatch(Term) ->
@@ -286,40 +327,40 @@ do_some_stuff(_) ->
     ok.
 
 expect_stacktrace(Stacktrace, Expect) ->
-    % erlang:display({stacktrace, [{M, F, A} || {M, F, A, _} <- Stacktrace]}),
-    % erlang:display({stacktrace, Stacktrace}),
-    % erlang:display({expect, Expect}),
-    MFAStacktrace = [{M, F, A} || {M, F, A, _} <- Stacktrace],
-    case contains_in_order(Expect, remove_duplicates(MFAStacktrace, [])) of
-        true ->
-            ok;
-        _ ->
-            error(shit)
+    case validate_stacktrace(Stacktrace) of
+        ok -> ok;
+        Error1 -> error(Error1)
+    end,
+    case contains_in_order(Stacktrace, Expect) of
+        true -> ok;
+        Error2 -> error(Error2)
     end.
 
-remove_duplicates([], Accum) ->
-    reverse(Accum, []);
-remove_duplicates([H, H | T], Accum) ->
-    remove_duplicates([H | T], Accum);
-remove_duplicates([H | T], Accum) ->
-    remove_duplicates(T, [H | Accum]).
+validate_stacktrace([]) ->
+    ok;
+validate_stacktrace([{M, F, A, [{file, File}, {line, Line}]} | Stacktrace]) when
+    is_atom(M) and is_atom(F) and is_integer(A) and
+        (A >= 0) and is_list(File) and is_integer(Line) and (Line >= 0)
+->
+    validate_stacktrace(Stacktrace);
+validate_stacktrace([E | _S]) ->
+    {invalid_stacktrace_entry, E}.
 
-reverse([], Accum) -> Accum;
-reverse([H | T], Accum) -> reverse(T, [H | Accum]).
-
-contains_in_order([], _) ->
+contains_in_order(_Stacktrace, []) ->
     true;
-contains_in_order([H | T], E) ->
-    case find(H, E) of
+contains_in_order(Stacktrace, [H | Expect]) ->
+    case find(Stacktrace, H) of
         not_found ->
-            false;
-        E2 ->
-            contains_in_order(T, E2)
+            {entry_not_found, H, Stacktrace};
+        Stacktrace2 ->
+            contains_in_order(Stacktrace2, Expect)
     end.
 
-find(_H, []) ->
+find([], _Entry) ->
     not_found;
-find(H, [H | T]) ->
-    T;
-find(H, [_ | T]) ->
-    find(H, T).
+find([Entry | Stacktrace], Entry) ->
+    Stacktrace;
+find([{M, F, A, _Location} | Stacktrace], {M, F, A}) ->
+    Stacktrace;
+find([_H | Stacktrace], Entry) ->
+    find(Stacktrace, Entry).

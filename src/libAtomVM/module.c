@@ -28,10 +28,10 @@
 #include "iff.h"
 #include "list.h"
 #include "nifs.h"
+#include "smp.h"
+#include "sys.h"
 #include "term.h"
 #include "utils.h"
-#include "sys.h"
-#include "smp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,24 +45,24 @@
 
 // TODO Constants similar to these are defined in opcodesswitch.h and should
 // be refactored so they can be used here, as well.
-#define TAG_COMPACT_INT 0x01
-#define TAG_COMPACT_ATOM 0x02
-#define TAG_EXTENDED_INT 0x09
-#define TAG_EXTENDED_ATOM 0x0A
+#define TAG_INT 0x01
+#define TAG_ATOM 0x02
 
-#define CHECK_FREE_SPACE(space, error)           \
-    if ((size_t) ((pos + space) - data) > len) { \
-        fprintf(stderr, error);                  \
-        return;                                  \
+#define FREE_SPACE() ((size_t) (data + len - pos))
+
+#define CHECK_FREE_SPACE(space, error)                     \
+    if (UNLIKELY((size_t) ((pos + space) - data) > len)) { \
+        fprintf(stderr, error);                            \
+        return;                                            \
     }
 
 #ifdef WITH_ZLIB
-    static void *module_uncompress_literals(const uint8_t *litT, int size);
+static void *module_uncompress_literals(const uint8_t *litT, int size);
 #endif
 static struct LiteralEntry *module_build_literals_table(const void *literalsBuf);
 static void module_add_label(Module *mod, int index, const uint8_t *ptr);
 static enum ModuleLoadResult module_build_imported_functions_table(Module *this_module, uint8_t *table_data, GlobalContext *glb);
-static void parse_line_table(uint16_t **line_refs, struct ModuleFilename **filenames, uint8_t *data, size_t len);
+static void parse_line_table(GlobalContext *global, Module *mod, uint8_t *data, size_t len);
 
 #define IMPL_CODE_LOADER 1
 #include "opcodesswitch.h"
@@ -100,7 +100,7 @@ static enum ModuleLoadResult module_build_imported_functions_table(Module *this_
         return MODULE_ERROR_FAILED_ALLOCATION;
     }
 
-    for (int i = 0; i < functions_count; i++) {
+    for (int i = 0; i < functions_count; ++i) {
         int local_module_atom_index = READ_32_ALIGNED(table_data + i * 12 + 12);
         int local_function_atom_index = READ_32_ALIGNED(table_data + i * 12 + 4 + 12);
         AtomString module_atom = module_get_atom_string_by_id(this_module, local_module_atom_index, glb);
@@ -196,7 +196,7 @@ uint32_t module_search_exported_function(Module *this_module, AtomString func_na
     size_t functions_count = module_get_exported_functions_count(this_module);
 
     const uint8_t *table_data = (const uint8_t *) this_module->export_table;
-    for (unsigned int i = 0; i < functions_count; i++) {
+    for (unsigned int i = 0; i < functions_count; ++i) {
         AtomString function_atom = module_get_atom_string_by_id(this_module, READ_32_ALIGNED(table_data + i * 12 + 12), glb);
         int32_t arity = READ_32_ALIGNED(table_data + i * 12 + 4 + 12);
         if ((func_arity == arity) && atom_are_equals(func_name, function_atom)) {
@@ -214,7 +214,7 @@ term module_get_exported_functions(Module *this_module, Heap *heap, GlobalContex
     term result_list = term_nil();
 
     const uint8_t *table_data = (const uint8_t *) this_module->export_table;
-    for (unsigned int i = 0; i < functions_count; i++) {
+    for (unsigned int i = 0; i < functions_count; ++i) {
         AtomString function_atom = module_get_atom_string_by_id(this_module, READ_32_ALIGNED(table_data + i * 12 + 12), glb);
         int32_t arity = READ_32_ALIGNED(table_data + i * 12 + 4 + 12);
         term function_tuple = term_alloc_tuple(2, heap);
@@ -281,21 +281,21 @@ Module *module_new_from_iff_binary(GlobalContext *global, const void *iff_binary
         return NULL;
     }
 
-    parse_line_table(&mod->line_refs, &mod->filenames, beam_file + offsets[LINT] + 8, sizes[LINT]);
+    parse_line_table(global, mod, beam_file + offsets[LINT] + 8, sizes[LINT]);
     list_init(&mod->line_ref_offsets);
 
     if (offsets[LITT]) {
-        #ifdef WITH_ZLIB
-            mod->literals_data = module_uncompress_literals(beam_file + offsets[LITT], sizes[LITT]);
-            if (IS_NULL_PTR(mod->literals_data)) {
-                module_destroy(mod);
-                return NULL;
-            }
-        #else
-            fprintf(stderr, "Error: zlib required to uncompress literals.\n");
+#ifdef WITH_ZLIB
+        mod->literals_data = module_uncompress_literals(beam_file + offsets[LITT], sizes[LITT]);
+        if (IS_NULL_PTR(mod->literals_data)) {
             module_destroy(mod);
             return NULL;
-        #endif
+        }
+#else
+        fprintf(stderr, "Error: zlib required to uncompress literals.\n");
+        module_destroy(mod);
+        return NULL;
+#endif
 
         mod->literals_table = module_build_literals_table(mod->literals_data);
         mod->free_literals_data = 1;
@@ -378,7 +378,7 @@ static struct LiteralEntry *module_build_literals_table(const void *literalsBuf)
         fprintf(stderr, "Failed to allocate memory: %s:%i.\n", __FILE__, __LINE__);
         return NULL;
     }
-    for (uint32_t i = 0; i < terms_count; i++) {
+    for (uint32_t i = 0; i < terms_count; ++i) {
         uint32_t term_size = READ_32_UNALIGNED(pos);
         literals_table[i].size = term_size;
         literals_table[i].data = pos + sizeof(uint32_t);
@@ -437,99 +437,124 @@ const struct ExportedFunction *module_resolve_function0(Module *mod, int import_
     }
 }
 
-static uint16_t *parse_line_refs(uint8_t **data, size_t num_refs, size_t len)
+static bool decode_int(int32_t *value, uint8_t **data_ptr, size_t len)
 {
-    uint16_t *ref_table = malloc((num_refs + 1) * sizeof(uint16_t));
+    // For reference see beam_disasm:decode_int/3 in ERTS
+    uint8_t *data = *data_ptr;
+    uint8_t *pos = data;
+    if ((*pos & 0x08) == 0) {
+        // Value < 16
+        *value = *pos >> 4;
+        ++pos;
+    } else if ((*pos & 0x10) == 0) {
+        // Value < 2048
+        // 0000 0000 | vvv0 0000
+        uint16_t high_order_3_bits = (*pos & 0xE0);
+        ++pos;
+        if (UNLIKELY(FREE_SPACE() < 1)) {
+            return false;
+        }
+        *value = (high_order_3_bits << 3) | *pos;
+        ++pos;
+    } else {
+        // Value < 2^16
+        uint8_t value_size_bytes = (*pos >> 5) + 2;
+        ++pos;
+        // Line refs >= 2^16 are not supported in ERTS
+        if (UNLIKELY(value_size_bytes != 2 || FREE_SPACE() < 2)) {
+            return false;
+        }
+        *value = ((int16_t) *pos << 8 | *(pos + 1));
+        pos += 2;
+    }
+
+    *data_ptr = pos;
+    return true;
+}
+
+static struct LineRef *parse_line_refs(uint8_t **data_ptr, size_t num_refs, uint32_t num_filenames, size_t len)
+{
+    struct LineRef *ref_table = malloc(num_refs * sizeof(struct LineRef));
     if (IS_NULL_PTR(ref_table)) {
         return NULL;
     }
 
-    // assert pos >= *data
-    uint8_t *pos = *data;
-    for (size_t i = 0; i < num_refs + 1; ++i) {
-        if ((size_t) (pos - *data) > len) {
+    uint8_t current_filename_idx = 0;
+
+    // The line ref 0 represents 'undefined location'
+    ref_table[0].line_idx = 0;
+    ref_table[0].filename_idx = current_filename_idx;
+
+    // From this point, the blob contains line indices (integers) mixed with pseudo-atoms.
+    // Each pseudo-atom is encoded as an atom but its ID doesn't correspond to a real atom,
+    // instead it contains the filename index that further line indices refer to.
+    uint8_t *data = *data_ptr;
+    uint8_t *pos = data;
+    for (size_t ref_num = 1; ref_num < num_refs;) {
+        if (UNLIKELY(FREE_SPACE() < 1)) {
             fprintf(stderr, "Invalid line_ref: expected tag.\n");
-            free(ref_table);
-            return NULL;
+            goto parse_line_refs_error;
         }
-        uint8_t tag = *pos;
-        switch (tag & 0x0F) {
-            case TAG_COMPACT_INT: {
-                uint16_t line_idx = ((tag & 0xF0) >> 4);
-                ref_table[i] = line_idx;
-                ++pos;
-                break;
-            }
-            case TAG_COMPACT_ATOM: {
-                uint16_t line_idx = ((tag & 0xF0) >> 4);
-                ref_table[i] = line_idx;
-                ++pos;
-                break;
-            }
-            case TAG_EXTENDED_INT: {
-                uint16_t high_order_3_bits = (tag & 0xE0);
-                ++pos;
-                if ((size_t) (pos - *data) > len) {
-                    fprintf(stderr, "Invalid line_ref: expected extended int.\n");
-                    free(ref_table);
-                    return NULL;
+
+        uint8_t tag = *pos & 0x07;
+        int32_t filename_idx;
+        switch (tag) {
+            case TAG_ATOM:
+                // Atom ID is encoded as an integer, so we decode it with decode_int
+                if (!decode_int(&filename_idx, &pos, FREE_SPACE())) {
+                    fprintf(stderr, "Invalid file name index: %u, expected atom\n", *pos);
+                    goto parse_line_refs_error;
+                } else if (filename_idx >= (int32_t) num_filenames) {
+                    fprintf(stderr, "File name index: %d exceeds expected number of filenames %u\n", filename_idx, num_filenames);
+                    goto parse_line_refs_error;
+                } else {
+                    current_filename_idx = filename_idx;
                 }
-                uint8_t next_byte = *pos;
-                uint16_t line_idx = ((high_order_3_bits << 3) | next_byte);
-                ++pos;
-                ref_table[i] = line_idx;
                 break;
-            }
-            case TAG_EXTENDED_ATOM: {
-                uint16_t file_idx = ((tag & 0xF0) >> 4);
-                ++pos;
-                if ((size_t) (pos - *data) > len) {
-                    fprintf(stderr, "Invalid line_ref: expected extended atom.\n");
-                    free(ref_table);
-                    return NULL;
+            case TAG_INT:
+                if (decode_int(&ref_table[ref_num].line_idx, &pos, FREE_SPACE())) {
+                    ref_table[ref_num].filename_idx = current_filename_idx;
+                    ++ref_num;
+                } else {
+                    fprintf(stderr, "Invalid line_ref value: %u, expected int\n", *pos);
+                    goto parse_line_refs_error;
                 }
-                uint8_t next_byte = *pos;
-                uint16_t line_idx = ((next_byte & 0xF0) >> 4);
-                ++pos;
-                if(file_idx == 0) {
-                    fprintf(stderr, "Invalid line_ref: expected correct file_idx for extended atom.\n");
-                    free(ref_table);
-                    return NULL;
-                }
-                ref_table[file_idx - 1] = line_idx;
                 break;
-            }
             default:
-                // TODO handle integer compact encodings > 2048
-                fprintf(stderr, "Unsupported line_ref tag: %u\n", tag);
-                free(ref_table);
-                return NULL;
+                fprintf(stderr, "Invalid line_ref value %u\n", *pos);
+                goto parse_line_refs_error;
         }
     }
 
-    *data = pos;
+    *data_ptr = pos;
     return ref_table;
+
+parse_line_refs_error:
+    free(ref_table);
+    return NULL;
 }
 
-struct ModuleFilename *parse_filename_table(uint8_t **data, size_t num_filenames, size_t len)
+struct ModuleFilename *parse_filename_table(uint8_t **data, AtomString mod_name, size_t num_filenames, size_t len)
 {
     struct ModuleFilename *filenames = malloc(num_filenames * sizeof(struct ModuleFilename));
     if (IS_NULL_PTR(filenames)) {
         return NULL;
     }
 
-    // assert pos >= *data
+    // Use module name as a default file name
+    filenames[0].data = (uint8_t *) atom_string_data(mod_name);
+    filenames[0].len = atom_string_len(mod_name);
     uint8_t *pos = *data;
-    for (size_t i = 0; i < num_filenames; ++i) {
+    for (size_t i = 1; i < num_filenames; ++i) {
         if ((size_t) ((pos + 2) - *data) > len) {
             fprintf(stderr, "Invalid filename: expected 16-bit size.\n");
             free(filenames);
             return NULL;
         }
         uint16_t size = READ_16_UNALIGNED(pos);
-        pos +=2;
+        pos += 2;
         if ((size_t) ((pos + size) - *data) > len) {
-            fprintf(stderr, "Invalid filename: expected filename data (%u bytes).\n", size);
+            fprintf(stderr, "Invalid filename: expected filename data (%u bytes), only %zu bytes left.\n", size, len - (pos - *data));
             free(filenames);
             return NULL;
         }
@@ -542,11 +567,15 @@ struct ModuleFilename *parse_filename_table(uint8_t **data, size_t num_filenames
     return filenames;
 }
 
-static void parse_line_table(uint16_t **line_refs, struct ModuleFilename **filenames, uint8_t *data, size_t len)
+static void parse_line_table(GlobalContext *global, Module *mod, uint8_t *data, size_t len)
 {
+    // See parse_line_chunk function in beam_file.c in ERTS
 
-    *line_refs = NULL;
-    *filenames = NULL;
+    term mod_name_term = module_get_name(mod);
+    AtomString mod_name = atom_table_get_atom_string(global->atom_table, term_to_atom_index(mod_name_term));
+
+    mod->line_refs = NULL;
+    mod->filenames = NULL;
 
     if (len == 0) {
         return;
@@ -573,21 +602,24 @@ static void parse_line_table(uint16_t **line_refs, struct ModuleFilename **filen
     pos += 4;
 
     CHECK_FREE_SPACE(4, "Error reading Line chunk: num_refs\n");
-    uint32_t num_refs = READ_32_UNALIGNED(pos);
+    // +1 for default line ref
+    uint32_t num_refs = READ_32_UNALIGNED(pos) + 1;
     pos += 4;
 
     CHECK_FREE_SPACE(4, "Error reading Line chunk: num_filenames\n");
-    uint32_t num_filenames = READ_32_UNALIGNED(pos);
+    // +1 for default file name
+    mod->num_filenames = READ_32_UNALIGNED(pos) + 1;
     pos += 4;
 
-    *line_refs = parse_line_refs(&pos, num_refs, len - (pos - data));
-    if (IS_NULL_PTR(*line_refs)) {
+    mod->line_refs = parse_line_refs(&pos, num_refs, mod->num_filenames, FREE_SPACE());
+    if (IS_NULL_PTR(mod->line_refs)) {
         return;
     }
 
-    *filenames = parse_filename_table(&pos, num_filenames, len - (pos - data));
-    if (IS_NULL_PTR(*filenames)) {
-        free(*line_refs);
+    mod->filenames = parse_filename_table(&pos, mod_name, mod->num_filenames, FREE_SPACE());
+    if (IS_NULL_PTR(mod->filenames)) {
+        free(mod->line_refs);
+        mod->line_refs = NULL;
         return;
     }
 }
@@ -607,7 +639,7 @@ void module_insert_line_ref_offset(Module *mod, int line_ref, int offset)
     list_append(&mod->line_ref_offsets, &ref_offset->head);
 }
 
-int module_find_line(Module *mod, unsigned int offset)
+struct LineRef module_find_line(Module *mod, unsigned int offset)
 {
     int i = 0;
     struct LineRefOffset *head = GET_LIST_ENTRY(&mod->line_ref_offsets, struct LineRefOffset, head);
@@ -618,7 +650,7 @@ int module_find_line(Module *mod, unsigned int offset)
         if (offset == ref_offset->offset) {
             return mod->line_refs[ref_offset->line_ref];
         } else if (i == 0 && offset < ref_offset->offset) {
-            return -1;
+            return (struct LineRef){ .line_idx = -1, .filename_idx = 0 };
         } else {
 
             struct LineRefOffset *prev_ref_offset = GET_LIST_ENTRY(ref_offset->head.prev, struct LineRefOffset, head);
@@ -636,5 +668,5 @@ int module_find_line(Module *mod, unsigned int offset)
     }
     // should never occur, but return is needed to squelch compiler warnings
     AVM_ABORT();
-    return -1;
+    return (struct LineRef){};
 }
