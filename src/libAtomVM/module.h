@@ -61,6 +61,9 @@ typedef struct Mutex Mutex;
 #define SMP_MODULE_UNLOCK(mod)
 #endif
 
+#define MODULE_OFFSET_FROM_CP(cp) ((cp & 0xFFFFFF) >> 2)
+#define MODULE_INDEX_FROM_CP(cp) (cp >> 24)
+
 typedef struct
 {
     char magic[4];
@@ -412,12 +415,12 @@ void module_insert_line_ref_offset(Module *mod, int line_ref, int offset);
  * @param offset
  * @return the line reference
  */
-struct LineRef module_find_line(Module *mod, unsigned int offset);
+struct LineRef module_find_line(const Module *mod, unsigned int offset);
 
 /**
  * @return true if the module has line information, false, otherwise.
  */
-static inline bool module_has_line_chunk(Module *mod)
+static inline bool module_has_line_chunk(const Module *mod)
 {
     return mod->line_refs != NULL;
 }

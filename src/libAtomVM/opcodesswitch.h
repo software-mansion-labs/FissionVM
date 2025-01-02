@@ -1078,7 +1078,7 @@ static void destroy_extended_registers(Context *ctx, unsigned int live)
 
 #define DO_RETURN()                                                     \
     {                                                                   \
-        int module_index = ctx->cp >> 24;                               \
+        int module_index = MODULE_INDEX_FROM_CP(ctx->cp);               \
         if (module_index == prev_mod->module_index) {                   \
             Module *t = mod;                                            \
             mod = prev_mod;                                             \
@@ -1089,7 +1089,7 @@ static void destroy_extended_registers(Context *ctx, unsigned int live)
             mod = globalcontext_get_module_by_index(glb, module_index); \
             code = mod->code->code;                                     \
         }                                                               \
-        pc = code + ((ctx->cp & 0xFFFFFF) >> 2);                        \
+        pc = code + MODULE_OFFSET_FROM_CP(ctx->cp);                     \
     }
 
 #define HANDLE_ERROR()                                                  \
@@ -1306,8 +1306,8 @@ static int get_catch_label_and_change_module(Context *ctx, Module **mod)
 
 COLD_FUNC static void cp_to_mod_lbl_off(term cp, Context *ctx, Module **cp_mod, int *label, int *l_off)
 {
-    Module *mod = globalcontext_get_module_by_index(ctx->global, cp >> 24);
-    long mod_offset = (cp & 0xFFFFFF) >> 2;
+    Module *mod = globalcontext_get_module_by_index(ctx->global, MODULE_INDEX_FROM_CP(cp));
+    long mod_offset = MODULE_OFFSET_FROM_CP(cp);
 
     *cp_mod = mod;
 
@@ -1583,16 +1583,39 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
 }
 
 #ifdef ENABLE_ADVANCED_TRACE
-    static void print_function_args(const Context *ctx, int arity)
-    {
-        for (int i = 0; i < arity; i++) {
-            printf("DBG: <0.%i.0> -- arg%i: ", ctx->process_id, i);
-            term_display(stdout, ctx->x[i], ctx);
-            printf("\n");
+    #ifdef ADVANCED_TRACING_STDERR
+        #define ADVANCED_TRACING_TARGET stderr
+    #else
+        #define ADVANCED_TRACING_TARGET stdout
+    #endif
+
+    static void get_location(const Context *ctx, const Module *mod, const char **name, int *name_len, int32_t *line) {
+        if (module_has_line_chunk(mod)) {
+            long mod_offset = MODULE_OFFSET_FROM_CP(ctx->cp);
+            struct LineRef line_ref = module_find_line(mod, (unsigned int) mod_offset);
+            struct ModuleFilename filename = mod->filenames[line_ref.filename_idx];
+            *name = (char *) filename.data;
+            *name_len = filename.len;
+            *line = line_ref.line_idx;
+        } else {
+            term mod_name_term = module_get_name(mod);
+            AtomString mod_name = atom_table_get_atom_string(ctx->global->atom_table, term_to_atom_index(mod_name_term));
+            *name = (char *) atom_string_data(mod_name);
+            *name_len = atom_string_len(mod_name);
+            *line = 0;
         }
     }
 
-    static void trace_apply(const Context *ctx, const char *call_type, AtomString module_name, AtomString function_name, int arity)
+    static void print_function_args(const Context *ctx, int arity)
+    {
+        for (int i = 0; i < arity; i++) {
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> -- arg%i: ", ctx->process_id, i);
+            term_display(ADVANCED_TRACING_TARGET, ctx->x[i], ctx);
+            fprintf(ADVANCED_TRACING_TARGET, "\n");
+        }
+    }
+
+    static void trace_apply(const Context *ctx, const char *call_type, const Module *mod, AtomString module_name, AtomString function_name, int arity)
     {
         if (UNLIKELY(ctx->trace_calls)) {
             char module_string[255];
@@ -1600,11 +1623,13 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
             char func_string[255];
             atom_string_to_c(function_name, func_string, 255);
 
+            char *name;
+            int name_len;
+            int32_t line;
+            get_location(ctx, mod, &name, &name_len, &line);
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %s:%s/%i at %.*s:%d\n", ctx->process_id, call_type, module_string, func_string, arity, name_len, name, line);
             if (ctx->trace_call_args && (arity != 0)) {
-                printf("DBG: <0.%i.0> - %s %s:%s/%i:\n", ctx->process_id, call_type, module_string, func_string, arity);
-                print_function_args(ctx, arity);
-            } else {
-                printf("DBG: <0.%i.0> - %s %s:%s/%i.\n", ctx->process_id, call_type, module_string, func_string, arity);
+                fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %s:%s/%i:\n", ctx->process_id, call_type, module_string, func_string, arity);
             }
         }
     }
@@ -1612,11 +1637,13 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
     static void trace_call(const Context *ctx, const Module *mod, const char *call_type, int label, int arity)
     {
         if (UNLIKELY(ctx->trace_calls)) {
+            char *name;
+            int name_len;
+            int32_t line;
+            get_location(ctx, mod, &name, &name_len, &line);
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %i:%i/%i at %.*s:%d\n", ctx->process_id, call_type, mod->module_index, label, arity, name_len, name, line);
             if (ctx->trace_call_args && (arity != 0)) {
-                printf("DBG: <0.%i.0> - %s %i:%i/%i:\n", ctx->process_id, call_type, mod->module_index, label, arity);
                 print_function_args(ctx, arity);
-            } else {
-                printf("DBG: <0.%i.0> - %s %i:%i/%i.\n", ctx->process_id, call_type, mod->module_index, label, arity);
             }
         }
     }
@@ -1627,36 +1654,36 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
             AtomString module_name;
             AtomString function_name;
             module_get_imported_function_module_and_name(mod, index, &module_name, &function_name, ctx->global);
-            trace_apply(ctx, call_type, module_name, function_name, arity);
+            trace_apply(ctx, call_type, mod, module_name, function_name, arity);
         }
     }
 
     static void trace_return(const Context *ctx)
     {
         if (UNLIKELY(ctx->trace_returns)) {
-            printf("DBG: <0.%i.0> - return, value: ", ctx->process_id);
-            term_display(stdout, ctx->x[0], ctx);
-            printf(".\n");
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - return, value: ", ctx->process_id);
+            term_display(ADVANCED_TRACING_TARGET, ctx->x[0], ctx);
+            fprintf(ADVANCED_TRACING_TARGET, ".\n");
         }
     }
 
     static void trace_send(const Context *ctx, term pid, term message)
     {
         if (UNLIKELY(ctx->trace_send)) {
-            printf("DBG: <0.%i.0> - send, pid: ", ctx->process_id);
-            term_display(stdout, pid, ctx);
-            printf(" message: ");
-            term_display(stdout, message, ctx);
-            printf(".\n");
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - send, pid: ", ctx->process_id);
+            term_display(ADVANCED_TRACING_TARGET, pid, ctx);
+            fprintf(ADVANCED_TRACING_TARGET, " message: ");
+            term_display(ADVANCED_TRACING_TARGET, message, ctx);
+            fprintf(ADVANCED_TRACING_TARGET, ".\n");
         }
     }
 
     static void trace_receive(const Context *ctx, term message)
     {
         if (UNLIKELY(ctx->trace_send)) {
-            printf("DBG: <0.%i.0> - receive, message: ", ctx->process_id);
-            term_display(stdout, message, ctx);
-            printf(".\n");
+            fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - receive, message: ", ctx->process_id);
+            term_display(ADVANCED_TRACING_TARGET, message, ctx);
+            fprintf(ADVANCED_TRACING_TARGET, ".\n");
         }
     }
 
@@ -5146,7 +5173,7 @@ wait_timeout_trap_handler:
                 AtomString module_name = globalcontext_atomstring_from_term(glb, module);
                 AtomString function_name = globalcontext_atomstring_from_term(glb, function);
 
-                TRACE_APPLY(ctx, "apply", module_name, function_name, arity);
+                TRACE_APPLY(ctx, "apply", mod, module_name, function_name, arity);
 
                 term native_return;
                 if (maybe_call_native(ctx, module_name, function_name, arity, &native_return)) {
@@ -5204,7 +5231,7 @@ wait_timeout_trap_handler:
                 AtomString module_name = globalcontext_atomstring_from_term(glb, module);
                 AtomString function_name = globalcontext_atomstring_from_term(glb, function);
 
-                TRACE_APPLY(ctx, "apply_last", module_name, function_name, arity);
+                TRACE_APPLY(ctx, "apply_last", mod, module_name, function_name, arity);
 
                 term native_return;
                 if (maybe_call_native(ctx, module_name, function_name, arity, &native_return)) {

@@ -132,6 +132,9 @@ endif()
 # AtomVM options used in libAtomVM
 if (ADVANCED_TRACING)
     target_compile_definitions(libAtomVM PUBLIC ENABLE_ADVANCED_TRACE)
+    if (ADVANCED_TRACING_STDERR)
+        target_compile_definitions(libAtomVM PUBLIC ADVANCED_TRACING_STDERR)
+    endif()
 endif()
 
 if(SANITIZER STREQUAL "address")
