@@ -103,7 +103,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
 
     frames_modules[0] = (struct ModuleOffsetPair){ .module = mod, .offset = current_offset };
 
-    unsigned int num_frames = 1;
+    int32_t num_frames = 1;
     Module *prev_mod = NULL;
     long prev_mod_offset = -1;
     for (term *ct = ctx->e; ct < stack_base; ++ct) {
@@ -140,7 +140,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
     }
 
     // {num_frames, num_aux_terms, filename_lens, num_mods, [{module, offset}, ...]}
-    size_t requested_size = TUPLE_SIZE(6) + num_frames * (2 + TUPLE_SIZE(2));
+    size_t requested_size = TUPLE_SIZE(6) + LIST_SIZE(num_frames, TUPLE_SIZE(2));
     // We need to preserve x0 and x1 that contain information on the current exception
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, requested_size, 2, ctx->x, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         fprintf(stderr, "WARNING: Unable to allocate heap space for raw stacktrace\n");
@@ -150,7 +150,7 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
 
     term raw_stacktrace = term_nil();
 
-    for (size_t i = 0; i < num_frames; ++i) {
+    for (int32_t i = 0; i < num_frames; ++i) {
         term frame_info = term_alloc_tuple(2, &ctx->heap);
         term_put_tuple_element(frame_info, 0, term_from_int(frames_modules[i].module->module_index));
         term_put_tuple_element(frame_info, 1, term_from_int(frames_modules[i].offset));
@@ -158,16 +158,16 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
     }
 
     // Needed for heap memory allocation
-    unsigned int num_aux_terms = 0;
-    unsigned int filename_lens = 0;
-    unsigned int num_mods = 0;
-    for (size_t i = 0; i < num_frames; ++i) {
+    int32_t num_aux_terms = 0;
+    int32_t filename_lens = 0;
+    int32_t num_mods = 0;
+    for (int32_t i = 0; i < num_frames; ++i) {
         Module *mod = frames_modules[i].module;
         if (module_has_line_chunk(mod)) {
             // If module occurs more than once in the stacktrace
             // the path term is reused
             bool module_reused = false;
-            for (size_t j = 0; j < i; ++j) {
+            for (int32_t j = 0; j < i; ++j) {
                 if (frames_modules[j].module == mod) {
                     module_reused = true;
                     break;
@@ -184,10 +184,10 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
     }
 
     term stack_info = term_alloc_tuple(6, &ctx->heap);
-    term_put_tuple_element(stack_info, 0, term_from_int(num_frames));
-    term_put_tuple_element(stack_info, 1, term_from_int(num_aux_terms));
-    term_put_tuple_element(stack_info, 2, term_from_int(filename_lens));
-    term_put_tuple_element(stack_info, 3, term_from_int(num_mods));
+    term_put_tuple_element(stack_info, 0, term_from_int32(num_frames));
+    term_put_tuple_element(stack_info, 1, term_from_int32(num_aux_terms));
+    term_put_tuple_element(stack_info, 2, term_from_int32(filename_lens));
+    term_put_tuple_element(stack_info, 3, term_from_int32(num_mods));
     term_put_tuple_element(stack_info, 4, raw_stacktrace);
     term_put_tuple_element(stack_info, 5, exception_class);
 
@@ -239,7 +239,7 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
     //
     // [{module, function, arity, [{file, string()}, {line, int}]}, ...]
     //
-    size_t requested_size = (TUPLE_SIZE(4) + 2) * num_frames + num_aux_terms * (4 + 2 * TUPLE_SIZE(2)) + 2 * filename_lens;
+    size_t requested_size = LIST_SIZE(num_frames, TUPLE_SIZE(4)) + num_aux_terms * LIST_SIZE(2, TUPLE_SIZE(2)) + TERM_STRING_SIZE(filename_lens);
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, requested_size, live, ctx->x, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         result = OUT_OF_MEMORY_ATOM;
         goto stacktrace_build_cleanup;
