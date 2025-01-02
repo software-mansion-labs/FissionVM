@@ -1078,7 +1078,7 @@ static void destroy_extended_registers(Context *ctx, unsigned int live)
 
 #define DO_RETURN()                                                     \
     {                                                                   \
-        int module_index = ctx->cp >> 24;                               \
+        int module_index = MODULE_INDEX_FROM_CP(ctx->cp);               \
         if (module_index == prev_mod->module_index) {                   \
             Module *t = mod;                                            \
             mod = prev_mod;                                             \
@@ -1089,7 +1089,7 @@ static void destroy_extended_registers(Context *ctx, unsigned int live)
             mod = globalcontext_get_module_by_index(glb, module_index); \
             code = mod->code->code;                                     \
         }                                                               \
-        pc = code + ((ctx->cp & 0xFFFFFF) >> 2);                        \
+        pc = code + MODULE_OFFSET_FROM_CP(ctx->cp);                     \
     }
 
 #define HANDLE_ERROR()                                                  \
@@ -1306,8 +1306,8 @@ static int get_catch_label_and_change_module(Context *ctx, Module **mod)
 
 COLD_FUNC static void cp_to_mod_lbl_off(term cp, Context *ctx, Module **cp_mod, int *label, int *l_off)
 {
-    Module *mod = globalcontext_get_module_by_index(ctx->global, cp >> 24);
-    long mod_offset = (cp & 0xFFFFFF) >> 2;
+    Module *mod = globalcontext_get_module_by_index(ctx->global, MODULE_INDEX_FROM_CP(cp));
+    long mod_offset = MODULE_OFFSET_FROM_CP(cp);
 
     *cp_mod = mod;
 
@@ -1589,9 +1589,9 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
         #define ADVANCED_TRACING_TARGET stdout
     #endif
 
-    static void get_location(const Context *ctx, const Module *mod, char **name, int *name_len, int32_t *line) {
+    static void get_location(const Context *ctx, const Module *mod, const char **name, int *name_len, int32_t *line) {
         if (module_has_line_chunk(mod)) {
-            long mod_offset = (ctx->cp & 0xFFFFFF) >> 2;
+            long mod_offset = MODULE_OFFSET_FROM_CP(ctx->cp);
             struct LineRef line_ref = module_find_line(mod, (unsigned int) mod_offset);
             struct ModuleFilename filename = mod->filenames[line_ref.filename_idx];
             *name = (char *) filename.data;

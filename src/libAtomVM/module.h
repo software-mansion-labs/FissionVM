@@ -61,6 +61,9 @@ typedef struct Mutex Mutex;
 #define SMP_MODULE_UNLOCK(mod)
 #endif
 
+#define MODULE_OFFSET_FROM_CP(cp) ((cp & 0xFFFFFF) >> 2)
+#define MODULE_INDEX_FROM_CP(cp) (cp >> 24)
+
 typedef struct
 {
     char magic[4];

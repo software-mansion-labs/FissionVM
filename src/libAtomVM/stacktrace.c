@@ -58,9 +58,8 @@ void stacktrace_print(FILE *fd, term stacktrace, const Context *ctx)
 
 static void cp_to_mod_lbl_off(term cp, Context *ctx, Module **cp_mod, int *label, int *l_off, long *mod_offset)
 {
-    int module_index = cp >> 24;
-    Module *mod = globalcontext_get_module_by_index(ctx->global, module_index);
-    *mod_offset = (cp & 0xFFFFFF) >> 2;
+    Module *mod = globalcontext_get_module_by_index(ctx->global, MODULE_INDEX_FROM_CP(cp));
+    *mod_offset = MODULE_OFFSET_FROM_CP(cp);
 
     *cp_mod = mod;
 
