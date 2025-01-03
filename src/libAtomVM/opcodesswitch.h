@@ -1623,13 +1623,13 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
             char func_string[255];
             atom_string_to_c(function_name, func_string, 255);
 
-            char *name;
+            const char *name;
             int name_len;
             int32_t line;
             get_location(ctx, mod, &name, &name_len, &line);
             fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %s:%s/%i at %.*s:%d\n", ctx->process_id, call_type, module_string, func_string, arity, name_len, name, line);
             if (ctx->trace_call_args && (arity != 0)) {
-                fprintf(ADVANCED_TRACING_TARGET, "DBG: <0.%i.0> - %s %s:%s/%i:\n", ctx->process_id, call_type, module_string, func_string, arity);
+                print_function_args(ctx, arity);
             }
         }
     }
@@ -1637,7 +1637,7 @@ static bool maybe_call_native(Context *ctx, AtomString module_name, AtomString f
     static void trace_call(const Context *ctx, const Module *mod, const char *call_type, int label, int arity)
     {
         if (UNLIKELY(ctx->trace_calls)) {
-            char *name;
+            const char *name;
             int name_len;
             int32_t line;
             get_location(ctx, mod, &name, &name_len, &line);
