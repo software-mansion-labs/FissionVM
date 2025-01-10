@@ -139,8 +139,8 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
         }
     }
 
-    // {num_frames, num_aux_terms, filename_lens, num_mods, [{module, offset}, ...]}
-    size_t requested_size = TUPLE_SIZE(6) + LIST_SIZE(num_frames, TUPLE_SIZE(2));
+    // {num_frames, num_aux_terms, filename_lens, [{module, offset}, ...]}
+    size_t requested_size = TUPLE_SIZE(5) + LIST_SIZE(num_frames, TUPLE_SIZE(2));
     // We need to preserve x0 and x1 that contain information on the current exception
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, requested_size, 2, ctx->x, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         fprintf(stderr, "WARNING: Unable to allocate heap space for raw stacktrace\n");
@@ -160,7 +160,6 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
     // Needed for heap memory allocation
     int32_t num_aux_terms = 0;
     int32_t filename_lens = 0;
-    int32_t num_mods = 0;
     for (int32_t i = 0; i < num_frames; ++i) {
         Module *mod = frames_modules[i].module;
         if (module_has_line_chunk(mod)) {
@@ -177,19 +176,17 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
                 for (size_t j = 0; j < mod->num_filenames; ++j) {
                     filename_lens += mod->filenames[j].len;
                 }
-                num_mods += 1;
             }
             num_aux_terms += 1;
         }
     }
 
-    term stack_info = term_alloc_tuple(6, &ctx->heap);
+    term stack_info = term_alloc_tuple(5, &ctx->heap);
     term_put_tuple_element(stack_info, 0, term_from_int32(num_frames));
     term_put_tuple_element(stack_info, 1, term_from_int32(num_aux_terms));
     term_put_tuple_element(stack_info, 2, term_from_int32(filename_lens));
-    term_put_tuple_element(stack_info, 3, term_from_int32(num_mods));
-    term_put_tuple_element(stack_info, 4, raw_stacktrace);
-    term_put_tuple_element(stack_info, 5, exception_class);
+    term_put_tuple_element(stack_info, 3, raw_stacktrace);
+    term_put_tuple_element(stack_info, 4, exception_class);
 
     result = stack_info;
 
@@ -200,7 +197,7 @@ stacktrace_create_raw_cleanup:
 
 term stacktrace_exception_class(term stack_info)
 {
-    return term_get_tuple_element(stack_info, 5);
+    return term_get_tuple_element(stack_info, 4);
 }
 
 struct ModulePathPair
@@ -227,9 +224,8 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
     int num_frames = term_to_int(term_get_tuple_element(*stack_info, 0));
     int num_aux_terms = term_to_int(term_get_tuple_element(*stack_info, 1));
     int filename_lens = term_to_int(term_get_tuple_element(*stack_info, 2));
-    int num_mods = term_to_int(term_get_tuple_element(*stack_info, 3));
 
-    modules_paths = malloc(num_mods * sizeof(struct ModulePathPair));
+    modules_paths = malloc(num_frames * sizeof(struct ModulePathPair));
     if (IS_NULL_PTR(modules_paths)) {
         fprintf(stderr, "Unable to allocate space for module paths.  Returning raw stacktrace.\n");
         result = *stack_info;
@@ -245,7 +241,7 @@ term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
         goto stacktrace_build_cleanup;
     }
 
-    term raw_stacktrace = term_get_tuple_element(*stack_info, 4);
+    term raw_stacktrace = term_get_tuple_element(*stack_info, 3);
 
     term stacktrace = term_nil();
     term el = raw_stacktrace;
