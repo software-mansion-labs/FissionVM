@@ -3494,8 +3494,14 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
         access = EtsAccessPublic;
     }
 
+    EtsTableType type = EtsTableSet;
+    term is_duplicate_bag = interop_kv_get_value_default(options, ATOM_STR("\xd", "duplicate_bag"), FALSE_ATOM, ctx->global) == TRUE_ATOM;
+    if (is_duplicate_bag) {
+        type = EtsTableDuplicateBag;
+    }
+
     term table = term_invalid_term();
-    EtsErrorCode result = ets_create_table(name, is_named == TRUE_ATOM, EtsTableSet, access, term_to_int(keypos) - 1, &table, ctx);
+    EtsErrorCode result = ets_create_table(name, is_named == TRUE_ATOM, type, access, term_to_int(keypos) - 1, &table, ctx);
     switch (result) {
         case EtsOk:
             return table;
