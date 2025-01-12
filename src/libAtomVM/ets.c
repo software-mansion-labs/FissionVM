@@ -252,7 +252,7 @@ static void ets_delete_all_tables(struct Ets *ets, GlobalContext *global)
     ets_delete_tables_internal(ets, true_pred, NULL, global);
 }
 
-EtsErrorCode ets_table_insert(struct EtsTable *ets_table, term entry, bool *overwritten, Context *ctx)
+EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term entry, bool *overwritten, Context *ctx)
 {
     if (ets_table->access_type != EtsAccessPublic && ets_table->owner_process_id != ctx->process_id) {
         return EtsPermissionDenied;
@@ -292,7 +292,7 @@ EtsErrorCode ets_table_insert(struct EtsTable *ets_table, term entry, bool *over
     return EtsOk;
 }
 
-EtsErrorCode ets_table_insert_list(struct EtsTable *ets_table, term entries, bool *overwritten, Context *ctx)
+EtsErrorCode ets_insert_multiple_internal(struct EtsTable *ets_table, term entries, bool *overwritten, Context *ctx)
 {
     bool insert_new = overwritten != NULL;
     term iter = entries;
@@ -304,7 +304,7 @@ EtsErrorCode ets_table_insert_list(struct EtsTable *ets_table, term entries, boo
         }
 
         if (insert_new) {
-            term key = term_get_tuple_element(entry, ets_table->keypos - 1);
+            term key = term_get_tuple_element(entry, ets_table->keypos);
             term res = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
             bool exists = !term_is_nil(res);
             if (exists) {
@@ -317,8 +317,8 @@ EtsErrorCode ets_table_insert_list(struct EtsTable *ets_table, term entries, boo
     }
 
     while (term_is_nonempty_list(entries)) {
-        term tuple = term_get_list_head(entries);
-        EtsErrorCode result = ets_table_insert(ets_table, tuple, overwritten, ctx);
+        term entry = term_get_list_head(entries);
+        EtsErrorCode result = ets_insert_internal(ets_table, entry, overwritten, ctx);
         if (UNLIKELY(result != EtsOk)) {
             // Partially inserted list
             // We would need to save previous values (i.e. memory) and reverting can fail (i.e. memory)
@@ -340,9 +340,9 @@ EtsErrorCode ets_insert(term ref, term entry, bool *overwritten, Context *ctx)
     EtsErrorCode result = EtsBadEntry;
 
     if (term_is_tuple(entry)) {
-        result = ets_table_insert(ets_table, entry, overwritten, ctx);
+        result = ets_insert_internal(ets_table, entry, overwritten, ctx);
     } else if (term_is_list(entry)) {
-        result = ets_table_insert_list(ets_table, entry, overwritten, ctx);
+        result = ets_insert_multiple_internal(ets_table, entry, overwritten, ctx);
     }
 
     SMP_UNLOCK(ets_table);
@@ -350,7 +350,7 @@ EtsErrorCode ets_insert(term ref, term entry, bool *overwritten, Context *ctx)
     return result;
 }
 
-EtsErrorCode ets_table_lookup(struct EtsTable *ets_table, term key, term *ret, Context *ctx)
+EtsErrorCode ets_lookup_internal(struct EtsTable *ets_table, term key, term *ret, Context *ctx)
 {
     if (ets_table->access_type == EtsAccessPrivate && ets_table->owner_process_id != ctx->process_id) {
         return EtsPermissionDenied;
@@ -379,7 +379,7 @@ EtsErrorCode ets_lookup(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    EtsErrorCode result = ets_table_lookup(ets_table, key, ret, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, ret, ctx);
     SMP_UNLOCK(ets_table);
 
     return result;
@@ -425,7 +425,7 @@ EtsErrorCode ets_lookup_element(term ref, term key, size_t pos, term *ret, Conte
     return EtsOk;
 }
 
-EtsErrorCode ets_table_delete(struct EtsTable *ets_table, term key, term *ret, Context *ctx)
+EtsErrorCode ets_delete_internal(struct EtsTable *ets_table, term key, term *ret, Context *ctx)
 {
     if (ets_table->access_type != EtsAccessPublic && ets_table->owner_process_id != ctx->process_id) {
         return EtsPermissionDenied;
@@ -465,7 +465,7 @@ EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    EtsErrorCode res = ets_table_delete(ets_table, key, ret, ctx);
+    EtsErrorCode res = ets_delete_internal(ets_table, key, ret, ctx);
 
     SMP_UNLOCK(ets_table);
     return res;
@@ -480,7 +480,7 @@ EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
 
     term key = term_get_tuple_element(tuple, 0);
     term list = term_invalid_term();
-    EtsErrorCode result = ets_table_lookup(ets_table, key, &list, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, &list, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
@@ -501,7 +501,7 @@ EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
         SMP_UNLOCK(ets_table);
         return EtsOk;
     }
-    EtsErrorCode res = ets_table_delete(ets_table, key, ret, ctx);
+    EtsErrorCode res = ets_delete_internal(ets_table, key, ret, ctx);
 
     SMP_UNLOCK(ets_table);
     return res;
@@ -560,7 +560,7 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
     }
     term to_insert = term_invalid_term();
     term list = term_invalid_term();
-    EtsErrorCode result = ets_table_lookup(ets_table, key, &list, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, &list, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
@@ -613,7 +613,7 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
 
     elem = term_from_int(elem_value);
     term_put_tuple_element(to_insert, position, elem);
-    EtsErrorCode insert_result = ets_table_insert(ets_table, to_insert, NULL, ctx);
+    EtsErrorCode insert_result = ets_insert_internal(ets_table, to_insert, NULL, ctx);
     if (insert_result == EtsOk) {
         *ret = elem;
     }
@@ -629,7 +629,7 @@ EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *
     }
     term to_insert = term_invalid_term();
     term list = term_invalid_term();
-    EtsErrorCode result = ets_table_lookup(ets_table, key, &list, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, &list, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
@@ -655,7 +655,7 @@ EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *
     }
 
     term_put_tuple_element(to_insert, position, value);
-    EtsErrorCode insert_result = ets_table_insert(ets_table, to_insert, NULL, ctx);
+    EtsErrorCode insert_result = ets_insert_internal(ets_table, to_insert, NULL, ctx);
     SMP_UNLOCK(ets_table);
     *ret = TRUE_ATOM;
     return insert_result;
@@ -669,7 +669,7 @@ EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx)
     }
 
     term to_return = term_invalid_term();
-    EtsErrorCode result = ets_table_lookup(ets_table, key, &to_return, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, &to_return, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
@@ -681,7 +681,7 @@ EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx)
     }
 
     term del_result;
-    EtsErrorCode res = ets_table_delete(ets_table, key, &del_result, ctx);
+    EtsErrorCode res = ets_delete_internal(ets_table, key, &del_result, ctx);
     SMP_UNLOCK(ets_table);
     return res;
 }

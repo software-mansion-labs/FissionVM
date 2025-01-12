@@ -313,7 +313,7 @@ static uint32_t hash_term_incr(term t, int32_t h, GlobalContext *global)
         }
         return h * LARGE_PRIME_MAP;
     } else {
-        fprintf(stderr, "hash_term: unsupported term type\n");
+        fprintf(stderr, "hash_term: unsupported term type: %d\n", t);
         return h;
     }
 }
