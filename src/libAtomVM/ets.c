@@ -327,7 +327,7 @@ EtsErrorCode ets_table_lookup(struct EtsTable *ets_table, term key, term *ret, C
         return EtsPermissionDenied;
     }
 
-    term res = ets_hashtable_lookup(ets_table->hashtable, key, ets_table->keypos, ctx->global);
+    term res = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
 
     if (term_is_nil(res)) {
         *ret = term_nil();
@@ -372,7 +372,7 @@ EtsErrorCode ets_lookup_element(term ref, term key, size_t pos, term *ret, Conte
         return EtsPermissionDenied;
     }
 
-    term entry = ets_hashtable_lookup(ets_table->hashtable, key, ets_table->keypos, ctx->global);
+    term entry = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
 
     if (term_is_nil(entry)) {
         SMP_UNLOCK(ets_table);
@@ -487,7 +487,7 @@ EtsErrorCode ets_table_delete(struct EtsTable *ets_table, term key, term *ret, C
         return EtsPermissionDenied;
     }
 
-    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ets_table->keypos, ctx->global);
+    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ctx->global);
     UNUSED(_res);
 
     *ret = TRUE_ATOM;
