@@ -292,28 +292,40 @@ EtsErrorCode ets_table_insert(struct EtsTable *ets_table, term entry, bool *over
     return EtsOk;
 }
 
-EtsErrorCode ets_table_insert_list(struct EtsTable *ets_table, term list, bool *overwritten, Context *ctx)
+EtsErrorCode ets_table_insert_list(struct EtsTable *ets_table, term entries, bool *overwritten, Context *ctx)
 {
-    term iter = list;
+    bool insert_new = overwritten != NULL;
+    term iter = entries;
     while (!term_is_nil(iter)) {
         term entry = term_get_list_head(iter);
         bool bad_pos = !term_is_tuple(entry) || (size_t) term_get_tuple_arity(entry) < (ets_table->keypos + 1);
         if (bad_pos) {
             return EtsBadEntry;
         }
+
+        if (insert_new) {
+            term key = term_get_tuple_element(entry, ets_table->keypos - 1);
+            term res = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
+            bool exists = !term_is_nil(res);
+            if (exists) {
+                *overwritten = false;
+                return EtsOk;
+            }
+        }
+
         iter = term_get_list_tail(iter);
     }
 
-    while (term_is_nonempty_list(list)) {
-        term tuple = term_get_list_head(list);
+    while (term_is_nonempty_list(entries)) {
+        term tuple = term_get_list_head(entries);
         EtsErrorCode result = ets_table_insert(ets_table, tuple, overwritten, ctx);
-        if (result != EtsOk) {
+        if (UNLIKELY(result != EtsOk)) {
             // Partially inserted list
             // We would need to save previous values (i.e. memory) and reverting can fail (i.e. memory)
             AVM_ABORT();
         }
 
-        list = term_get_list_tail(list);
+        entries = term_get_list_tail(entries);
     }
 
     return EtsOk;
