@@ -259,7 +259,6 @@ EtsErrorCode ets_table_insert(struct EtsTable *ets_table, term entry, Context *c
     }
 
     if ((size_t) term_get_tuple_arity(entry) < (ets_table->keypos + 1)) {
-        SMP_UNLOCK(ets_table);
         return EtsBadEntry;
     }
 
@@ -333,10 +332,8 @@ EtsErrorCode ets_table_lookup(struct EtsTable *ets_table, term key, term *ret, C
     if (term_is_nil(res)) {
         *ret = term_nil();
     } else {
-
         size_t size = (size_t) memory_estimate_usage(res);
-        // allocate [object]
-        if (UNLIKELY(memory_ensure_free_opt(ctx, size + CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        if (UNLIKELY(memory_ensure_free_with_roots(ctx, size + CONS_SIZE, 1, &res, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             return EtsAllocationFailure;
         }
         term new_res = memory_copy_term_tree(&ctx->heap, res);
