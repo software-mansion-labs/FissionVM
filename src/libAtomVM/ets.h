@@ -27,6 +27,7 @@ struct GlobalContext;
 #include "list.h"
 #include "synclist.h"
 #include "term.h"
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,13 +74,12 @@ void ets_destroy(struct Ets *ets, GlobalContext *global);
 EtsErrorCode ets_create_table(term name, bool is_named, EtsTableType table_type, EtsAccessType access_type, size_t keypos, term *ret, Context *ctx);
 void ets_delete_owned_tables(struct Ets *ets, int32_t process_id, GlobalContext *global);
 
-EtsErrorCode ets_insert(term ref, term entry, Context *ctx);
+EtsErrorCode ets_insert(term ref, term entry, bool *entry_inserted, Context *ctx);
 EtsErrorCode ets_lookup(term ref, term key, term *ret, Context *ctx);
 EtsErrorCode ets_lookup_element(term ref, term key, size_t pos, term *ret, Context *ctx);
 EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx);
 EtsErrorCode ets_drop_table(term ref, term *ret, Context *ctx);
 EtsErrorCode ets_update_counter(term ref, term key, term operation, term default_value, term *ret, Context *ctx);
-EtsErrorCode ets_insert_new(term ref, term tuple, term *ret, Context *ctx);
 EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx);
 EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *ret, Context *ctx);
 EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx);

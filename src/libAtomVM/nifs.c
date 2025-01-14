@@ -3522,13 +3522,37 @@ static term nif_ets_insert(Context *ctx, int argc, term argv[])
 
     term entry = argv[1];
 
-    EtsErrorCode result = ets_insert(ref, entry, ctx);
+    EtsErrorCode result = ets_insert(ref, entry, NULL, ctx);
     switch (result) {
         case EtsOk:
             return TRUE_ATOM;
         case EtsTableNotFound:
         case EtsBadEntry:
         case EtsPermissionDenied:
+            RAISE_ERROR(BADARG_ATOM);
+        case EtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_ets_table_id);
+    term to_insert = argv[1];
+    bool entry_inserted = false;
+
+    EtsErrorCode result = ets_insert(ref, to_insert, &entry_inserted, ctx);
+    switch (result) {
+        case EtsOk:
+            return entry_inserted ? TRUE_ATOM : FALSE_ATOM;
+        case EtsTableNotFound:
+        case EtsPermissionDenied:
+        case EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3601,32 +3625,6 @@ static term nif_ets_take(Context *ctx, int argc, term argv[])
             return ret;
         case EtsTableNotFound:
         case EtsPermissionDenied:
-            RAISE_ERROR(BADARG_ATOM);
-        case EtsAllocationFailure:
-            RAISE_ERROR(MEMORY_ATOM);
-        default:
-            AVM_ABORT();
-    }
-}
-
-static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
-{
-    UNUSED(argc);
-
-    term ref = argv[0];
-    VALIDATE_VALUE(ref, is_ets_table_id);
-
-    term to_insert = argv[1];
-    term ret = term_invalid_term();
-
-    EtsErrorCode result = ets_insert_new(ref, to_insert, &ret, ctx);
-
-    switch (result) {
-        case EtsOk:
-            return ret;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
-        case EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3991,7 +3989,7 @@ static term nif_erlang_exit(Context *ctx, int argc, term argv[])
                 } else if (ctx == target) {
                     mailbox_send_term_signal(target, KillSignal, reason);
                     self_is_signaled = target == ctx;
-                } else if (reason != NORMAL_ATOM){
+                } else if (reason != NORMAL_ATOM) {
                     mailbox_send_term_signal(target, KillSignal, reason);
                     self_is_signaled = target == ctx;
                 } // else there is no effect
