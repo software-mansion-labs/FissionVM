@@ -252,7 +252,7 @@ static void ets_delete_all_tables(struct Ets *ets, GlobalContext *global)
     ets_delete_tables_internal(ets, true_pred, NULL, global);
 }
 
-EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term entry, bool *overwritten, Context *ctx)
+EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term entry, bool *entry_inserted, Context *ctx)
 {
     if (ets_table->access_type != EtsAccessPublic && ets_table->owner_process_id != ctx->process_id) {
         return EtsPermissionDenied;
@@ -276,15 +276,15 @@ EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term entry, bool *o
     term new_entry = memory_copy_term_tree(heap, entry);
     term key = term_get_tuple_element(new_entry, (int) ets_table->keypos);
 
-    bool insert_new = overwritten != NULL;
+    bool insert_new = entry_inserted != NULL;
     EtsHashtableOptions options = insert_new ? 0 : EtsHashtableAllowOverwrite;
     EtsHashtableErrorCode res = ets_hashtable_insert(ets_table->hashtable, key, new_entry, options, heap, ctx->global);
 
     if (insert_new && res == EtsOk) {
-        *overwritten = true;
+        *entry_inserted = true;
         return EtsOk;
     } else if (insert_new && res == EtsHashtableAlreadyExists) {
-        *overwritten = false;
+        *entry_inserted = false;
         return EtsOk;
     } else if (UNLIKELY(res != EtsHashtableOk)) {
         return EtsAllocationFailure;
@@ -331,7 +331,7 @@ EtsErrorCode ets_insert_multiple_internal(struct EtsTable *ets_table, term entri
     return EtsOk;
 }
 
-EtsErrorCode ets_insert(term ref, term entry, bool *overwritten, Context *ctx)
+EtsErrorCode ets_insert(term ref, term entry, bool *entry_inserted, Context *ctx)
 {
     struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
     if (ets_table == NULL) {
@@ -340,9 +340,9 @@ EtsErrorCode ets_insert(term ref, term entry, bool *overwritten, Context *ctx)
     EtsErrorCode result = EtsBadEntry;
 
     if (term_is_tuple(entry)) {
-        result = ets_insert_internal(ets_table, entry, overwritten, ctx);
+        result = ets_insert_internal(ets_table, entry, entry_inserted, ctx);
     } else if (term_is_list(entry)) {
-        result = ets_insert_multiple_internal(ets_table, entry, overwritten, ctx);
+        result = ets_insert_multiple_internal(ets_table, entry, entry_inserted, ctx);
     }
 
     SMP_UNLOCK(ets_table);

@@ -3544,12 +3544,12 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
     term ref = argv[0];
     VALIDATE_VALUE(ref, is_ets_table_id);
     term to_insert = argv[1];
-    bool overwriten = false;
+    bool entry_inserted = false;
 
-    EtsErrorCode result = ets_insert(ref, to_insert, &overwriten, ctx);
+    EtsErrorCode result = ets_insert(ref, to_insert, &entry_inserted, ctx);
     switch (result) {
         case EtsOk:
-            return overwriten ? TRUE_ATOM : FALSE_ATOM;
+            return entry_inserted ? TRUE_ATOM : FALSE_ATOM;
         case EtsTableNotFound:
         case EtsPermissionDenied:
         case EtsBadEntry:
