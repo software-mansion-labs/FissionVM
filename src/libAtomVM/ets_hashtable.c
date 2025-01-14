@@ -102,7 +102,7 @@ EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term
                 node->heap = heap;
                 return EtsHashtableOk;
             } else {
-                return EtsHashtableAlreadyExists;
+                return EtsHashtableKeyAlreadyExists;
             }
         }
         node = node->next;

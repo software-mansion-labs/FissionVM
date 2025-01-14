@@ -283,7 +283,7 @@ EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term entry, bool *e
     if (insert_new && res == EtsOk) {
         *entry_inserted = true;
         return EtsOk;
-    } else if (insert_new && res == EtsHashtableAlreadyExists) {
+    } else if (insert_new && res == EtsHashtableKeyAlreadyExists) {
         *entry_inserted = false;
         return EtsOk;
     } else if (UNLIKELY(res != EtsHashtableOk)) {
