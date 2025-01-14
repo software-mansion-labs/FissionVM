@@ -94,6 +94,7 @@ EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term
 #endif
 
     struct HNode *node = hash_table->buckets[index];
+    struct HNode *last_node = NULL;
     while (node) {
         if (term_compare(key, node->key, TermCompareExact, global) == TermEquals) {
             if (opts & EtsHashtableAllowOverwrite) {
@@ -105,6 +106,7 @@ EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term
                 return EtsHashtableKeyAlreadyExists;
             }
         }
+        last_node = node;
         node = node->next;
     }
 
@@ -117,8 +119,8 @@ EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term
     new_node->entry = entry;
     new_node->heap = heap;
 
-    if (node) {
-        node->next = new_node;
+    if (last_node) {
+        last_node->next = new_node;
     } else {
         hash_table->buckets[index] = new_node;
     }
