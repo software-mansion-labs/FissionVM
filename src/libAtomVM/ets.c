@@ -391,18 +391,40 @@ EtsErrorCode ets_lookup_internal(struct EtsTable *ets_table, term key, term *ret
     if (ets_table->access_type == EtsAccessPrivate && ets_table->owner_process_id != ctx->process_id) {
         return EtsPermissionDenied;
     }
+    bool is_duplicate_bag = ets_table->table_type == EtsTableDuplicateBag;
 
-    term res = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
+    term ets_entry = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
 
-    if (term_is_nil(res)) {
+    if (term_is_nil(ets_entry)) {
         *ret = term_nil();
-    } else {
-        size_t size = (size_t) memory_estimate_usage(res);
-        if (UNLIKELY(memory_ensure_free_with_roots(ctx, size + CONS_SIZE, 1, &res, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    } else if (is_duplicate_bag) {
+        term ets_tuples = ets_entry;
+        // for tuple list and it reversed version - we don't want to copy terms in the loop
+        size_t size = 2 * memory_estimate_usage(ets_tuples);
+        // we don't need to preserve tuples, they live on different heap
+        if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             return EtsAllocationFailure;
         }
-        term new_res = memory_copy_term_tree(&ctx->heap, res);
-        *ret = term_list_prepend(new_res, term_nil(), &ctx->heap);
+        term tuples = memory_copy_term_tree(&ctx->heap, ets_tuples);
+        // lookup returns in insertion order
+        // TODO: do it in place?
+        term reversed = term_nil();
+        while (!term_is_nil(tuples)) {
+            term tuple = term_get_list_head(tuples);
+            reversed = term_list_prepend(tuple, reversed, &ctx->heap);
+            tuples = term_get_list_tail(tuples);
+        }
+
+        *ret = reversed;
+    } else {
+        term ets_tuple = ets_entry;
+        size_t size = (size_t) memory_estimate_usage(ets_tuple) + CONS_SIZE;
+        if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            return EtsAllocationFailure;
+        }
+        term tuple = memory_copy_term_tree(&ctx->heap, ets_entry);
+
+        *ret = term_list_prepend(tuple, term_nil(), &ctx->heap);
     }
 
     return EtsOk;
