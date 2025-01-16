@@ -235,7 +235,7 @@ typedef dreg_t dreg_gc_safe_t;
                     int sz = (first_byte >> 5) + 2;                                     \
                     if (UNLIKELY(sz > 8)) {                                             \
                         /* TODO: when first_byte >> 5 is 7, a different encoding is used */ \
-                        fprintf(stderr, "Unexpected nbits vaue @ %" PRIuPTR "\n", (uintptr_t) ((decode_pc) - 1)); \
+                        fprintf(stderr, "Unexpected nbits value @ %" PRIuPTR "\n", (uintptr_t) ((decode_pc) - 1)); \
                         AVM_ABORT();                                                    \
                         break;                                                          \
                     }                                                                   \
