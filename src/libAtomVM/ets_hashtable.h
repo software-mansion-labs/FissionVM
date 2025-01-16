@@ -39,7 +39,7 @@ struct EtsHashTable
 
 typedef enum EtsHashtableOptions
 {
-    EtsHashtableAllowOverwrite = 1
+    EtsHashtableAllowOverwrite = (1 << 0),
 } EtsHashtableOptions;
 
 typedef enum EtsHashtableErrorCode
@@ -52,7 +52,7 @@ typedef enum EtsHashtableErrorCode
 struct EtsHashTable *ets_hashtable_new();
 void ets_hashtable_destroy(struct EtsHashTable *hash_table, GlobalContext *global);
 
-EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term key, term entry, EtsHashtableOptions opts, Heap *heap, GlobalContext *global);
+EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term key, term entry, EtsHashtableOptions opts, Heap *entry_heap, GlobalContext *global);
 term ets_hashtable_lookup(struct EtsHashTable *hash_table, term key, GlobalContext *global);
 bool ets_hashtable_remove(struct EtsHashTable *hash_table, term key, GlobalContext *global);
 

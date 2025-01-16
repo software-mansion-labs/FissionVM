@@ -82,7 +82,7 @@ static void print_info(struct EtsHashTable *hash_table)
 }
 #endif
 
-EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term key, term entry, EtsHashtableOptions opts, Heap *heap, GlobalContext *global)
+EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term key, term entry, EtsHashtableOptions opts, Heap *entry_heap, GlobalContext *global)
 {
     uint32_t hash = hash_term(key, global);
     uint32_t index = hash % hash_table->capacity;
@@ -98,9 +98,10 @@ EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term
     while (node) {
         if (term_compare(key, node->key, TermCompareExact, global) == TermEquals) {
             if (opts & EtsHashtableAllowOverwrite) {
+                node->key = key;
                 node->entry = entry;
                 memory_destroy_heap(node->heap, global);
-                node->heap = heap;
+                node->heap = entry_heap;
                 return EtsHashtableOk;
             } else {
                 return EtsHashtableKeyAlreadyExists;
@@ -114,10 +115,11 @@ EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term
     if (IS_NULL_PTR(new_node)) {
         return EtsHashtableError;
     }
+
     new_node->next = NULL;
     new_node->key = key;
     new_node->entry = entry;
-    new_node->heap = heap;
+    new_node->heap = entry_heap;
 
     if (last_node) {
         last_node->next = new_node;

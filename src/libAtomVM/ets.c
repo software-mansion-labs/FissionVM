@@ -252,41 +252,77 @@ static void ets_delete_all_tables(struct Ets *ets, GlobalContext *global)
     ets_delete_tables_internal(ets, true_pred, NULL, global);
 }
 
-EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term entry, bool *entry_inserted, Context *ctx)
+static bool ets_hashtable_new_heap(size_t size, Heap **new_heap)
+{
+    Heap *heap = malloc(sizeof(Heap));
+    if (IS_NULL_PTR(heap)) {
+        return false;
+    }
+
+    if (UNLIKELY(memory_init_heap(heap, size) != MEMORY_GC_OK)) {
+        free(heap);
+        return false;
+    }
+
+    *new_heap = heap;
+    return true;
+}
+
+EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term tuple, bool *tuple_inserted, Context *ctx)
 {
     if (ets_table->access_type != EtsAccessPublic && ets_table->owner_process_id != ctx->process_id) {
         return EtsPermissionDenied;
     }
 
-    bool bad_pos = (size_t) term_get_tuple_arity(entry) < (ets_table->keypos + 1);
+    size_t arity = (size_t) term_get_tuple_arity(tuple);
+    bool bad_pos = arity < (ets_table->keypos + 1);
     if (bad_pos) {
         return EtsBadEntry;
     }
 
-    Heap *heap = malloc(sizeof(Heap));
-    if (IS_NULL_PTR(heap)) {
-        return EtsAllocationFailure;
+    bool is_duplicate_bag = ets_table->table_type == EtsTableDuplicateBag;
+    bool insert_new = tuple_inserted != NULL;
+
+    term ets_tuple;
+    term ets_key;
+    Heap *ets_heap;
+
+    if (is_duplicate_bag) {
+        // With duplicate bag mode, we copy entire entries list to new heap fragment.
+        // We could create a new heap and merge it with the existing one but we'd need to expose nodes from hashtable.
+        // Alternatively, we could use owner's heap, as ets table shouldn't be accessible after owner exited.
+        term tuple_key = term_get_tuple_element(tuple, (int) ets_table->keypos);
+        term old_tuples = ets_hashtable_lookup(ets_table->hashtable, tuple_key, ctx->global);
+        size_t size = memory_estimate_usage(tuple) + memory_estimate_usage(old_tuples) + CONS_SIZE;
+        if (UNLIKELY(!ets_hashtable_new_heap(size, &ets_heap))) {
+            return EtsAllocationFailure;
+        }
+        term ets_tuples = memory_copy_term_tree(ets_heap, old_tuples);
+        ets_tuple = memory_copy_term_tree(ets_heap, tuple);
+
+        ets_key = term_get_tuple_element(ets_tuple, (int) ets_table->keypos);
+        ets_tuple = term_list_prepend(ets_tuple, ets_tuples, ets_heap);
+    } else {
+        size_t size = memory_estimate_usage(tuple);
+        if (!ets_hashtable_new_heap(size, &ets_heap)) {
+            return EtsAllocationFailure;
+        }
+
+        ets_tuple = memory_copy_term_tree(ets_heap, tuple);
+        ets_key = term_get_tuple_element(ets_tuple, (int) ets_table->keypos);
     }
-    size_t size = (size_t) memory_estimate_usage(entry);
-    if (memory_init_heap(heap, size) != MEMORY_GC_OK) {
-        free(heap);
-        return EtsAllocationFailure;
-    }
 
-    term new_entry = memory_copy_term_tree(heap, entry);
-    term key = term_get_tuple_element(new_entry, (int) ets_table->keypos);
-
-    bool insert_new = entry_inserted != NULL;
-    EtsHashtableOptions options = insert_new ? 0 : EtsHashtableAllowOverwrite;
-    EtsHashtableErrorCode res = ets_hashtable_insert(ets_table->hashtable, key, new_entry, options, heap, ctx->global);
-
+    EtsHashtableOptions opts = insert_new ? 0 : EtsHashtableAllowOverwrite;
+    EtsHashtableErrorCode res = ets_hashtable_insert(ets_table->hashtable, ets_key, ets_tuple, opts, ets_heap, ctx->global);
     if (insert_new && res == EtsOk) {
-        *entry_inserted = true;
+        *tuple_inserted = true;
         return EtsOk;
     } else if (insert_new && res == EtsHashtableKeyAlreadyExists) {
-        *entry_inserted = false;
+        *tuple_inserted = false;
+        memory_destroy_heap(ets_heap, ctx->global);
         return EtsOk;
     } else if (UNLIKELY(res != EtsHashtableOk)) {
+        memory_destroy_heap(ets_heap, ctx->global);
         return EtsAllocationFailure;
     }
     return EtsOk;
