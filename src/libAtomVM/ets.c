@@ -386,39 +386,51 @@ EtsErrorCode ets_insert(term ref, term entry, bool *entry_inserted, Context *ctx
     return result;
 }
 
-EtsErrorCode ets_lookup_internal(struct EtsTable *ets_table, term key, term *ret, Context *ctx)
+static EtsErrorCode ets_lookup_internal(struct EtsTable *ets_table, term key, size_t pos, term *ret, Context *ctx)
 {
     if (ets_table->access_type == EtsAccessPrivate && ets_table->owner_process_id != ctx->process_id) {
         return EtsPermissionDenied;
     }
     bool is_duplicate_bag = ets_table->table_type == EtsTableDuplicateBag;
+    // pos is 1-based
+    bool lookup_element = pos > 0;
 
     term ets_entry = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
 
     if (term_is_nil(ets_entry)) {
         *ret = term_nil();
     } else if (is_duplicate_bag) {
-        term ets_tuples = ets_entry;
         // for tuple list and it reversed version - we don't want to copy terms in the loop
-        size_t size = 2 * memory_estimate_usage(ets_tuples);
+        size_t size = 2 * memory_estimate_usage(ets_entry);
         // we don't need to preserve tuples, they live on different heap
         if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             return EtsAllocationFailure;
         }
-        term tuples = memory_copy_term_tree(&ctx->heap, ets_tuples);
+        term tuples = memory_copy_term_tree(&ctx->heap, ets_entry);
         // lookup returns in insertion order
-        // TODO: do it in place?
+        // TODO: store it in correct order?
         term reversed = term_nil();
         while (!term_is_nil(tuples)) {
             term tuple = term_get_list_head(tuples);
+            if (lookup_element) {
+                if ((size_t) term_get_tuple_arity(tuple) < pos) {
+                    return EtsBadPosition;
+                }
+                tuple = term_get_tuple_element(tuple, pos - 1);
+            }
             reversed = term_list_prepend(tuple, reversed, &ctx->heap);
             tuples = term_get_list_tail(tuples);
         }
 
         *ret = reversed;
     } else {
-        term ets_tuple = ets_entry;
-        size_t size = (size_t) memory_estimate_usage(ets_tuple) + CONS_SIZE;
+        if (lookup_element) {
+            if ((size_t) term_get_tuple_arity(ets_entry) < pos) {
+                return EtsBadPosition;
+            }
+            ets_entry = term_get_tuple_element(ets_entry, pos - 1);
+        }
+        size_t size = (size_t) memory_estimate_usage(ets_entry) + CONS_SIZE;
         if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             return EtsAllocationFailure;
         }
@@ -437,7 +449,7 @@ EtsErrorCode ets_lookup(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    EtsErrorCode result = ets_lookup_internal(ets_table, key, ret, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, 0, ret, ctx);
     SMP_UNLOCK(ets_table);
 
     return result;
@@ -459,25 +471,24 @@ EtsErrorCode ets_lookup_element(term ref, term key, size_t pos, term *ret, Conte
         return EtsPermissionDenied;
     }
 
-    term entry = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
+    bool is_duplicate_bag = ets_table->table_type == EtsTableDuplicateBag;
 
+    term entry;
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, pos, &entry, ctx);
+    if (result != EtsOk) {
+        SMP_UNLOCK(ets_table);
+        return result;
+    }
     if (term_is_nil(entry)) {
         SMP_UNLOCK(ets_table);
         return EtsEntryNotFound;
     }
 
-    if ((size_t) term_get_tuple_arity(entry) < pos) {
-        SMP_UNLOCK(ets_table);
-        return EtsBadPosition;
+    if (is_duplicate_bag) {
+        *ret = entry;
+    } else {
+        *ret = term_get_list_head(entry);
     }
-
-    term res = term_get_tuple_element(entry, pos - 1);
-    size_t size = (size_t) memory_estimate_usage(res);
-    if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        SMP_UNLOCK(ets_table);
-        return EtsAllocationFailure;
-    }
-    *ret = memory_copy_term_tree(&ctx->heap, res);
     SMP_UNLOCK(ets_table);
 
     return EtsOk;
@@ -538,7 +549,7 @@ EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
 
     term key = term_get_tuple_element(tuple, 0);
     term list = term_invalid_term();
-    EtsErrorCode result = ets_lookup_internal(ets_table, key, &list, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, 0, &list, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
@@ -618,7 +629,7 @@ EtsErrorCode ets_update_counter(term ref, term key, term operation, term default
     }
     term to_insert = term_invalid_term();
     term list = term_invalid_term();
-    EtsErrorCode result = ets_lookup_internal(ets_table, key, &list, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, 0, &list, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
@@ -687,7 +698,7 @@ EtsErrorCode ets_update_element(term ref, term key, term value, term pos, term *
     }
     term to_insert = term_invalid_term();
     term list = term_invalid_term();
-    EtsErrorCode result = ets_lookup_internal(ets_table, key, &list, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, 0, &list, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
@@ -727,7 +738,7 @@ EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx)
     }
 
     term to_return = term_invalid_term();
-    EtsErrorCode result = ets_lookup_internal(ets_table, key, &to_return, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, 0, &to_return, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
