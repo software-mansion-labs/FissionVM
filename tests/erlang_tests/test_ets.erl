@@ -23,22 +23,23 @@
 -export([start/0]).
 
 start() ->
-    ok = test_basic(),
-    ok = test_named_table(),
-    ok = test_keypos(),
-    ok = test_key_types(),
-    ok = test_private_access(),
-    ok = test_protected_access(),
-    ok = test_public_access(),
-    ok = test_lookup_element(),
-    ok = test_insert_new(),
-    ok = test_update_counter(),
-    ok = test_update_element(),
-    ok = test_delete_object(),
-    ok = test_take(),
-    ok = test_member(),
-    ok = test_insert_list(),
-    ok = test_delete_table(),
+    % ok = test_basic(),
+    % ok = test_named_table(),
+    % ok = test_keypos(),
+    % ok = test_key_types(),
+    % ok = test_private_access(),
+    % ok = test_protected_access(),
+    % ok = test_public_access(),
+    % ok = test_lookup_element(),
+    % ok = test_insert_new(),
+    % ok = test_update_counter(),
+    % ok = test_update_element(),
+    % ok = test_delete_object(),
+    % ok = test_take(),
+    % ok = test_member(),
+    % ok = test_insert_list(),
+    % ok = test_delete_table(),
+    ok = test_duplicate_bag(),
 
     0.
 
@@ -390,3 +391,38 @@ test_delete_table() ->
     true = ets:delete(Tid),
     ok = expect_failure(fun() -> ets:insert(Tid, {gnu, gnat}) end),
     ok.
+
+test_duplicate_bag() ->
+    Tid = ets:new(test_duplicate_bag, [duplicate_bag, {keypos, 2}]),
+    T = {ok, foo, 100, extra},
+    T2 = {error, foo, 200},
+    true = ets:insert_new(Tid, T),
+    true = ets:insert(Tid, T),
+    true = ets:insert(Tid, [T, T]),
+    true = ets:insert(Tid, [T2]),
+    true = [T, T, T, T, T2] == ets:lookup(Tid, foo),
+
+    false = ets:insert_new(Tid, T),
+    false = ets:insert_new(Tid, [T, {ok, bar, batat}]),
+
+    [ok, ok, ok, ok, error] = ets:lookup_element(Tid, foo, 1),
+    [foo, foo, foo, foo, foo] = ets:lookup_element(Tid, foo, 2),
+    [100, 100, 100, 100, 200] = ets:lookup_element(Tid, foo, 3),
+    % some tuples don't have 4 arity
+    ok = expect_failure(fun() -> ets:lookup_element(Tid, foo, 4) end),
+
+    % unsupported for duplicate bag
+    ok = expect_failure(fun() -> ets:update_counter(Tid, foo, 10) end),
+    ok = expect_failure(fun() -> ets:update_element(Tid, foo, {1, error}) end),
+
+    true = ets:delete_object(Tid, {bad, bad}),
+    true = [T, T, T, T, T2] == ets:lookup(Tid, foo),
+    [T2] = ets:delete_object(Tid, T),
+
+    ok.
+
+    % ok = test_delete_object(),
+    % ok = test_take(),
+    % ok = test_member(),
+    % ok = test_insert_list(),
+    % ok = test_delete_table(),

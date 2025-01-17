@@ -3479,8 +3479,9 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
 
     term is_named = interop_kv_get_value_default(options, ATOM_STR("\xB", "named_table"), FALSE_ATOM, ctx->global);
     term keypos = interop_kv_get_value_default(options, ATOM_STR("\x6", "keypos"), term_from_int(1), ctx->global);
+    avm_int_t index = term_to_int(keypos) - 1;
 
-    if (term_to_int(keypos) < 1) {
+    if (UNLIKELY(index < 0)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
@@ -3501,7 +3502,7 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
     }
 
     term table = term_invalid_term();
-    EtsErrorCode result = ets_create_table(name, is_named == TRUE_ATOM, type, access, term_to_int(keypos) - 1, &table, ctx);
+    EtsErrorCode result = ets_create_table(name, is_named == TRUE_ATOM, type, access, (size_t) index, &table, ctx);
     switch (result) {
         case EtsOk:
             return table;
@@ -3583,6 +3584,7 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
             return ret;
         case EtsTableNotFound:
         case EtsPermissionDenied:
+        case EtsBadPosition:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3684,8 +3686,13 @@ static term nif_ets_update_element(Context *ctx, int argc, term argv[])
     VALIDATE_VALUE(pos, term_is_integer);
     term value = term_get_tuple_element(operation, 1);
 
+    avm_int_t index = term_to_int(pos) - 1;
+    if (UNLIKELY(index < 0)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
     term ret = term_invalid_term();
-    EtsErrorCode result = ets_update_element(ref, key, value, pos, &ret, ctx);
+    EtsErrorCode result = ets_update_element(ref, key, value, (size_t) index, &ret, ctx);
     switch (result) {
         case EtsOk:
             return ret;
@@ -3708,6 +3715,10 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
     term key = argv[1];
     term pos = argv[2];
     VALIDATE_VALUE(pos, term_is_integer);
+    avm_int_t index = term_to_int(pos) - 1;
+    if (UNLIKELY(index < 0)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
 
     term default_value = term_invalid_term();
     if (argc == 4) {
@@ -3715,7 +3726,7 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
     }
 
     term ret = term_invalid_term();
-    EtsErrorCode result = ets_lookup_element(ref, key, term_to_int(pos), &ret, ctx);
+    EtsErrorCode result = ets_lookup_element(ref, key, (size_t) index, &ret, ctx);
     switch (result) {
         case EtsOk:
             return ret;
@@ -3777,6 +3788,7 @@ static term nif_ets_delete_object(Context *ctx, int argc, term argv[])
             return ret;
         case EtsTableNotFound:
         case EtsPermissionDenied:
+        case EtsBadPosition:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
