@@ -490,19 +490,6 @@ EtsErrorCode ets_lookup_element(term ref, term key, size_t index, term *ret, Con
     return EtsOk;
 }
 
-EtsErrorCode ets_delete_internal(struct EtsTable *ets_table, term key, term *ret, Context *ctx)
-{
-    if (ets_table->access_type != EtsAccessPublic && ets_table->owner_process_id != ctx->process_id) {
-        return EtsPermissionDenied;
-    }
-
-    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ctx->global);
-    UNUSED(_res);
-
-    *ret = TRUE_ATOM;
-    return EtsOk;
-}
-
 EtsErrorCode ets_drop_table(term ref, term *ret, Context *ctx)
 {
     struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
@@ -530,10 +517,12 @@ EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    EtsErrorCode res = ets_delete_internal(ets_table, key, ret, ctx);
-
+    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ctx->global);
+    UNUSED(_res);
     SMP_UNLOCK(ets_table);
-    return res;
+
+    *ret = TRUE_ATOM;
+    return EtsOk;
 }
 
 EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
@@ -572,10 +561,13 @@ EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
         SMP_UNLOCK(ets_table);
         return EtsOk;
     }
-    EtsErrorCode res = ets_delete_internal(ets_table, key, ret, ctx);
 
+    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ctx->global);
+    UNUSED(_res);
     SMP_UNLOCK(ets_table);
-    return res;
+
+    *ret = TRUE_ATOM;
+    return EtsOk;
 }
 
 static bool operation_to_tuple4(term operation, size_t default_pos, term *position, term *increment, term *threshold, term *set_value)
@@ -756,20 +748,18 @@ EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    term to_return = term_invalid_term();
-    EtsErrorCode result = ets_lookup_internal(ets_table, key, ETS_NO_INDEX, &to_return, ctx);
+    EtsErrorCode result = ets_lookup_internal(ets_table, key, ETS_NO_INDEX, ret, ctx);
     if (result != EtsOk) {
         SMP_UNLOCK(ets_table);
         return result;
     }
-    *ret = to_return;
-    if (term_is_nil(to_return)) {
+    if (term_is_nil(*ret)) {
         SMP_UNLOCK(ets_table);
         return EtsOk;
     }
 
-    term del_result;
-    EtsErrorCode res = ets_delete_internal(ets_table, key, &del_result, ctx);
+    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ctx->global);
+    UNUSED(_res);
     SMP_UNLOCK(ets_table);
-    return res;
+    return EtsOk;
 }
