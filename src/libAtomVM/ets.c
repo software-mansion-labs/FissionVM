@@ -517,8 +517,8 @@ EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ctx->global);
-    UNUSED(_res);
+    bool _found = ets_hashtable_remove(ets_table->hashtable, key, NULL, ctx->global);
+    UNUSED(_found);
     SMP_UNLOCK(ets_table);
 
     *ret = TRUE_ATOM;
@@ -539,31 +539,8 @@ EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
     }
 
     term key = term_get_tuple_element(tuple, index);
-    term list = term_invalid_term();
-    EtsErrorCode result = ets_lookup_internal(ets_table, key, ETS_NO_INDEX, &list, ctx);
-    if (result != EtsOk) {
-        SMP_UNLOCK(ets_table);
-        return result;
-    }
-    if (term_is_nil(list)) {
-        *ret = TRUE_ATOM;
-        SMP_UNLOCK(ets_table);
-        return EtsOk;
-    }
-    term elem = term_get_list_head(list);
-    TermCompareResult cmp_result = term_compare(tuple, elem, TermCompareExact, ctx->global);
-    if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
-        SMP_UNLOCK(ets_table);
-        return EtsAllocationFailure;
-    }
-    if (cmp_result != TermEquals) {
-        *ret = TRUE_ATOM;
-        SMP_UNLOCK(ets_table);
-        return EtsOk;
-    }
-
-    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ctx->global);
-    UNUSED(_res);
+    bool _found = ets_hashtable_remove(ets_table->hashtable, key, NULL, ctx->global);
+    UNUSED(_found);
     SMP_UNLOCK(ets_table);
 
     *ret = TRUE_ATOM;
@@ -748,18 +725,23 @@ EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx)
         return EtsTableNotFound;
     }
 
-    EtsErrorCode result = ets_lookup_internal(ets_table, key, ETS_NO_INDEX, ret, ctx);
-    if (result != EtsOk) {
-        SMP_UNLOCK(ets_table);
-        return result;
-    }
-    if (term_is_nil(*ret)) {
-        SMP_UNLOCK(ets_table);
-        return EtsOk;
-    }
-
-    bool _res = ets_hashtable_remove(ets_table->hashtable, key, ctx->global);
-    UNUSED(_res);
+    struct EtsHashTableEntry deleted;
+    bool found = ets_hashtable_remove(ets_table->hashtable, key, &deleted, ctx->global);
+    // we can unlock here because hashtable doesn't have reference to the entry and its heap anymore
     SMP_UNLOCK(ets_table);
+
+    if (found) {
+        size_t size = memory_estimate_usage(deleted.entry) + CONS_SIZE;
+        // we don't need to preserve tuples, they live on different heap
+        if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            return EtsAllocationFailure;
+        }
+        term entry = memory_copy_term_tree(&ctx->heap, deleted.entry);
+        memory_destroy_heap(deleted.heap, ctx->global);
+
+        *ret = term_list_prepend(entry, term_nil(), &ctx->heap);
+    } else {
+        *ret = term_nil();
+    }
     return EtsOk;
 }

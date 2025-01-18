@@ -31,6 +31,12 @@ extern "C" {
 
 #define NUM_BUCKETS 16
 
+struct EtsHashTableEntry
+{
+    term entry;
+    Heap *heap;
+};
+
 struct EtsHashTable
 {
     size_t capacity;
@@ -54,7 +60,7 @@ void ets_hashtable_destroy(struct EtsHashTable *hash_table, GlobalContext *globa
 
 EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term key, term entry, EtsHashtableOptions opts, Heap *entry_heap, GlobalContext *global);
 term ets_hashtable_lookup(struct EtsHashTable *hash_table, term key, GlobalContext *global);
-bool ets_hashtable_remove(struct EtsHashTable *hash_table, term key, GlobalContext *global);
+bool ets_hashtable_remove(struct EtsHashTable *hash_table, term key, struct EtsHashTableEntry *removed, GlobalContext *global);
 
 #ifdef __cplusplus
 }
