@@ -814,19 +814,38 @@ EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx)
     // we can unlock here because hashtable doesn't have reference to the entry and its heap anymore
     SMP_UNLOCK(ets_table);
 
-    if (found) {
-        size_t size = memory_estimate_usage(deleted.entry) + CONS_SIZE;
-        // we don't need to preserve tuples, they live on different heap
-        if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-            return EtsAllocationFailure;
-        }
-        term entry = memory_copy_term_tree(&ctx->heap, deleted.entry);
-        memory_destroy_heap(deleted.heap, ctx->global);
-
-        // TODO: handle duplicate bag
-        *ret = term_list_prepend(entry, term_nil(), &ctx->heap);
-    } else {
+    if (!found) {
         *ret = term_nil();
+        return EtsOk;
     }
+
+    bool is_duplicate_bag = ets_table->table_type == EtsTableDuplicateBag;
+    size_t size = 0;
+    if (is_duplicate_bag) {
+        size = 2 * memory_estimate_usage(deleted.entry);
+    } else {
+        size = memory_estimate_usage(deleted.entry) + CONS_SIZE;
+    }
+    // we don't need to preserve tuples, they live on different heap
+    if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        return EtsAllocationFailure;
+    }
+    term entry_or_entries = memory_copy_term_tree(&ctx->heap, deleted.entry);
+    memory_destroy_heap(deleted.heap, ctx->global);
+
+    if (is_duplicate_bag) {
+        term taken = term_nil();
+
+        // return in insertion order
+        while (!term_is_nil(entry_or_entries)) {
+            term entry = term_get_list_head(entry_or_entries);
+            taken = term_list_prepend(entry, taken, &ctx->heap);
+            entry_or_entries = term_get_list_tail(entry_or_entries);
+        }
+        *ret = taken;
+    } else {
+        *ret = term_list_prepend(entry_or_entries, term_nil(), &ctx->heap);
+    }
+
     return EtsOk;
 }

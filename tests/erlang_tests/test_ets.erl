@@ -23,22 +23,22 @@
 -export([start/0]).
 
 start() ->
-    % ok = test_basic(),
-    % ok = test_named_table(),
-    % ok = test_keypos(),
-    % ok = test_key_types(),
-    % ok = test_private_access(),
-    % ok = test_protected_access(),
-    % ok = test_public_access(),
-    % ok = test_lookup_element(),
-    % ok = test_insert_new(),
-    % ok = test_update_counter(),
-    % ok = test_update_element(),
-    % ok = test_delete_object(),
-    % ok = test_take(),
-    % ok = test_member(),
-    % ok = test_insert_list(),
-    % ok = test_delete_table(),
+    ok = test_basic(),
+    ok = test_named_table(),
+    ok = test_keypos(),
+    ok = test_key_types(),
+    ok = test_private_access(),
+    ok = test_protected_access(),
+    ok = test_public_access(),
+    ok = test_lookup_element(),
+    ok = test_insert_new(),
+    ok = test_update_counter(),
+    ok = test_update_element(),
+    ok = test_delete_object(),
+    ok = test_take(),
+    ok = test_member(),
+    ok = test_insert_list(),
+    ok = test_delete_table(),
     ok = test_duplicate_bag(),
 
     0.
@@ -396,14 +396,19 @@ test_duplicate_bag() ->
     Tid = ets:new(test_duplicate_bag, [duplicate_bag, {keypos, 2}]),
     T = {ok, foo, 100, extra},
     T2 = {error, foo, 200},
+    T3 = {error, foo, 300},
+
     true = ets:insert_new(Tid, T),
+    false = ets:insert_new(Tid, T),
     true = ets:insert(Tid, T),
     true = ets:insert(Tid, [T, T]),
     true = ets:insert(Tid, [T2]),
     true = [T, T, T, T, T2] == ets:lookup(Tid, foo),
+    true = ets:member(Tid, foo),
 
-    false = ets:insert_new(Tid, T),
+    % nothing inserted, T exists in table
     false = ets:insert_new(Tid, [T, {ok, bar, batat}]),
+    false = ets:member(Tid, bar),
 
     [ok, ok, ok, ok, error] = ets:lookup_element(Tid, foo, 1),
     [foo, foo, foo, foo, foo] = ets:lookup_element(Tid, foo, 2),
@@ -420,9 +425,11 @@ test_duplicate_bag() ->
     true = ets:delete_object(Tid, T),
     true = [T2] == ets:lookup(Tid, foo),
 
-    ok.
+    true = ets:insert(Tid, T3),
+    % keeps insertion order
+    true = [T2, T3] == ets:take(Tid, foo),
 
-    % ok = test_take(),
-    % ok = test_member(),
-    % ok = test_insert_list(),
-    % ok = test_delete_table(),
+    true = ets:delete(Tid),
+    ok = expect_failure(fun() -> ets:insert(Tid, T) end),
+
+    ok.
