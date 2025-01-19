@@ -26,13 +26,13 @@
 
 #include <errno.h>
 #include <fenv.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <limits.h>
 
 #include "atom_table.h"
 #include "avm_version.h"
@@ -79,11 +79,16 @@
 #define NOT_FOUND (0xFF)
 
 #ifdef ENABLE_ADVANCED_TRACE
-static const char *const trace_calls_atom = "\xB" "trace_calls";
-static const char *const trace_call_args_atom = "\xF" "trace_call_args";
-static const char *const trace_returns_atom = "\xD" "trace_returns";
-static const char *const trace_send_atom = "\xA" "trace_send";
-static const char *const trace_receive_atom = "\xD" "trace_receive";
+static const char *const trace_calls_atom = "\xB"
+                                            "trace_calls";
+static const char *const trace_call_args_atom = "\xF"
+                                                "trace_call_args";
+static const char *const trace_returns_atom = "\xD"
+                                              "trace_returns";
+static const char *const trace_send_atom = "\xA"
+                                           "trace_send";
+static const char *const trace_receive_atom = "\xD"
+                                              "trace_receive";
 #endif
 
 static NativeHandlerResult process_echo_mailbox(Context *ctx);
@@ -236,464 +241,387 @@ DECLARE_MATH_NIF_FUN(sqrt)
 DECLARE_MATH_NIF_FUN(tan)
 DECLARE_MATH_NIF_FUN(tanh)
 
-static const struct Nif binary_at_nif =
-{
+static const struct Nif binary_at_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_at_2
 };
 
-static const struct Nif binary_copy_nif =
-{
+static const struct Nif binary_copy_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_copy
 };
 
-static const struct Nif binary_first_nif =
-{
+static const struct Nif binary_first_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_first_1
 };
 
-static const struct Nif binary_last_nif =
-{
+static const struct Nif binary_last_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_last_1
 };
 
-static const struct Nif binary_part_nif =
-{
+static const struct Nif binary_part_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_part_3
 };
 
-static const struct Nif binary_split_nif =
-{
+static const struct Nif binary_split_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_split
 };
 
-static const struct Nif binary_replace_nif =
-{
+static const struct Nif binary_replace_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_replace
 };
 
-static const struct Nif prim_file_get_cwd_nif =
-{
+static const struct Nif prim_file_get_cwd_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_prim_file_get_cwd_0
 };
 
-static const struct Nif make_ref_nif =
-{
+static const struct Nif make_ref_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_make_ref_0
 };
 
-static const struct Nif atom_to_binary_nif =
-{
+static const struct Nif atom_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_atom_to_binary
 };
 
-static const struct Nif atom_to_list_nif =
-{
+static const struct Nif atom_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_atom_to_list_1
 };
 
-static const struct Nif binary_to_atom_nif =
-{
+static const struct Nif binary_to_atom_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_atom_2
 };
 
-static const struct Nif binary_to_float_nif =
-{
+static const struct Nif binary_to_float_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_float_1
 };
 
-static const struct Nif binary_to_integer_nif =
-{
+static const struct Nif binary_to_integer_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_integer
 };
 
-static const struct Nif binary_to_list_nif =
-{
+static const struct Nif binary_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_list_1
 };
 
-static const struct Nif binary_to_existing_atom_nif =
-{
+static const struct Nif binary_to_existing_atom_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_existing_atom_2
 };
 
-static const struct Nif delete_element_nif =
-{
+static const struct Nif delete_element_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_delete_element_2
 };
 
-static const struct Nif display_nif =
-{
+static const struct Nif display_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_display_1
 };
 
-static const struct Nif erase_nif =
-{
+static const struct Nif erase_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_erase_1
 };
 
-static const struct Nif error_nif =
-{
+static const struct Nif error_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_error
 };
 
-static const struct Nif exit_nif =
-{
+static const struct Nif exit_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_exit
 };
 
-static const struct Nif insert_element_nif =
-{
+static const struct Nif insert_element_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_insert_element_3
 };
 
-static const struct Nif integer_to_binary_nif =
-{
+static const struct Nif integer_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_integer_to_binary_2
 };
 
-static const struct Nif integer_to_list_nif =
-{
+static const struct Nif integer_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_integer_to_list_2
 };
 
-static const struct Nif float_to_binary_nif =
-{
+static const struct Nif float_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_float_to_binary
 };
 
-static const struct Nif float_to_list_nif =
-{
+static const struct Nif float_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_float_to_list
 };
 
-static const struct Nif fun_info_nif =
-{
+static const struct Nif fun_info_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_fun_info_2
 };
 
-static const struct Nif is_process_alive_nif =
-{
+static const struct Nif is_process_alive_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_is_process_alive_1
 };
 
-static const struct Nif list_to_atom_nif =
-{
+static const struct Nif list_to_atom_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_atom_1
 };
 
-static const struct Nif list_to_existing_atom_nif =
-{
+static const struct Nif list_to_existing_atom_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_existing_atom_1
 };
 
-static const struct Nif list_to_binary_nif =
-{
+static const struct Nif list_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_binary_1
 };
 
-static const struct Nif list_to_integer_nif =
-{
+static const struct Nif list_to_integer_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_integer
 };
 
-static const struct Nif list_to_float_nif =
-{
+static const struct Nif list_to_float_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_float_1
 };
 
-static const struct Nif list_to_tuple_nif =
-{
+static const struct Nif list_to_tuple_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_tuple_1
 };
 
-static const struct Nif iolist_size_nif =
-{
+static const struct Nif iolist_size_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_iolist_size_1
 };
 
-static const struct Nif iolist_to_binary_nif =
-{
+static const struct Nif iolist_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_iolist_to_binary_1
 };
 
-static const struct Nif open_port_nif =
-{
+static const struct Nif open_port_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_open_port_2
 };
 
-static const struct Nif make_tuple_nif =
-{
+static const struct Nif make_tuple_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_make_tuple_2
 };
 
-static const struct Nif register_nif =
-{
+static const struct Nif register_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_register_2
 };
 
-static const struct Nif unregister_nif =
-{
+static const struct Nif unregister_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_unregister_1
 };
 
-static const struct Nif spawn_opt_nif =
-{
+static const struct Nif spawn_opt_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_spawn_opt
 };
 
-static const struct Nif spawn_fun_opt_nif =
-{
+static const struct Nif spawn_fun_opt_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_spawn_fun_opt
 };
 
-static const struct Nif send_nif =
-{
+static const struct Nif send_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_send_2
 };
 
-static const struct Nif setelement_nif =
-{
+static const struct Nif setelement_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_setelement_3
 };
 
-static const struct Nif whereis_nif =
-{
+static const struct Nif whereis_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_whereis_1
 };
 
-static const struct Nif concat_nif =
-{
+static const struct Nif concat_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_concat_2
 };
 
-static const struct Nif monotonic_time_nif =
-{
+static const struct Nif monotonic_time_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_monotonic_time_1
 };
 
-static const struct Nif system_time_nif =
-{
+static const struct Nif system_time_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_system_time_1
 };
 
-static const struct Nif universaltime_nif =
-{
+static const struct Nif universaltime_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_universaltime_0
 };
 
-static const struct Nif localtime_nif =
-{
+static const struct Nif localtime_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_localtime
 };
 
-static const struct Nif timestamp_nif =
-{
+static const struct Nif timestamp_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_timestamp_0
 };
 
-static const struct Nif system_time_to_universal_time_nif =
-{
+static const struct Nif system_time_to_universal_time_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_calendar_system_time_to_universal_time_2
 };
 
-static const struct Nif tuple_to_list_nif =
-{
+static const struct Nif tuple_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_tuple_to_list_1
 };
 
-static const struct Nif flat_size_nif =
-{
+static const struct Nif flat_size_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erts_debug_flat_size
 };
 
-static const struct Nif process_flag_nif =
-{
+static const struct Nif process_flag_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_process_flag
 };
 
-static const struct Nif processes_nif =
-{
+static const struct Nif processes_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_processes
 };
 
-static const struct Nif process_info_nif =
-{
+static const struct Nif process_info_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_process_info
 };
 
-static const struct Nif put_nif =
-{
+static const struct Nif put_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_put_2
 };
 
-static const struct Nif system_info_nif =
-{
+static const struct Nif system_info_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_system_info
 };
 
-static const struct Nif system_flag_nif =
-{
+static const struct Nif system_flag_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_system_flag
 };
 
-static const struct Nif binary_to_term_nif =
-{
+static const struct Nif binary_to_term_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_term
 };
 
-static const struct Nif term_to_binary_nif =
-{
+static const struct Nif term_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_term_to_binary
 };
 
-static const struct Nif throw_nif =
-{
+static const struct Nif throw_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_throw
 };
 
-static const struct Nif pid_to_list_nif =
-{
+static const struct Nif pid_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_pid_to_list
 };
 
-static const struct Nif ref_to_list_nif =
-{
+static const struct Nif ref_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_ref_to_list
 };
 
-static const struct Nif fun_to_list_nif =
-{
+static const struct Nif fun_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_fun_to_list
 };
 
-static const struct Nif function_exported_nif =
-{
+static const struct Nif function_exported_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_function_exported
 };
 
-static const struct Nif garbage_collect_nif =
-{
+static const struct Nif garbage_collect_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_garbage_collect
 };
 
-static const struct Nif make_fun_nif =
-{
+static const struct Nif make_fun_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_make_fun_3
 };
 
-static const struct Nif memory_nif =
-{
+static const struct Nif memory_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_memory
 };
 
-static const struct Nif monitor_nif =
-{
+static const struct Nif monitor_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_monitor
 };
 
-static const struct Nif demonitor_nif =
-{
+static const struct Nif demonitor_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_demonitor
 };
 
-static const struct Nif link_nif =
-{
+static const struct Nif link_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_link
 };
 
-static const struct Nif unlink_nif =
-{
+static const struct Nif unlink_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_unlink
 };
 
-static const struct Nif group_leader_nif =
-{
+static const struct Nif group_leader_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_group_leader
 };
 
-static const struct Nif get_module_info_nif =
-{
+static const struct Nif get_module_info_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_get_module_info
 };
 
-static const struct Nif raise_nif =
-{
+static const struct Nif raise_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_raise
 };
@@ -703,204 +631,166 @@ static const struct Nif md5_nif = {
     .nif_ptr = nif_erlang_md5
 };
 
-static const struct Nif ets_new_nif =
-{
+static const struct Nif ets_new_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_new
 };
 
-static const struct Nif ets_insert_nif =
-{
+static const struct Nif ets_insert_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_insert
 };
 
-static const struct Nif ets_insert_new_nif =
-{
+static const struct Nif ets_insert_new_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_insert_new
 };
 
-static const struct Nif ets_update_counter_nif =
-{
+static const struct Nif ets_update_counter_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_update_counter
 };
 
-static const struct Nif ets_update_element_nif =
-{
+static const struct Nif ets_update_element_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_update_element
 };
 
-static const struct Nif ets_lookup_nif =
-{
+static const struct Nif ets_lookup_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_lookup
 };
 
-static const struct Nif ets_member_nif =
-{
+static const struct Nif ets_member_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_member
 };
 
-static const struct Nif ets_take_nif =
-{
+static const struct Nif ets_take_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_take
 };
 
-static const struct Nif ets_lookup_element_nif =
-{
+static const struct Nif ets_lookup_element_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_lookup_element
 };
 
-static const struct Nif ets_delete_nif =
-{
+static const struct Nif ets_delete_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_delete
 };
 
-static const struct Nif ets_delete_object_nif =
-{
+static const struct Nif ets_delete_object_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_delete_object
 };
 
-static const struct Nif atomvm_add_avm_pack_binary_nif =
-{
+static const struct Nif atomvm_add_avm_pack_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_add_avm_pack_binary
 };
-static const struct Nif atomvm_add_avm_pack_file_nif =
-{
+static const struct Nif atomvm_add_avm_pack_file_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_add_avm_pack_file
 };
-static const struct Nif atomvm_close_avm_pack_nif =
-{
+static const struct Nif atomvm_close_avm_pack_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_close_avm_pack
 };
-static const struct Nif atomvm_get_start_beam_nif =
-{
+static const struct Nif atomvm_get_start_beam_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_get_start_beam
 };
-static const struct Nif atomvm_read_priv_nif =
-{
+static const struct Nif atomvm_read_priv_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_read_priv
 };
-static const struct Nif console_print_nif =
-{
+static const struct Nif console_print_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_console_print
 };
-static const struct Nif base64_encode_nif =
-{
+static const struct Nif base64_encode_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_base64_encode
 };
-static const struct Nif base64_decode_nif =
-{
+static const struct Nif base64_decode_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_base64_decode
 };
-static const struct Nif base64_encode_to_string_nif =
-{
+static const struct Nif base64_encode_to_string_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_base64_encode_to_string
 };
-static const struct Nif base64_decode_to_string_nif =
-{
+static const struct Nif base64_decode_to_string_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_base64_decode_to_string
 };
-static const struct Nif code_all_available_nif =
-{
+static const struct Nif code_all_available_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_all_available
 };
-static const struct Nif code_all_loaded_nif =
-{
+static const struct Nif code_all_loaded_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_all_loaded
 };
-static const struct Nif code_load_abs_nif =
-{
+static const struct Nif code_load_abs_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_load_abs
 };
-static const struct Nif code_load_binary_nif =
-{
+static const struct Nif code_load_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_load_binary
 };
-static const struct Nif code_ensure_loaded_nif =
-{
+static const struct Nif code_ensure_loaded_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_ensure_loaded
 };
-static const struct Nif lists_reverse_nif =
-{
+static const struct Nif lists_reverse_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_reverse
 };
-static const struct Nif lists_member_nif = 
-{
+static const struct Nif lists_member_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_member
 };
-static const struct Nif lists_keymember_nif = 
-{
+static const struct Nif lists_keymember_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keymember
 };
-static const struct Nif lists_keyfind_nif = 
-{
+static const struct Nif lists_keyfind_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keyfind
 };
-static const struct Nif maps_from_keys_nif =
-{
+static const struct Nif maps_from_keys_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_maps_from_keys
 };
-static const struct Nif maps_next_nif =
-{
+static const struct Nif maps_next_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_maps_next
 };
-static const struct Nif unicode_characters_to_list_nif =
-{
+static const struct Nif unicode_characters_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_list
 };
-static const struct Nif unicode_characters_to_binary_nif =
-{
+static const struct Nif unicode_characters_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_binary
 };
-static const struct Nif erlang_lists_subtract_nif = 
-{
+static const struct Nif erlang_lists_subtract_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_lists_subtract
 };
-static const struct Nif zlib_compress_nif = 
-{
+static const struct Nif zlib_compress_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_zlib_compress_1
 };
 
-
-#define DEFINE_MATH_NIF(moniker)                    \
-    static const struct Nif math_##moniker##_nif =  \
-    {                                               \
-        .base.type = NIFFunctionType,               \
-        .nif_ptr = nif_math_##moniker               \
+#define DEFINE_MATH_NIF(moniker)                     \
+    static const struct Nif math_##moniker##_nif = { \
+        .base.type = NIFFunctionType,                \
+        .nif_ptr = nif_math_##moniker                \
     };
 
 DEFINE_MATH_NIF(cos)
@@ -926,7 +816,7 @@ DEFINE_MATH_NIF(sqrt)
 DEFINE_MATH_NIF(tan)
 DEFINE_MATH_NIF(tanh)
 
-//Handle optional nifs
+// Handle optional nifs
 #if HAVE_OPEN && HAVE_CLOSE
 #define IF_HAVE_OPEN_CLOSE(expr) (expr)
 #else
@@ -955,7 +845,7 @@ DEFINE_MATH_NIF(tanh)
 #define IF_HAVE_OPENDIR_READDIR_CLOSEDIR(expr) NULL
 #endif
 
-//Ignore warning caused by gperf generated code
+// Ignore warning caused by gperf generated code
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -978,7 +868,7 @@ const struct Nif *nifs_get(AtomString module, AtomString function, int arity)
     }
     memcpy(nifname + module_name_len + 1, atom_string_data(function), function_name_len);
 
-    //TODO: handle NIFs with more than 9 parameters
+    // TODO: handle NIFs with more than 9 parameters
     nifname[module_name_len + function_name_len + 1] = '/';
     nifname[module_name_len + function_name_len + 2] = '0' + arity;
     nifname[module_name_len + function_name_len + 3] = 0;
@@ -993,14 +883,14 @@ const struct Nif *nifs_get(AtomString module, AtomString function, int arity)
 
 static inline term make_maybe_boxed_int64(Context *ctx, avm_int64_t value)
 {
-    #if BOXED_TERMS_REQUIRED_FOR_INT64 == 2
-        if ((value < AVM_INT_MIN) || (value > AVM_INT_MAX)) {
-            if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT64_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-                RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-            }
-            return term_make_boxed_int64(value, &ctx->heap);
+#if BOXED_TERMS_REQUIRED_FOR_INT64 == 2
+    if ((value < AVM_INT_MIN) || (value > AVM_INT_MAX)) {
+        if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT64_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
-    #endif
+        return term_make_boxed_int64(value, &ctx->heap);
+    }
+#endif
 
     if ((value < MIN_NOT_BOXED_INT) || (value > MAX_NOT_BOXED_INT)) {
         if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
@@ -1055,11 +945,11 @@ static term nif_erlang_open_port_2(Context *ctx, int argc, term argv[])
     }
 
     term t = term_get_tuple_element(port_name_tuple, 1);
-    //TODO: validate port name
+    // TODO: validate port name
     int ok;
     char *driver_name = interop_term_to_string(t, &ok);
     if (UNLIKELY(!ok)) {
-        //TODO: handle atoms here
+        // TODO: handle atoms here
         RAISE_ERROR(BADARG_ATOM);
     }
 
@@ -1100,9 +990,7 @@ static term nif_erlang_register_2(Context *ctx, int argc, term argv[])
     int32_t pid = term_to_local_process_id(pid_or_port_term);
 
     // pid must be existing, not already registered, and not the atom undefined.
-    if (UNLIKELY(!globalcontext_process_exists(ctx->global, pid)) ||
-        globalcontext_get_registered_process(ctx->global, atom_index) != 0 ||
-        reg_name_term == UNDEFINED_ATOM){
+    if (UNLIKELY(!globalcontext_process_exists(ctx->global, pid)) || globalcontext_get_registered_process(ctx->global, atom_index) != 0 || reg_name_term == UNDEFINED_ATOM) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
@@ -1260,7 +1148,8 @@ static NativeHandlerResult process_console_mailbox(Context *ctx)
     NativeHandlerResult result = NativeContinue;
     while (result == NativeContinue) {
         Message *message = mailbox_first(&ctx->mailbox);
-        if (message == NULL) break;
+        if (message == NULL)
+            break;
         term msg = message->message;
 
         result = process_console_message(ctx, msg);
@@ -1403,7 +1292,7 @@ static term nif_erlang_spawn_fun_opt(Context *ctx, int argc, term argv[])
         size += memory_estimate_usage(boxed_value[i + 3]);
     }
     if (UNLIKELY(memory_ensure_free_opt(new_ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        //TODO: new process should be terminated, however a new pid is returned anyway
+        // TODO: new process should be terminated, however a new pid is returned anyway
         fprintf(stderr, "Unable to allocate sufficient memory to spawn process.\n");
         AVM_ABORT();
     }
@@ -1448,7 +1337,7 @@ static term nif_erlang_spawn_opt(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
     int label = module_search_exported_function(found_module, function_string, args_len, ctx->global);
-    //TODO: fail here if no function has been found
+    // TODO: fail here if no function has been found
     if (UNLIKELY(label == 0)) {
         AVM_ABORT();
     }
@@ -1456,7 +1345,7 @@ static term nif_erlang_spawn_opt(Context *ctx, int argc, term argv[])
     new_ctx->saved_ip = found_module->labels[label];
     new_ctx->cp = module_address(found_module->module_index, found_module->end_instruction_ii);
 
-    //TODO: check available registers count
+    // TODO: check available registers count
     int reg_index = 0;
 
     size_t min_heap_size = 0;
@@ -2002,8 +1891,8 @@ static term nif_erlang_binary_to_integer(Context *ctx, int argc, term argv[])
     memcpy(null_terminated_buf, bin_data, bin_data_size);
     null_terminated_buf[bin_data_size] = '\0';
 
-    //TODO: handle errors
-    //TODO: do not copy buffer, implement a custom strotoll
+    // TODO: handle errors
+    // TODO: do not copy buffer, implement a custom strotoll
     char *endptr;
     uint64_t value = strtoll(null_terminated_buf, &endptr, base);
     if (*endptr != '\0') {
@@ -3062,7 +2951,8 @@ static term nif_erlang_system_flag(Context *ctx, int argc, term argv[])
             argv[1] = BADARG_ATOM;
             return term_invalid_term();
         }
-        while (!ATOMIC_COMPARE_EXCHANGE_WEAK_INT(&ctx->global->online_schedulers, &old_value, new_value)) {};
+        while (!ATOMIC_COMPARE_EXCHANGE_WEAK_INT(&ctx->global->online_schedulers, &old_value, new_value)) {
+        };
         return term_from_int32(old_value);
     }
 #else
@@ -3288,7 +3178,8 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     int temp_bin_size = bin_size;
     do {
         const char *found = (const char *) memmem(temp_bin_data, temp_bin_size, pattern_data, pattern_size);
-        if (!found) break;
+        if (!found)
+            break;
         num_segments++;
         int next_search_offset = found - temp_bin_data + pattern_size;
         temp_bin_data += next_search_offset;
@@ -3533,9 +3424,8 @@ static term nif_ets_insert(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return TRUE_ATOM;
-        case EtsTableNotFound:
+        case EtsBadAccess:
         case EtsBadEntry:
-        case EtsPermissionDenied:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3557,8 +3447,7 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return entry_inserted ? TRUE_ATOM : FALSE_ATOM;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
         case EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
@@ -3582,8 +3471,7 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return ret;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
         case EtsBadPosition:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
@@ -3607,8 +3495,7 @@ static term nif_ets_member(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return term_is_nil(ret) ? FALSE_ATOM : TRUE_ATOM;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3631,8 +3518,7 @@ static term nif_ets_take(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return ret;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3659,8 +3545,7 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return ret;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
         case EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
@@ -3696,8 +3581,7 @@ static term nif_ets_update_element(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return ret;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
         case EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
@@ -3735,8 +3619,7 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
                 return default_value;
             }
         case EtsBadPosition:
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3761,8 +3644,7 @@ static term nif_ets_delete(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return ret;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
             RAISE_ERROR(MEMORY_ATOM);
@@ -3786,8 +3668,7 @@ static term nif_ets_delete_object(Context *ctx, int argc, term argv[])
     switch (result) {
         case EtsOk:
             return ret;
-        case EtsTableNotFound:
-        case EtsPermissionDenied:
+        case EtsBadAccess:
         case EtsBadPosition:
             RAISE_ERROR(BADARG_ATOM);
         case EtsAllocationFailure:
@@ -4119,7 +4000,7 @@ static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
             AVM_ABORT();
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 2, (term[]){key, value}, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 2, (term[]){ key, value }, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     term fun_info_tuple = term_alloc_tuple(2, &ctx->heap);
@@ -4880,9 +4761,8 @@ static term base64_encode(Context *ctx, int argc, term argv[], bool return_binar
             break;
     }
     size_t dst_size_with_pad = dst_size + pad;
-    size_t heap_free = return_binary ?
-        term_binary_heap_size(dst_size_with_pad)
-        : 2*dst_size_with_pad;
+    size_t heap_free = return_binary ? term_binary_heap_size(dst_size_with_pad)
+                                     : 2 * dst_size_with_pad;
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_free, 1, &src, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
@@ -5028,9 +4908,8 @@ static term base64_decode(Context *ctx, int argc, term argv[], bool return_binar
         }
     }
     dst_size -= pad;
-    size_t heap_free = return_binary ?
-        term_binary_heap_size(dst_size)
-        : 2*dst_size;
+    size_t heap_free = return_binary ? term_binary_heap_size(dst_size)
+                                     : 2 * dst_size;
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_free, 1, &src, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
@@ -5132,7 +5011,8 @@ static term nif_code_all_loaded(Context *ctx, int argc, term argv[])
     return result;
 }
 
-struct CodeAllAvailableAcc {
+struct CodeAllAvailableAcc
+{
     Context *ctx;
     struct AVMPackData *avmpack_data;
     term result;
@@ -5323,7 +5203,8 @@ static term nif_code_load_binary(Context *ctx, int argc, term argv[])
     return result;
 }
 
-static const char *const embedded_atom = "\x8" "embedded";
+static const char *const embedded_atom = "\x8"
+                                         "embedded";
 
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
 {
@@ -5950,7 +5831,7 @@ static void maybe_clear_exceptions()
 static term get_exception(avm_float_t f)
 {
 #ifdef HAVE_PRAGMA_STDC_FENV_ACCESS
-    #pragma STDC FENV_ACCESS ON
+#pragma STDC FENV_ACCESS ON
     UNUSED(f)
     if (fetestexcept(FE_DIVBYZERO | FE_INVALID)) {
         return BADARITH_ATOM;
@@ -5965,7 +5846,7 @@ static term get_exception(avm_float_t f)
 static term math_unary_op(Context *ctx, term x_term, unary_math_f f)
 {
 #ifdef HAVE_PRAGMA_STDC_FENV_ACCESS
-    #pragma STDC FENV_ACCESS ON
+#pragma STDC FENV_ACCESS ON
 #endif
     avm_float_t x = term_conv_to_float(x_term);
     maybe_clear_exceptions();
@@ -5984,7 +5865,7 @@ static term math_unary_op(Context *ctx, term x_term, unary_math_f f)
 static term math_binary_op(Context *ctx, term x_term, term y_term, binary_math_f f)
 {
 #ifdef HAVE_PRAGMA_STDC_FENV_ACCESS
-    #pragma STDC FENV_ACCESS ON
+#pragma STDC FENV_ACCESS ON
 #endif
     avm_float_t x = term_conv_to_float(x_term);
     avm_float_t y = term_conv_to_float(y_term);
