@@ -417,11 +417,11 @@ test_duplicate_bag() ->
 
     true = ets:delete_object(Tid, {bad, bad}),
     true = [T, T, T, T, T2] == ets:lookup(Tid, foo),
-    [T2] = ets:delete_object(Tid, T),
+    true = ets:delete_object(Tid, T),
+    true = [T2] == ets:lookup(Tid, foo),
 
     ok.
 
-    % ok = test_delete_object(),
     % ok = test_take(),
     % ok = test_member(),
     % ok = test_insert_list(),

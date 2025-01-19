@@ -175,6 +175,7 @@ bool ets_hashtable_remove(struct EtsHashTable *hash_table, term key, struct EtsH
     bool found = node != NULL;
     bool return_removed = removed != NULL;
     if (found && return_removed) {
+        removed->key = node->key;
         removed->entry = node->entry;
         removed->heap = node->heap;
     } else if (found) {

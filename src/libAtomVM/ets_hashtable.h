@@ -33,6 +33,7 @@ extern "C" {
 
 struct EtsHashTableEntry
 {
+    term key;
     term entry;
     Heap *heap;
 };

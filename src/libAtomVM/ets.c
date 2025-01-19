@@ -26,6 +26,7 @@
 #include "list.h"
 #include "memory.h"
 #include "term.h"
+#include "utils.h"
 
 #define ETS_NO_INDEX SIZE_MAX
 
@@ -527,24 +528,107 @@ EtsErrorCode ets_delete(term ref, term key, term *ret, Context *ctx)
 
 EtsErrorCode ets_delete_object(term ref, term tuple, term *ret, Context *ctx)
 {
+    EtsErrorCode error_code = EtsOk;
     struct EtsTable *ets_table = term_is_atom(ref) ? ets_get_table_by_name(&ctx->global->ets, ref, TableAccessWrite) : ets_get_table_by_ref(&ctx->global->ets, term_to_ref_ticks(ref), TableAccessWrite);
     if (ets_table == NULL) {
-        return EtsTableNotFound;
+        error_code = EtsTableNotFound;
+        goto exit;
     }
+
+    bool is_duplicate_bag = ets_table->table_type == EtsTableDuplicateBag;
 
     term index = ets_table->key_index;
     if (index >= (size_t) term_get_tuple_arity(tuple)) {
-        SMP_UNLOCK(ets_table);
-        return EtsBadPosition;
+        error_code = EtsBadPosition;
+        goto exit;
+    }
+    term key = term_get_tuple_element(tuple, index);
+
+    if (is_duplicate_bag) {
+        term entries = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
+        if (term_is_nil(entries)) {
+            goto exit;
+        }
+
+        int proper;
+        size_t n = term_list_length(entries, &proper);
+        UNUSED(proper);
+
+        term *kept = malloc(n * sizeof(term));
+        size_t kept_n = 0;
+        while (!term_is_nil(entries)) {
+            term entry = term_get_list_head(entries);
+
+            // full element comparison
+            TermCompareResult cmp = term_compare(entry, tuple, TermCompareExact, ctx->global);
+
+            bool keep = cmp != TermEquals;
+            if (UNLIKELY(cmp == TermCompareMemoryAllocFail)) {
+                error_code = EtsAllocationFailure;
+                goto exit;
+            }
+            if (keep) {
+                kept[kept_n++] = entry;
+            }
+
+            entries = term_get_list_tail(entries);
+        }
+
+        bool all_removed = kept_n == 0;
+        if (all_removed) {
+            bool _found = ets_hashtable_remove(ets_table->hashtable, key, NULL, ctx->global);
+            UNUSED(_found);
+            free(kept);
+        } else {
+            size_t memory_needed = memory_estimate_usage(key);
+            for (size_t i = 0; i < kept_n; ++i) {
+                memory_needed += memory_estimate_usage(kept[i]) + CONS_SIZE;
+            }
+
+            Heap *heap;
+            if (UNLIKELY(!ets_hashtable_new_heap(memory_needed, &heap))) {
+                error_code = EtsAllocationFailure;
+                goto exit;
+            }
+
+            term filtered = term_nil();
+            for (size_t i = 0; i < kept_n; ++i) {
+                term copy = memory_copy_term_tree(heap, kept[i]);
+                filtered = term_list_prepend(copy, filtered, heap);
+            }
+            free(kept);
+
+            term new_key = memory_copy_term_tree(heap, key);
+            EtsHashtableErrorCode res = ets_hashtable_insert(ets_table->hashtable, new_key, filtered, EtsHashtableAllowOverwrite, heap, ctx->global);
+            if (res != EtsHashtableOk) {
+                error_code = EtsAllocationFailure;
+                goto exit;
+            }
+        }
+    } else {
+        term entry = ets_hashtable_lookup(ets_table->hashtable, key, ctx->global);
+        if (term_is_nil(entry)) {
+            goto exit;
+        }
+        // full element comparison
+        TermCompareResult cmp = term_compare(entry, tuple, TermCompareExact, ctx->global);
+        bool remove = cmp == TermEquals;
+        if (UNLIKELY(cmp == TermCompareMemoryAllocFail)) {
+            error_code = EtsAllocationFailure;
+            goto exit;
+        }
+        if (remove) {
+            bool _found = ets_hashtable_remove(ets_table->hashtable, key, NULL, ctx->global);
+            UNUSED(_found);
+        }
     }
 
-    term key = term_get_tuple_element(tuple, index);
-    bool _found = ets_hashtable_remove(ets_table->hashtable, key, NULL, ctx->global);
-    UNUSED(_found);
-    SMP_UNLOCK(ets_table);
-
+exit:
     *ret = TRUE_ATOM;
-    return EtsOk;
+    if (LIKELY(ets_table != NULL)) {
+        SMP_UNLOCK(ets_table);
+    }
+    return error_code;
 }
 
 static bool operation_to_tuple4(term operation, size_t default_pos, term *position, term *increment, term *threshold, term *set_value)
@@ -739,6 +823,7 @@ EtsErrorCode ets_take(term ref, term key, term *ret, Context *ctx)
         term entry = memory_copy_term_tree(&ctx->heap, deleted.entry);
         memory_destroy_heap(deleted.heap, ctx->global);
 
+        // TODO: handle duplicate bag
         *ret = term_list_prepend(entry, term_nil(), &ctx->heap);
     } else {
         *ret = term_nil();
