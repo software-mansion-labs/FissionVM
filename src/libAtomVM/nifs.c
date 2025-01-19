@@ -209,6 +209,7 @@ static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]);
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[]);
 static term nif_zlib_compress_1(Context *ctx, int argc, term argv[]);
+static term nif_erlang_nif_error_1(Context *ctx, int argc, term argv[]);
 
 #define DECLARE_MATH_NIF_FUN(moniker) \
     static term nif_math_##moniker(Context *ctx, int argc, term argv[]);
@@ -895,6 +896,10 @@ static const struct Nif zlib_compress_nif =
     .nif_ptr = nif_zlib_compress_1
 };
 
+static const struct Nif erlang_nif_error_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_nif_error_1
+};
 
 #define DEFINE_MATH_NIF(moniker)                    \
     static const struct Nif math_##moniker##_nif =  \
@@ -5911,6 +5916,16 @@ static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
     RAISE_ERROR(UNDEFINED_ATOM);
 }
 #endif
+
+static term nif_erlang_nif_error_1(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    UNUSED(argv)
+    UNUSED(ctx)
+
+    AVM_ABORT();
+}
+
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math
 // error handling is designed to be thread-safe, as errors are specified
