@@ -260,7 +260,7 @@ static bool ets_hashtable_new_heap(size_t size, Heap **new_heap)
     return true;
 }
 
-EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term tuple, bool *tuple_inserted, Context *ctx)
+static EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term tuple, bool *tuple_inserted, Context *ctx)
 {
     size_t arity = (size_t) term_get_tuple_arity(tuple);
     if (ets_table->key_index >= arity) {
@@ -315,7 +315,7 @@ EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term tuple, bool *t
     return EtsOk;
 }
 
-EtsErrorCode ets_insert_multiple_internal(struct EtsTable *ets_table, term entries, bool *overwritten, Context *ctx)
+static EtsErrorCode ets_insert_multiple_internal(struct EtsTable *ets_table, term entries, bool *overwritten, Context *ctx)
 {
     bool insert_new = overwritten != NULL;
     term iter = entries;
