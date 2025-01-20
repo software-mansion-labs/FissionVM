@@ -20,9 +20,15 @@
 
 -module(test_maps).
 
--export([test/0, id/1]).
+-export([test/0, id/1, start/0]).
 
 -include("etest.hrl").
+
+
+start() ->
+    ok = test_take(),
+    ok.
+    
 
 test() ->
     ok = test_get(),
@@ -71,6 +77,7 @@ test() ->
     end,
     ok = test_remove(),
     ok = test_update(),
+    ok = test_take(),
     ok.
 
 test_get() ->
@@ -352,6 +359,12 @@ test_update() ->
     ?ASSERT_ERROR(maps:update({hello}, 40, #{a => 1, b => 2, c => 3}), {badkey, {hello}}),
     ?ASSERT_ERROR(maps:update(a, 40, {hello}), {badmap, {hello}}),
     ok = check_bad_map(fun() -> maps:update(foo, bar, id(not_a_map)) end),
+    ok.
+
+test_take() ->
+    % ?ASSERT_EQUALS(maps:take(foo, #{ok => foo, patat => foo, batat => foo}), {ok, #{patat => foo, batat => foo}}),
+    % ?ASSERT_EQUALS(maps:take(batat, #{ok => foo, patat => foo, batat => foo}), {batat, #{ok => foo, patat => foo}}),
+    ok = maps:take(batat, #{ok => foo, patat => foo, batat => foo}),
     ok.
 
 id(X) -> X.

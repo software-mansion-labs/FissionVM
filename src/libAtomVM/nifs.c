@@ -205,6 +205,7 @@ static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
 static term nif_lists_keyfind(Context *ctx, int argc, term argv[]);
 static term nif_maps_from_keys(Context *ctx, int argc, term argv[]);
 static term nif_maps_next(Context *ctx, int argc, term argv[]);
+static term nif_maps_take(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]);
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[]);
@@ -873,6 +874,11 @@ static const struct Nif maps_next_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_maps_next
+};
+static const struct Nif maps_take_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_maps_take
 };
 static const struct Nif unicode_characters_to_list_nif =
 {
@@ -5607,6 +5613,43 @@ static term nif_maps_next(Context *ctx, int argc, term argv[])
     term_put_tuple_element(ret, 2, next_iterator);
 
     return ret;
+}
+
+static term nif_maps_take(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    term key = argv[0];
+    term map = argv[1];
+    VALIDATE_VALUE(map, term_is_map);
+
+    int pos = term_find_map_pos(map, key, ctx->global);
+    if (pos == TERM_MAP_NOT_FOUND) {
+        return ERROR_ATOM;
+    }
+
+    size_t size = term_get_map_size(map);
+    size_t required_size = TUPLE_SIZE(2) + TERM_MAP_SIZE(size - 1);
+
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, required_size, argc, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term updated_map = term_alloc_map(size - 1, &ctx->heap);
+
+    for (size_t i = 0; i < size; i++) {
+        printf("%d \n \n \n ", i);
+        printf("%d \n \n \n ", size);
+        if (i != (size_t) pos) {
+            term key = term_get_map_key(map, (avm_uint_t) i);
+            term value = term_get_map_value(map, (avm_uint_t) i);
+            int index_to_update = i > pos ? i - 1 : i;
+            term_set_map_assoc(updated_map, index_to_update, key, value);
+        }
+    }
+
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(result_tuple, 0, key);
+    term_put_tuple_element(result_tuple, 1, updated_map);
+    return result_tuple;
 }
 
 static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[])

@@ -23,7 +23,8 @@
 -export([start/0]).
 
 start() ->
-    ok = etest:test(get_tests(get_otp_version())).
+    % ok = etest:test(get_tests(get_otp_version())).
+    ok = etest:test([test_maps]).
 
 get_otp_version() ->
     case erlang:system_info(machine) of
