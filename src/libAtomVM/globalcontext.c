@@ -547,6 +547,24 @@ int globalcontext_get_registered_process(GlobalContext *glb, int atom_index)
     return 0;
 }
 
+int globalcontext_get_registered_process_name(GlobalContext *glb, int local_process_id)
+{
+    struct ListHead *registered_processes_list = synclist_rdlock(&glb->registered_processes);
+    struct ListHead *item;
+    LIST_FOR_EACH (item, registered_processes_list) {
+        const struct RegisteredProcess *registered_process = GET_LIST_ENTRY(item, struct RegisteredProcess, registered_processes_list_head);
+        if (registered_process->local_process_id == local_process_id) {
+            int result = registered_process->atom_index;
+            synclist_unlock(&glb->registered_processes);
+            return result;
+        }
+    }
+
+    synclist_unlock(&glb->registered_processes);
+
+    return 0;
+}
+
 bool globalcontext_is_atom_index_equal_to_atom_string(GlobalContext *glb, int atom_index_a, AtomString atom_string_b)
 {
     AtomString atom_string_a;

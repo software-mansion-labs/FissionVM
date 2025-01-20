@@ -171,6 +171,8 @@ static const char *const env_atom = "\x3" "env";
 static const char *const positive_atom = "\x8" "positive";
 static const char *const monotonic_atom = "\x9" "monotonic";
 
+static const char *const registered_name_atom = "\xF" "registered_name";
+
 void defaultatoms_init(GlobalContext *glb)
 {
     int ok = 1;
@@ -326,6 +328,8 @@ void defaultatoms_init(GlobalContext *glb)
 
     ok &= globalcontext_insert_atom(glb, positive_atom) == POSITIVE_ATOM_INDEX;
     ok &= globalcontext_insert_atom(glb, monotonic_atom) == MONOTONIC_ATOM_INDEX;
+
+    ok &= globalcontext_insert_atom(glb, registered_name_atom) == REGISTERED_NAME_ATOM_INDEX;
 
     if (!ok) {
         AVM_ABORT();
