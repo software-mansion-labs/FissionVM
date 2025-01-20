@@ -279,6 +279,7 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
         case STACK_SIZE_ATOM:
         case MESSAGE_QUEUE_LEN_ATOM:
         case MEMORY_ATOM:
+        case REGISTERED_NAME_ATOM:
             ret_size = TUPLE_SIZE(2);
             break;
         case LINKS_ATOM: {
@@ -342,6 +343,17 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
             term_put_tuple_element(ret, 0, MEMORY_ATOM);
             unsigned long value = context_size(ctx);
             term_put_tuple_element(ret, 1, term_from_int32(value));
+            break;
+        }
+
+        case REGISTERED_NAME_ATOM: {
+            term_put_tuple_element(ret, 0, REGISTERED_NAME_ATOM);
+            unsigned long value = globalcontext_get_registered_process_name(ctx->global, ctx->process_id);
+            if (value) {
+                term_put_tuple_element(ret, 1, term_from_atom_index(value));
+            } else {
+                ret = term_nil();
+            }
             break;
         }
 
