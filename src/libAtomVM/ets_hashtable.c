@@ -82,7 +82,7 @@ static void print_info(struct EtsHashTable *hash_table)
 }
 #endif
 
-EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term key, term entry, EtsHashtableOptions opts, Heap *heap, GlobalContext *global)
+EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term key, term entry, EtsHashtableOptions opts, Heap *entry_heap, GlobalContext *global)
 {
     uint32_t hash = hash_term(key, global);
     uint32_t index = hash % hash_table->capacity;
@@ -98,9 +98,10 @@ EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term
     while (node) {
         if (term_compare(key, node->key, TermCompareExact, global) == TermEquals) {
             if (opts & EtsHashtableAllowOverwrite) {
+                node->key = key;
                 node->entry = entry;
                 memory_destroy_heap(node->heap, global);
-                node->heap = heap;
+                node->heap = entry_heap;
                 return EtsHashtableOk;
             } else {
                 return EtsHashtableKeyAlreadyExists;
@@ -114,10 +115,11 @@ EtsHashtableErrorCode ets_hashtable_insert(struct EtsHashTable *hash_table, term
     if (IS_NULL_PTR(new_node)) {
         return EtsHashtableError;
     }
+
     new_node->next = NULL;
     new_node->key = key;
     new_node->entry = entry;
-    new_node->heap = heap;
+    new_node->heap = entry_heap;
 
     if (last_node) {
         last_node->next = new_node;
@@ -148,7 +150,7 @@ term ets_hashtable_lookup(struct EtsHashTable *hash_table, term key, GlobalConte
     return term_nil();
 }
 
-bool ets_hashtable_remove(struct EtsHashTable *hash_table, term key, GlobalContext *global)
+bool ets_hashtable_remove(struct EtsHashTable *hash_table, term key, struct EtsHashTableEntry *removed, GlobalContext *global)
 {
     uint32_t hash = hash_term(key, global);
     uint32_t index = hash % hash_table->capacity;
@@ -157,24 +159,30 @@ bool ets_hashtable_remove(struct EtsHashTable *hash_table, term key, GlobalConte
     struct HNode *prev_node = NULL;
     while (node) {
         if (term_compare(node->key, key, TermCompareExact, global) == TermEquals) {
-
-            memory_destroy_heap(node->heap, global);
             struct HNode *next_node = node->next;
-            free(node);
-
             if (prev_node != NULL) {
                 prev_node->next = next_node;
             } else {
                 hash_table->buckets[index] = next_node;
             }
-            return true;
+            break;
         } else {
             prev_node = node;
             node = node->next;
         }
     }
 
-    return false;
+    bool found = node != NULL;
+    bool return_removed = removed != NULL;
+    if (found && return_removed) {
+        removed->key = node->key;
+        removed->entry = node->entry;
+        removed->heap = node->heap;
+    } else if (found) {
+        memory_destroy_heap(node->heap, global);
+    }
+    free(node);
+    return found;
 }
 
 //

@@ -1233,7 +1233,7 @@ static inline term term_alloc_tuple(uint32_t size, Heap *heap)
 /**
  * @brief Replaces the content of a tuple element.
  *
- * @details Destructively replaces the nth element of an existing tuple, it should be used only on newly allocated tuples.
+ * @details Destructively replaces the nth (0-based) element of an existing tuple, it should be used only on newly allocated tuples.
  * @param t the term pointing to the target tuple, fails if not a tuple.
  * @param elem_index the index of the element that will be replaced.
  * @param put_value the term that will be put on the nth tuple element.
@@ -1250,7 +1250,7 @@ static inline void term_put_tuple_element(term t, uint32_t elem_index, term put_
 }
 
 /**
- * @brief Returns the nth tuple element
+ * @brief Returns the nth (0-based) tuple element
  *
  * @details Returns the nth element for a given tuple pointed by a term.
  * @param t a term that points to a tuple, fails otherwise.

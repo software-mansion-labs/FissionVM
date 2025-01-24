@@ -39,6 +39,7 @@ start() ->
     ok = test_member(),
     ok = test_insert_list(),
     ok = test_delete_table(),
+    ok = test_duplicate_bag(),
 
     0.
 
@@ -55,11 +56,7 @@ test_basic(Options) ->
     %% The table should no longer exist
     %%
     sleep(25),
-    ok = expect_failure(
-        fun() ->
-            ets:lookup(Tid, foo)
-        end
-    ),
+    ok = expect_failure(fun() -> ets:lookup(Tid, foo) end),
     ok.
 
 test_basic_fun(Pid, Options) ->
@@ -107,9 +104,8 @@ test_basic_fun(Pid, Options) ->
 
     [] = ets:lookup(Tid, #{some => structured, key => [a, b, c]}),
     true = ets:insert(Tid, {#{some => structured, key => [a, b, c]}, bar}),
-    [{#{some := structured, key := [a, b, c]}, bar}] = ets:lookup(Tid, #{
-        some => structured, key => [a, b, c]
-    }),
+    [{#{some := structured, key := [a, b, c]}, bar}] =
+        ets:lookup(Tid, #{some => structured, key => [a, b, c]}),
 
     expect_failure(fun() -> ets:insert(Tid, {}) end),
     expect_failure(fun() -> ets:insert(Tid, not_a_tuple) end),
@@ -150,62 +146,23 @@ test_key_types_fun(Pid, _Options) ->
     EchoServer = spawn_opt(fun echo_server/0, []),
     register(echo, EchoServer),
 
-    ok = test_key_insert_lookup(
-        Tid,
-        some_atom
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        12345
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        0
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        -12345
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        3.14159365
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        self()
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        erlang:make_ref()
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        <<"fubar">>
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        <<"">>
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        {some_atom, 1234}
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        [a, b, c, self(), 3.1415265]
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        [a | b]
-    ),
-    ok = test_key_insert_lookup(
-        Tid,
-        #{
-            some_atom => {a, b, c},
-            #{another => "map"} => erlang:make_ref(),
-            <<1, 2, 3, 4>> => <<-4, -3, -2, -1>>
-        }
-    ),
+    ok = test_key_insert_lookup(Tid, some_atom),
+    ok = test_key_insert_lookup(Tid, 12345),
+    ok = test_key_insert_lookup(Tid, 0),
+    ok = test_key_insert_lookup(Tid, -12345),
+    ok = test_key_insert_lookup(Tid, 3.14159365),
+    ok = test_key_insert_lookup(Tid, self()),
+    ok = test_key_insert_lookup(Tid, erlang:make_ref()),
+    ok = test_key_insert_lookup(Tid, <<"fubar">>),
+    ok = test_key_insert_lookup(Tid, <<"">>),
+    ok = test_key_insert_lookup(Tid, {some_atom, 1234}),
+    ok = test_key_insert_lookup(Tid, [a, b, c, self(), 3.1415265]),
+    ok = test_key_insert_lookup(Tid, [a | b]),
+    ok =
+        test_key_insert_lookup(Tid,
+                               #{some_atom => {a, b, c},
+                                 #{another => "map"} => erlang:make_ref(),
+                                 <<1, 2, 3, 4>> => <<(-4), (-3), (-2), (-1)>>}),
 
     EchoServer ! halt,
 
@@ -221,20 +178,15 @@ test_private_access() ->
     Pid = spawn_opt(fun() -> test_access_fun(Self, [private]) end, []),
 
     Pid ! get_table,
-    Tid =
-        receive
-            {table, T} ->
-                T
-        after 1000 ->
-            error(timeout_wait_for_table)
-        end,
+    Tid = receive
+              {table, T} ->
+                  T
+          after 1000 ->
+              error(timeout_wait_for_table)
+          end,
 
-    ok = expect_failure(
-        fun() -> ets:insert(Tid, {gnu, gnat}) end
-    ),
-    ok = expect_failure(
-        fun() -> ets:lookup(Tid, foo) end
-    ),
+    ok = expect_failure(fun() -> ets:insert(Tid, {gnu, gnat}) end),
+    ok = expect_failure(fun() -> ets:lookup(Tid, foo) end),
 
     Pid ! halt,
     ok.
@@ -244,17 +196,14 @@ test_protected_access() ->
     Pid = spawn_opt(fun() -> test_access_fun(Self, [protected]) end, []),
 
     Pid ! get_table,
-    Tid =
-        receive
-            {table, T} ->
-                T
-        after 1000 ->
-            error(timeout_wait_for_table)
-        end,
+    Tid = receive
+              {table, T} ->
+                  T
+          after 1000 ->
+              error(timeout_wait_for_table)
+          end,
 
-    ok = expect_failure(
-        fun() -> ets:insert(Tid, {gnu, gnat}) end
-    ),
+    ok = expect_failure(fun() -> ets:insert(Tid, {gnu, gnat}) end),
     [{foo, bar}] = ets:lookup(Tid, foo),
 
     Pid ! halt,
@@ -265,13 +214,12 @@ test_public_access() ->
     Pid = spawn_opt(fun() -> test_access_fun(Self, [public]) end, []),
 
     Pid ! get_table,
-    Tid =
-        receive
-            {table, T} ->
-                T
-        after 1000 ->
-            error(timeout_wait_for_table)
-        end,
+    Tid = receive
+              {table, T} ->
+                  T
+          after 1000 ->
+              error(timeout_wait_for_table)
+          end,
 
     true = ets:insert(Tid, {gnu, gnat}),
     [{foo, bar}] = ets:lookup(Tid, foo),
@@ -322,8 +270,7 @@ expect_failure(Fun, Class, Error) ->
     end.
 
 sleep(Ms) ->
-    receive
-    after Ms ->
+    receive after Ms ->
         ok
     end.
 
@@ -442,7 +389,47 @@ test_delete_table() ->
     true = ets:insert(Tid, {foo, tapas}),
     [{foo, tapas}] = ets:lookup(Tid, foo),
     true = ets:delete(Tid),
-    ok = expect_failure(
-        fun() -> ets:insert(Tid, {gnu, gnat}) end
-    ),
+    ok = expect_failure(fun() -> ets:insert(Tid, {gnu, gnat}) end),
+    ok.
+
+test_duplicate_bag() ->
+    Tid = ets:new(test_duplicate_bag, [duplicate_bag, {keypos, 2}]),
+    T = {ok, foo, 100, extra},
+    T2 = {error, foo, 200},
+    T3 = {error, foo, 300},
+
+    true = ets:insert_new(Tid, T),
+    false = ets:insert_new(Tid, T),
+    true = ets:insert(Tid, T),
+    true = ets:insert(Tid, [T, T]),
+    true = ets:insert(Tid, [T2]),
+    true = [T, T, T, T, T2] == ets:lookup(Tid, foo),
+    true = ets:member(Tid, foo),
+
+    % nothing inserted, T exists in table
+    false = ets:insert_new(Tid, [T, {ok, bar, batat}]),
+    false = ets:member(Tid, bar),
+
+    [ok, ok, ok, ok, error] = ets:lookup_element(Tid, foo, 1),
+    [foo, foo, foo, foo, foo] = ets:lookup_element(Tid, foo, 2),
+    [100, 100, 100, 100, 200] = ets:lookup_element(Tid, foo, 3),
+    % some tuples don't have 4 arity
+    ok = expect_failure(fun() -> ets:lookup_element(Tid, foo, 4) end),
+
+    % unsupported for duplicate bag
+    ok = expect_failure(fun() -> ets:update_counter(Tid, foo, 10) end),
+    ok = expect_failure(fun() -> ets:update_element(Tid, foo, {1, error}) end),
+
+    true = ets:delete_object(Tid, {bad, bad}),
+    true = [T, T, T, T, T2] == ets:lookup(Tid, foo),
+    true = ets:delete_object(Tid, T),
+    true = [T2] == ets:lookup(Tid, foo),
+
+    true = ets:insert(Tid, T3),
+    % keeps insertion order
+    true = [T2, T3] == ets:take(Tid, foo),
+
+    true = ets:delete(Tid),
+    ok = expect_failure(fun() -> ets:insert(Tid, T) end),
+
     ok.

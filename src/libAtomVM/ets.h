@@ -52,9 +52,8 @@ typedef enum EtsAccessType
 typedef enum EtsErrorCode
 {
     EtsOk,
-    EtsTableNotFound,
+    EtsBadAccess,
     EtsTableNameInUse,
-    EtsPermissionDenied,
     EtsBadEntry,
     EtsAllocationFailure,
     EtsEntryNotFound,
