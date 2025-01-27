@@ -301,7 +301,7 @@ static EtsErrorCode ets_insert_internal(struct EtsTable *ets_table, term tuple, 
 
     EtsHashtableOptions opts = insert_new ? 0 : EtsHashtableAllowOverwrite;
     EtsHashtableErrorCode res = ets_hashtable_insert(ets_table->hashtable, ets_key, ets_tuple, opts, ets_heap, ctx->global);
-    if (insert_new && res == EtsOk) {
+    if (insert_new && res == EtsHashtableOk) {
         *tuple_inserted = true;
         return EtsOk;
     } else if (insert_new && res == EtsHashtableKeyAlreadyExists) {
