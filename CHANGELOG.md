@@ -51,6 +51,9 @@ certain VM instructions are used.
 - Fix `network:stop/0` on ESP32 so the network can be started again
 - Fix matching of binaries on unaligned boundaries for code compiled with older versions of OTP
 - Fix a memory corruption caused by `binary:split/2,3`
+- Add missing out of memory handling in binary_to_atom
+- Fixed potential crashes or memory leaks caused by a mistake in calculation of reference counts
+and a race condition in otp_socket code
 
 ## [0.6.5] - 2024-10-15
 
