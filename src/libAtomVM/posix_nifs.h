@@ -34,6 +34,9 @@
 extern "C" {
 #endif
 
+#if HAVE_GETENV
+extern const struct Nif atomvm_posix_getenv_nif;
+#endif
 #if HAVE_OPEN && HAVE_CLOSE
 extern const ErlNifResourceTypeInit posix_fd_resource_type_init;
 extern const struct Nif atomvm_posix_open_nif;

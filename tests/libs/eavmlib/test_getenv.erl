@@ -1,7 +1,7 @@
 %
 % This file is part of AtomVM.
 %
-% Copyright 2019 Fred Dushin <fred@dushin.net>
+% Copyright 2025 Jakub Gonet <jakub.gonet@swmansion.com>
 %
 % Licensed under the Apache License, Version 2.0 (the "License");
 % you may not use this file except in compliance with the License.
@@ -18,17 +18,13 @@
 % SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 %
 
--module(tests).
+-module(test_getenv).
 
--export([start/0]).
+-export([test/0]).
 
-start() ->
-    etest:test([
-        test_dir,
-        test_file,
-        test_http_server,
-        test_getenv,
-        test_port,
-        test_timer_manager,
-        test_ahttp_client
-    ]).
+-include("etest.hrl").
+
+test() ->
+    Path = atomvm:posix_getenv("PATH"),
+    true = Path =/= undefined,
+    ok.

@@ -932,6 +932,11 @@ DEFINE_MATH_NIF(tan)
 DEFINE_MATH_NIF(tanh)
 
 //Handle optional nifs
+#if HAVE_GETENV
+#define IF_HAVE_GETENV(expr) (expr)
+#else
+#define IF_HAVE_GETENV(expr) NULL
+#endif
 #if HAVE_OPEN && HAVE_CLOSE
 #define IF_HAVE_OPEN_CLOSE(expr) (expr)
 #else

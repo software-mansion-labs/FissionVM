@@ -209,6 +209,7 @@ endif()
 
 include(DefineIfExists)
 # HAVE_OPEN, HAVE_OPENDIR, HAVE_CLOSE HAVE_CLOSEDIR, HAVE_READDIR are used in globalcontext.h
+define_if_function_exists(libAtomVM getenv "stdlib.h" PUBLIC HAVE_GETENV)
 define_if_function_exists(libAtomVM open "fcntl.h" PUBLIC HAVE_OPEN)
 define_if_function_exists(libAtomVM opendir "dirent.h" PUBLIC HAVE_OPENDIR)
 define_if_function_exists(libAtomVM close "unistd.h" PUBLIC HAVE_CLOSE)

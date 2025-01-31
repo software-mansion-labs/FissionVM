@@ -25,6 +25,7 @@ include(BuildErlang)
 set(ERLANG_MODULES
     test_dir
     test_file
+    test_getenv
     test_ahttp_client
     test_http_server
     test_port
