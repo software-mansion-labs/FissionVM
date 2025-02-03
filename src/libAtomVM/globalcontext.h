@@ -305,7 +305,7 @@ void globalcontext_init_process(GlobalContext *glb, Context *ctx);
 bool globalcontext_register_process(GlobalContext *glb, int atom_index, int local_process_id);
 
 /**
- * @brief Get a registered process
+ * @brief Get a registered process id
  *
  * @details Returns the local process id of a previously registered process.
  * @param glb the global context.
@@ -313,6 +313,17 @@ bool globalcontext_register_process(GlobalContext *glb, int atom_index, int loca
  * @returns a previously registered process local id.
  */
 int globalcontext_get_registered_process(GlobalContext *glb, int atom_index);
+
+
+/**
+ * @brief Get a registered process name
+ *
+ * @details Returns the atom index of the name of a previously registered process.
+ * @param glb the global context.
+ * @param local_process_id previously registered process local id.
+ * @returns an atom table index of the process name.
+ */
+int globalcontext_get_registered_process_name(GlobalContext *glb, int local_process_id);
 
 /**
  * @brief Unregister a process by name
