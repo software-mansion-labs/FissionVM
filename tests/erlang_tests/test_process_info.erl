@@ -34,6 +34,11 @@ start() ->
     {links, [Self]} = process_info(Pid, links),
     unlink(Pid),
     {links, []} = process_info(Pid, links),
+    [] = process_info(Pid, registered_name),
+    register(test_process_name, Pid),
+    {registered_name, test_process_name} = process_info(Pid, registered_name),
+    unregister(test_process_name),
+    [] = process_info(Pid, registered_name),
     Pid ! {Self, stop},
     _Accum =
         receive

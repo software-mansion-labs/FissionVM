@@ -348,11 +348,11 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
 
         case REGISTERED_NAME_ATOM: {
             term_put_tuple_element(ret, 0, REGISTERED_NAME_ATOM);
-            unsigned long value = globalcontext_get_registered_process_name(ctx->global, ctx->process_id);
-            if (value) {
-                term_put_tuple_element(ret, 1, term_from_atom_index(value));
-            } else {
+            int value = globalcontext_get_registered_process_name(ctx->global, ctx->process_id);
+            if (value == 0) {
                 ret = term_nil();
+            } else {
+                term_put_tuple_element(ret, 1, term_from_atom_index(value));
             }
             break;
         }
