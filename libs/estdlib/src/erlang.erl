@@ -314,8 +314,8 @@ system_flag(_Key, _Value) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec md5(Data :: binary()) -> binary().
-md5(Data) when is_binary(Data) ->
-    crypto:hash(md5, Data).
+md5(Data) when is_binary(Data) orelse is_list(Data) ->
+    erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
 %% @param   Module Name of module
