@@ -27,6 +27,7 @@ start() ->
     ok = test_process_count(Machine),
     ok = test_port_count(Machine),
     ok = test_os_type(),
+    ok = test_otp_release(),
     assert(erlang:system_info(atom_count) > 0),
     assert(erlang:system_info(wordsize) > 0),
     case Machine of
@@ -96,5 +97,11 @@ test_process_count() ->
 test_os_type() ->
     case erlang:system_info(os_type) of
         {unix, _} -> ok;
+        _ -> error
+    end.
+
+test_otp_release() ->
+    case erlang:system_info(otp_release) of
+        "26" -> ok;
         _ -> error
     end.
