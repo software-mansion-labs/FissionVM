@@ -26,6 +26,7 @@ start() ->
     Machine = erlang:system_info(machine),
     ok = test_process_count(Machine),
     ok = test_port_count(Machine),
+    ok = test_os_type(),
     assert(erlang:system_info(atom_count) > 0),
     assert(erlang:system_info(wordsize) > 0),
     case Machine of
@@ -91,3 +92,9 @@ test_process_count() ->
         ok -> ok
     end,
     Count.
+
+test_os_type() ->
+    case erlang:system_info(os_type) of
+        {unix, _} -> ok;
+        _ -> error
+    end.
