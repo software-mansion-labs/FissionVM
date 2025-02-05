@@ -319,7 +319,7 @@ struct Test tests[] = {
     TEST_CASE(test_unicode),
 
     TEST_CASE_EXPECTED(test_binary_part, 12),
-    TEST_CASE_EXPECTED(test_binary_split, 16),
+    TEST_CASE(test_binary_split),
     TEST_CASE(test_binary_replace),
     TEST_CASE(test_prim_file_getcwd),
 
@@ -440,6 +440,7 @@ struct Test tests[] = {
     TEST_CASE_EXPECTED(boxed_is_not_float, 16),
     TEST_CASE_EXPECTED(float_is_float, 32),
     TEST_CASE_EXPECTED(float_is_number, 32),
+    TEST_CASE(fconv_fail_invalid),
 
     TEST_CASE_EXPECTED(float2bin, 31),
     TEST_CASE_EXPECTED(float2list, 31),
@@ -571,6 +572,8 @@ struct Test tests[] = {
     TEST_CASE(unique),
     TEST_CASE(complex_list_match_xregs),
     TEST_CASE(twentyone_param_fun),
+    TEST_CASE(gc_safe_x_reg_write),
+
     TEST_CASE(test_fun_to_list),
     TEST_CASE(maps_nifs),
 
@@ -616,7 +619,6 @@ static int test_atom(struct Test *test)
 
     context_destroy(ctx);
     globalcontext_destroy(glb);
-    module_destroy(mod);
     mapped_file_close(beam_file);
     return result;
 }

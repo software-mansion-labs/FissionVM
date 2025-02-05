@@ -28,6 +28,9 @@
 #ifndef _TERM_H_
 #define _TERM_H_
 
+// gcc-arm-none-eabi 13.2.1 with newlib requires this first
+#include <sys/types.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -305,30 +308,6 @@ static inline bool term_is_boxed(term t)
 {
     /* boxed: 10 */
     return ((t & 0x3) == 0x2);
-}
-
-/**
- * @brief Checks if a term is a movable boxed value
- *
- * @details Returns \c true if a term is a boxed value that can be safely copied with memcpy.
- * @param t the term that will checked.
- * @return \c true if check succeeds, \c false otherwise.
- */
-static inline bool term_is_movable_boxed(term t)
-{
-    /* boxed: 10 */
-    if ((t & 0x3) == 0x2) {
-        const term *boxed_value = term_to_const_term_ptr(t);
-        switch (boxed_value[0] & TERM_BOXED_TAG_MASK) {
-            case 0x10:
-                return true;
-
-            default:
-                return false;
-        }
-    } else {
-        return false;
-    }
 }
 
 /**
@@ -1066,7 +1045,7 @@ static inline term term_from_literal_binary(const void *data, size_t size, Heap 
  */
 static inline size_t term_sub_binary_heap_size(term binary, size_t len)
 {
-    if (term_is_refc_binary(binary) && len >= SUB_BINARY_MIN) {
+    if ((term_is_refc_binary(binary) || term_is_sub_binary(binary)) && len >= SUB_BINARY_MIN) {
         return TERM_BOXED_SUB_BINARY_SIZE;
     } else {
         return term_binary_heap_size(len);
@@ -1533,6 +1512,19 @@ static inline bool term_is_string(term t)
     }
     return term_is_nil(t);
 }
+
+/**
+ * @brief Gets function module name, name and arity.
+ *
+ * @details Allows to retrieve partial information by passing NULL pointers.
+ * @param fun function term.
+ * @param m module name as an atom.
+ * @param f function name as an atom.
+ * @param a function arity as an integer.
+ * @param global the \c GlobalContext used for creating function name atoms.
+ *
+ */
+void term_get_function_mfa(term fun, term *m, term *f, term *a, GlobalContext *global);
 
 static inline term term_make_function_reference(term m, term f, term a, Heap *heap)
 {

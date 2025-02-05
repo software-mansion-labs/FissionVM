@@ -19,39 +19,51 @@
 %
 
 -module(test_fun_info).
--export([start/0]).
 
--define(SUCCESS, (0)).
--define(ERROR, (1)).
+-export([start/0, get_fun/1]).
+
+-define(SUCCESS, 0).
+-define(ERROR, 1).
 
 start() ->
     try test_funs() of
-        ok -> ?SUCCESS
+        ok ->
+            ?SUCCESS
     catch
-        _:E ->
-            erlang:display(E),
+        _:E:S ->
+            erlang:display({E, S}),
             ?ERROR
     end.
 
-f(_X, _Y, _Z) -> ok.
+f(_X, _Y, _Z) ->
+    ok.
+
+get_fun(local) ->
+    fun(B) -> not B end;
+get_fun(local_ref) ->
+    fun f/3;
+get_fun(external_ref) ->
+    fun erlang:apply/2;
+get_fun(not_existing_ref) ->
+    fun erlang:undef/8.
 
 test_funs() ->
-    LocalFun = fun(B) -> not B end,
-    LocalFunRef = fun f/3,
-    ExternalFunRef = fun erlang:apply/2,
-    NotExistingFunRef = fun erlang:undef/8,
+    LocalFun = ?MODULE:get_fun(local),
+    LocalFunRef = ?MODULE:get_fun(local_ref),
+    ExternalFunRef = ?MODULE:get_fun(external_ref),
+    NotExistingFunRef = ?MODULE:get_fun(not_existing_ref),
 
     {module, test_fun_info} = erlang:fun_info(LocalFun, module),
     {name, LocalFunName} = erlang:fun_info(LocalFun, name),
-    % e.g. -test_funs/0-fun-1-
-    true = atom_contains(LocalFunName, "test_funs"),
+    % e.g. -get_fun/1-fun-1-
+    true = atom_contains(LocalFunName, "get_fun"),
     {arity, 1} = erlang:fun_info(LocalFun, arity),
     {type, local} = erlang:fun_info(LocalFun, type),
 
     {module, test_fun_info} = erlang:fun_info(LocalFunRef, module),
     {name, LocalFunRefName} = erlang:fun_info(LocalFunRef, name),
     % across Erlang versions, this representation changed frequently
-    Format1 = atom_contains(LocalFunRefName, "test_funs"),
+    Format1 = atom_contains(LocalFunRefName, "get_fun"),
     Format2 = atom_contains(LocalFunRefName, "f/3"),
     Format3 = LocalFunRefName == f,
     true = Format1 or Format2 or Format3,
@@ -74,8 +86,10 @@ atom_contains(Atom, Pattern) when is_atom(Atom) ->
     atom_contains(atom_to_list(Atom), Pattern);
 atom_contains([_C | Rest] = String, Pattern) ->
     case prefix_match(String, Pattern) of
-        true -> true;
-        false -> atom_contains(Rest, Pattern)
+        true ->
+            true;
+        false ->
+            atom_contains(Rest, Pattern)
     end;
 atom_contains([], _Pattern) ->
     false.

@@ -306,6 +306,20 @@ bool globalcontext_register_process(GlobalContext *glb, int atom_index, int loca
 
 /**
  * @brief Get a registered process id
+ * @brief Get registered name for a process/port
+ *
+ * @details Gets a process or port name (atom).
+ * @param glb the global context.
+ * @param local_process_id the process local id.
+ * @returns
+ * - `{registered_name, RegisteredName}` if the process/port was registered,
+ * - `[]` if the process/port is not registered.
+ */
+term globalcontext_get_registered_name_process(GlobalContext *glb, int local_process_id);
+
+
+/**
+ * @brief Get a registered process
  *
  * @details Returns the local process id of a previously registered process.
  * @param glb the global context.
@@ -314,16 +328,6 @@ bool globalcontext_register_process(GlobalContext *glb, int atom_index, int loca
  */
 int globalcontext_get_registered_process(GlobalContext *glb, int atom_index);
 
-
-/**
- * @brief Get a registered process name
- *
- * @details Returns the atom index of the name of a previously registered process.
- * @param glb the global context.
- * @param local_process_id previously registered process local id.
- * @returns an atom table index of the process name.
- */
-int globalcontext_get_registered_process_name(GlobalContext *glb, int local_process_id);
 
 /**
  * @brief Unregister a process by name
@@ -449,7 +453,7 @@ term globalcontext_existing_term_from_atom_string(GlobalContext *glb, AtomString
 /**
  * @brief Inserts a module to the modules table.
  *
- * @details Inserts an already loaded module to the modules table and assigns and index to it so it can be retrieved later by name or index.
+ * @details Inserts an already loaded module to the modules table and assigns and index to it so it can be retrieved later by name or index. The module is then owned by the global context that will destroy it when globalcontext_destroy is invoked.
  * @param global the global context.
  * @param module the module that will be added to the modules table.
  * @returns the module index if successful, otherwise -1.

@@ -3124,9 +3124,7 @@ static term nif_erlang_binary_to_term(Context *ctx, int argc, term argv[])
 
 static term nif_erlang_term_to_binary(Context *ctx, int argc, term argv[])
 {
-    if (argc != 1) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
+    UNUSED(argc);
     term t = argv[0];
     term ret = externalterm_to_binary(ctx, t);
     if (term_is_invalid_term(ret)) {
@@ -3291,14 +3289,18 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     size_t num_segments = 1;
     const char *temp_bin_data = bin_data;
     int temp_bin_size = bin_size;
+    size_t heap_size = 0;
     do {
         const char *found = (const char *) memmem(temp_bin_data, temp_bin_size, pattern_data, pattern_size);
         if (!found) break;
         num_segments++;
+        heap_size += CONS_SIZE + term_sub_binary_heap_size(argv[0], found - temp_bin_data);
         int next_search_offset = found - temp_bin_data + pattern_size;
         temp_bin_data += next_search_offset;
         temp_bin_size -= next_search_offset;
     } while (global && temp_bin_size >= pattern_size);
+
+    heap_size += CONS_SIZE + term_sub_binary_heap_size(argv[0], temp_bin_size);
 
     term result_list = term_nil();
 
@@ -3312,7 +3314,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     }
 
     // binary:split/2,3 always return sub binaries, except when copied binaries are as small as sub-binaries.
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, LIST_SIZE(num_segments, TERM_BOXED_SUB_BINARY_SIZE), 2, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, 2, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
@@ -4039,82 +4041,46 @@ static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
     term fun = argv[0];
-    VALIDATE_VALUE(fun, term_is_fun);
     term key = argv[1];
+
+    VALIDATE_VALUE(fun, term_is_fun);
     VALIDATE_VALUE(key, term_is_atom);
 
     term value;
     switch (key) {
         case MODULE_ATOM: {
-            const term *boxed_value = term_to_const_term_ptr(fun);
-            if (term_is_external_fun(fun)) {
-                term module_atom = boxed_value[1];
-
-                value = module_atom;
-            } else {
-                Module *module = (Module *) boxed_value[1];
-
-                value = module_get_name(module);
-            }
+            term module_name;
+            term_get_function_mfa(fun, &module_name, NULL, NULL, ctx->global);
+            value = module_name;
             break;
         }
         case NAME_ATOM: {
-            if (term_is_external_fun(fun)) {
-                const term *boxed_value = term_to_const_term_ptr(fun);
-                term name_atom = boxed_value[2];
-
-                value = name_atom;
-            } else {
-                const term *boxed_value = term_to_const_term_ptr(fun);
-                Module *fun_module = (Module *) boxed_value[1];
-                uint32_t fun_index = term_to_int32(boxed_value[2]);
-
-                uint32_t label, arity, n_freeze;
-                module_get_fun(fun_module, fun_index, &label, &arity, &n_freeze);
-
-                AtomString fun_name = NULL;
-                bool has_local_name = module_get_function_from_label(fun_module, label, &fun_name, (int *) &arity, (GlobalContext *) ctx->global);
-
-                if (has_local_name) {
-                    value = globalcontext_make_atom(ctx->global, fun_name);
-                } else {
-                    value = term_nil();
-                }
-            }
+            term function_name;
+            term_get_function_mfa(fun, NULL, &function_name, NULL, ctx->global);
+            value = function_name;
             break;
         }
 
-        case ARITY_ATOM:
-            if (term_is_external_fun(fun)) {
-                const term *boxed_value = term_to_const_term_ptr(fun);
-                term arity = boxed_value[3];
-
-                value = make_maybe_boxed_int64(ctx, term_to_int32(arity));
-            } else {
-                const term *boxed_value = term_to_const_term_ptr(fun);
-                Module *module = (Module *) boxed_value[1];
-                uint32_t fun_index = term_to_int32(boxed_value[2]);
-
-                uint32_t label, arity, n_freeze;
-                module_get_fun(module, fun_index, &label, &arity, &n_freeze);
-
-                value = make_maybe_boxed_int64(ctx, arity);
-            }
+        case ARITY_ATOM: {
+            term arity;
+            term_get_function_mfa(fun, NULL, NULL, &arity, ctx->global);
+            value = arity;
             break;
+        }
 
         case TYPE_ATOM:
             value = term_is_external_fun(fun) ? EXTERNAL_ATOM : LOCAL_ATOM;
             break;
-
+            
         case ENV_ATOM:
             value = term_nil();
             break;
 
         default:
-            AVM_ABORT();
+            RAISE_ERROR(BADARG_ATOM);
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 2, (term[]){key, value}, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 2, (term[]) { key, value }, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     term fun_info_tuple = term_alloc_tuple(2, &ctx->heap);
@@ -5744,6 +5710,9 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     term list1 = argv[0];
     term list2 = argv[1];
 
+    VALIDATE_VALUE(list1, term_is_list);
+    VALIDATE_VALUE(list2, term_is_list);
+
     int proper;
     int len = term_list_length(list1, &proper);
     if (UNLIKELY(!proper)) {
@@ -5756,10 +5725,6 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    if (!term_is_list(list1) || !term_is_list(list2)) {
-        return BADARG_ATOM;
-    }
-
     if (term_is_nil(list1)) {
         return term_nil();
     }
@@ -5769,7 +5734,7 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     }
 
     term *cons = malloc(len * sizeof(term));
-    if (UNLIKELY(IS_NULL_PTR(cons))) {
+    if (IS_NULL_PTR(cons)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     int i = 0;
@@ -5782,7 +5747,6 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     }
 
     int last_filtered_idx = -1;
-    term result = term_nil();
 
     while (!term_is_nil(list2)) {
         term to_nullify = term_get_list_head(list2);
@@ -5801,7 +5765,6 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
             if (cmp_result == TermEquals) {
                 if (last_filtered_idx < i) {
                     last_filtered_idx = i;
-                    result = term_get_list_tail(cons[i]);
                 }
                 cons[i] = term_invalid_term();
                 break;
@@ -5815,9 +5778,14 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
         return list1;
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, (last_filtered_idx + 1) * CONS_SIZE, 1, &list1, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, (last_filtered_idx + 1) * CONS_SIZE, last_filtered_idx + 1, cons, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(cons);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    term result = term_nil();
+    if (last_filtered_idx < len - 1) {
+        result = cons[last_filtered_idx + 1];
     }
 
     for (int i = last_filtered_idx - 1; i >= 0; i--) {
@@ -5830,6 +5798,7 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
     free(cons);
     return result;
 }
+
 
 static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
 {

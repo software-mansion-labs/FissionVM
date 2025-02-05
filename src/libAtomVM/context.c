@@ -182,9 +182,7 @@ void context_destroy(Context *ctx)
     // globalcontext_get_process_lock before accessing platform_data.
     // Here, the context can no longer be acquired with
     // globalcontext_get_process_lock, so it's safe to free the pointer.
-    if (ctx->platform_data) {
-        free(ctx->platform_data);
-    }
+    free(ctx->platform_data);
 
     ets_delete_owned_tables(&ctx->global->ets, ctx->process_id, ctx->global);
 
@@ -278,8 +276,8 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
         case TOTAL_HEAP_SIZE_ATOM:
         case STACK_SIZE_ATOM:
         case MESSAGE_QUEUE_LEN_ATOM:
-        case MEMORY_ATOM:
         case REGISTERED_NAME_ATOM:
+        case MEMORY_ATOM:
             ret_size = TUPLE_SIZE(2);
             break;
         case LINKS_ATOM: {
@@ -314,6 +312,18 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
             break;
         }
 
+        // registered_name for process or port..
+        case REGISTERED_NAME_ATOM: {
+            term name = globalcontext_get_registered_name_process(ctx->global, ctx->process_id);
+            if (term_is_invalid_term((name))) {
+                ret = term_nil(); // Set ret to an empty list to match erlang behaviour
+            } else {
+                term_put_tuple_element(ret, 0, REGISTERED_NAME_ATOM);
+                term_put_tuple_element(ret, 1, name);
+            }
+            break;
+        }
+
         // total_heap_size size in words of the heap of the process, including fragments
         case TOTAL_HEAP_SIZE_ATOM: {
             term_put_tuple_element(ret, 0, TOTAL_HEAP_SIZE_ATOM);
@@ -343,17 +353,6 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
             term_put_tuple_element(ret, 0, MEMORY_ATOM);
             unsigned long value = context_size(ctx);
             term_put_tuple_element(ret, 1, term_from_int32(value));
-            break;
-        }
-
-        case REGISTERED_NAME_ATOM: {
-            term_put_tuple_element(ret, 0, REGISTERED_NAME_ATOM);
-            int value = globalcontext_get_registered_process_name(ctx->global, ctx->process_id);
-            if (value == 0) {
-                ret = term_nil();
-            } else {
-                term_put_tuple_element(ret, 1, term_from_atom_index(value));
-            }
             break;
         }
 

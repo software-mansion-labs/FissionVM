@@ -196,6 +196,11 @@ COLD_FUNC void globalcontext_destroy(GlobalContext *glb)
     struct ListHead *item;
     struct ListHead *tmp;
 
+    int module_index = glb->loaded_modules_count;
+    for (int i = 0; i < module_index; i++) {
+        module_destroy(glb->modules_by_index[i]);
+    }
+
     struct ListHead *open_avm_packs = synclist_nolock(&glb->avmpack_data);
     MUTABLE_LIST_FOR_EACH (item, tmp, open_avm_packs) {
         struct AVMPackData *avmpack_data = GET_LIST_ENTRY(item, struct AVMPackData, avmpack_head);
@@ -226,7 +231,7 @@ COLD_FUNC void globalcontext_destroy(GlobalContext *glb)
         struct RefcBinary *refc = GET_LIST_ENTRY(item, struct RefcBinary, head);
 #ifndef NDEBUG
         if (refc->resource_type) {
-            fprintf(stderr, "Warning, dangling resource of type %s, ref_count = %d\n", refc->resource_type->name, (int) refc->ref_count);
+            fprintf(stderr, "Warning, dangling resource of type %s, ref_count = %d, data = %p\n", refc->resource_type->name, (int) refc->ref_count, refc->data);
         } else {
             fprintf(stderr, "Warning, dangling refc binary, ref_count = %d\n", (int) refc->ref_count);
         }
@@ -547,22 +552,21 @@ int globalcontext_get_registered_process(GlobalContext *glb, int atom_index)
     return 0;
 }
 
-int globalcontext_get_registered_process_name(GlobalContext *glb, int local_process_id)
+term globalcontext_get_registered_name_process(GlobalContext *glb, int local_process_id)
 {
-    struct ListHead *registered_processes_list = synclist_rdlock(&glb->registered_processes);
+    struct ListHead *registered_processes_list = synclist_wrlock(&glb->registered_processes);
     struct ListHead *item;
-    LIST_FOR_EACH (item, registered_processes_list) {
-        const struct RegisteredProcess *registered_process = GET_LIST_ENTRY(item, struct RegisteredProcess, registered_processes_list_head);
+    struct ListHead *tmp;
+    MUTABLE_LIST_FOR_EACH (item, tmp, registered_processes_list) {
+        struct RegisteredProcess *registered_process = GET_LIST_ENTRY(item, struct RegisteredProcess, registered_processes_list_head);
         if (registered_process->local_process_id == local_process_id) {
             int result = registered_process->atom_index;
             synclist_unlock(&glb->registered_processes);
-            return result;
+            return term_from_atom_index(result);
         }
     }
-
     synclist_unlock(&glb->registered_processes);
-
-    return 0;
+    return term_invalid_term();
 }
 
 bool globalcontext_is_atom_index_equal_to_atom_string(GlobalContext *glb, int atom_index_a, AtomString atom_string_b)
@@ -674,6 +678,9 @@ Module *globalcontext_get_module(GlobalContext *global, AtomString module_name_a
         if (UNLIKELY(!loaded_module || (globalcontext_insert_module(global, loaded_module) < 0))) {
             fprintf(stderr, "Failed load module: %s\n", module_name);
             free(module_name);
+            if (loaded_module) {
+                module_destroy(loaded_module);
+            }
             return NULL;
         }
 

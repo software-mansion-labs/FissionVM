@@ -76,7 +76,7 @@ The `src` directory is broken up into the core platform-independent AtomVM libra
 * [Generic UNIX](#building-for-generic-unix)
 * [ESP32](#building-for-esp32)
 * [STM32](#building-for-stm32)
-* [Raspberry Pi Pico](#building-for-raspberry-pi-pico) (rp2040)
+* [RP2](#building-for-rp2) (including Pico boards)
 * [WASM](#building-for-emscripten) (NodeJS or web)
 
 ## Building for Generic UNIX
@@ -314,6 +314,63 @@ $ pytest --embedded-services=idf,qemu -s
 ```
 
 ESP32 tests are erlang modules located in `src/platforms/esp32/test/main/test_erl_sources/` and executed from `src/platforms/esp32/test/main/test_main.c`.
+
+### Performance and Power
+
+AtomVM comes with conservative defaults for broad compatibility with different ESP32 boards, and a reasonable performance/power/longevity tradeoff.
+
+You may want to change these settings to optimize for your specific application's performance and power needs.
+
+Factors like heat dissipation should also be considered, and the effect on overall longevity of components.
+
+#### CPU frequency
+
+Use `idf.py menuconfig` in `src/platforms/esp32`
+`Component config ---> ESP System Settings  ---> CPU frequency (160 MHz)  --->`
+
+You can increase or decrease the CPU frequency, this is a tradeoff against power usage.
+Eg. 160 MHz is the conservative default for the ESP32, but you can increase it to 240 MHz or decrease it to 80 MHz. The higher the frequency, the more power is consumed. The lower the frequency, the less power is consumed.
+
+#### Flash mode and speed
+
+Use `idf.py menuconfig` in `src/platforms/esp32`
+`Serial flasher config  ---> Flash SPI mode (DIO)  --->`
+You can change the mode of the SPI flash. QIO is the fastest mode, but not all flash chips support it.
+
+`Serial flasher config  ---> Flash SPI speed (40 MHz)  --->`
+You can change the speed of the SPI flash. The higher the speed, the faster the flash will be, at the cost of higher power usage, but not all flash chips support higher speeds.
+
+See external docs: [ESP-IDF flash modes](https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/spi-flash-modes.html)
+
+#### PSRAM speed
+
+Use `idf.py menuconfig` in `src/platforms/esp32`
+`Component config ---> ESP PSRAM  ---> SPI RAM config  --->`
+
+If your board has PSRAM and it's enabled, you can configure the SPI RAM settings here.
+`Set RAM clock speed (40MHz clock speed)  --->`
+You can increase or decrease the clock speed of the PSRAM.
+
+```{warning}
+You may have to increase "Flash SPI speed" (see above) before you can increase PSRAM speed.
+```
+
+The higher the speed, the faster the PSRAM will be, at the cost of higher power usage, but not all PSRAM chips support higher speeds.
+
+#### Sleep mode - Deep sleep
+
+For low power applications, you should use the [deep sleep functionality](./programmers-guide.md#restart-and-deep-sleep) of the ESP32.
+
+This will put the ESP32 into a very low power state, and it will consume very little power.
+You can wake the ESP32 from deep sleep using a timer, or an interrupt etc.
+
+Make sure your board is suitable for low power deep sleep, some boards have voltage regulators and/or LEDs constantly draining power, also make sure sensors are powered down or in low power mode when the ESP32 is in deep sleep.
+
+For persisting small amounts of data during deep sleep, you can use the [RTC memory](./programmers-guide.md#rtc-memory) of the ESP32, which is preserved during deep sleep.
+
+#### Sleep mode - Light sleep
+
+Usage of light sleep is untested, and no support for controlling light sleep is currently implemented. Reach out if you do any experiments and measurements.
 
 ### Flash Layout
 
@@ -732,19 +789,22 @@ If building for a different target USART may be configure as explained above in
 
 After your application has been tested (_and debugged_) and is ready to put into active use you may want to tune the build of AtomVM.  For instance disabling logging with `-DAVM_LOG_DISABLE=on` as a `cmake` configuration option may result in slightly better performance. This will have no affect on the console output of your application, just disable low level log messages from the AtomVM system. You may also want to enabling automatic reboot in the case that your application ever exits with a return other than `ok`. This can be enabled with the `cmake` option `-DAVM_CONFIG_REBOOT_ON_NOT_OK=on`.
 
-## Building for Raspberry Pi Pico
+## Building for Raspberry Pi RP2
 
-### Pico Prerequisites
+You can build with all boards supported by Raspberry Pi pico SDK, including Pico, Pico-W and Pico2. AtomVM also works with clones such as RP2040 Zero.
+
+### RP2 Prerequisites
 
 * `cmake`
 * `ninja`
 * `Erlang/OTP`
 * `Elixir` (optional)
+* A toolchain for the target (ARM or Risc-V)
 
-### AtomVM build steps (Pico)
+### AtomVM build steps (Pico or most boards based on RP2040)
 
 ```shell
-$ cd src/platforms/rp2040/
+$ cd src/platforms/rp2/
 $ mkdir build
 $ cd build
 $ cmake .. -G Ninja
@@ -752,13 +812,13 @@ $ ninja
 ```
 
 ```{tip}
-You may want to build with option `AVM_REBOOT_ON_NOT_OK` so Pico restarts on error.
+You may want to build with option `AVM_REBOOT_ON_NOT_OK` so AtomVM restarts on error.
 ```
 
 ### AtomVM build steps (Pico-W)
 
 ```shell
-$ cd src/platforms/rp2040/
+$ cd src/platforms/rp2/
 $ mkdir build
 $ cd build
 $ cmake .. -G Ninja -DPICO_BOARD=pico_w
@@ -766,14 +826,39 @@ $ ninja
 ```
 
 ```{tip}
-You may want to build with option `AVM_REBOOT_ON_NOT_OK` so Pico restarts on error.
+You may want to build with option `AVM_REBOOT_ON_NOT_OK` so AtomVM restarts on error.
+```
+
+### AtomVM build steps (Pico2 or boards based on RP2350)
+
+For ARM S platform (recommended) :
+```shell
+$ cd src/platforms/rp2/
+$ mkdir build
+$ cd build
+$ cmake .. -G Ninja -DPICO_BOARD=pico2
+$ ninja
+```
+
+For RISC-V platform (supported but slower) :
+
+```shell
+$ cd src/platforms/rp2/
+$ mkdir build
+$ cd build
+$ cmake .. -G Ninja -DPICO_BOARD=pico2 -DPICO_PLATFORM=rp2350-riscv
+$ ninja
+```
+
+```{tip}
+You may want to build with option `AVM_REBOOT_ON_NOT_OK` so AtomVM restarts on error.
 ```
 
 The default build configuration allows the device to be re-flashed with the `atomvm_rebar3_plugin` `atomvm pico_flash` task or restarting the application after exiting using [`picotool`](https://github.com/raspberrypi/picotool).  This behaviour can be changed to hang the CPU when the application exits, so that power must be cycled to restart, and `BOOTSEL` must be held when power on to flash a new application.  To disable software resets use `-DAVM_WAIT_BOOTSEL_ON_EXIT=off` when configuring `cmake`.
 
 The 20 second default timeout for a USB serial connection can be changed using option `AVM_USB_WAIT_SECONDS`.  The device can also be configured to wait indefinitely for a serial connection using the option `AVM_WAIT_FOR_USB_CONNECT=on`.
 
-### libAtomVM build steps for Pico
+### libAtomVM build steps for RP2
 
 Build of standard libraries is part of the generic unix build.
 
@@ -786,16 +871,16 @@ $ cmake .. -G Ninja
 $ ninja
 ```
 
-### Running tests for Pico
+### Running tests for RP2
 
-Tests for Pico/RP2040 are run on the desktop (or CI) using [rp2040js](https://github.com/wokwi/rp2040js).
+Tests for RP2040 are run on the desktop (or CI) using [rp2040js](https://github.com/wokwi/rp2040js).
 Running tests currently require nodejs 20.
 
-Change directory to the `src/platforms/rp2040/tests` directory under the AtomVM source tree root:
+Change directory to the `src/platforms/rp2/tests` directory under the AtomVM source tree root:
 
 ```shell
 $ cd <atomvm-source-tree-root>
-$ cd src/platforms/rp2040/tests
+$ cd src/platforms/rp2/tests
 $
 ```
 

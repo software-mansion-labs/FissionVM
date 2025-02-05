@@ -87,8 +87,11 @@ static const char *const esp32_c2_atom = "\x8" "esp32_c2";
 static const char *const esp32_c3_atom = "\x8" "esp32_c3";
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
 static const char *const esp32_c6_atom = "\x8" "esp32_c6";
-#endif
 static const char *const esp32_h2_atom = "\x8" "esp32_h2";
+#endif
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)
+static const char *const esp32_p4_atom = "\x8" "esp32_p4";
+#endif
 #endif
 static const char *const emb_flash_atom = "\x9" "emb_flash";
 static const char *const bgn_atom = "\x3" "bgn";
@@ -457,9 +460,13 @@ static term get_model(Context *ctx, esp_chip_model_t model)
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
         case CHIP_ESP32C6:
             return globalcontext_make_atom(ctx->global, esp32_c6_atom);
-#endif
         case CHIP_ESP32H2:
             return globalcontext_make_atom(ctx->global, esp32_h2_atom);
+#endif
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)
+        case CHIP_ESP32P4:
+            return globalcontext_make_atom(ctx->global, esp32_p4_atom);
+#endif
         default:
             return UNDEFINED_ATOM;
     }
@@ -586,12 +593,12 @@ static void *select_thread_loop(void *arg)
 {
     GlobalContext *glb = arg;
     struct ESP32PlatformData *platform = glb->platform_data;
-    struct pollfd *fds = malloc(0);
+    struct pollfd *fds = NULL;
     while (!platform->select_thread_exit) {
         int select_events_poll_count = platform->select_events_poll_count;
         int poll_count = 1;
         int fd_index;
-        if (select_events_poll_count < 0) {
+        if (fds == NULL || select_events_poll_count < 0) {
             // Means it is dirty and should be rebuilt.
             struct ListHead *select_events = synclist_wrlock(&glb->select_events);
             size_t select_events_new_count;
@@ -601,7 +608,11 @@ static void *select_thread_loop(void *arg)
                 select_events_new_count = select_events_poll_count;
             }
 
-            fds = realloc(fds, sizeof(struct pollfd) * (poll_count + select_events_new_count));
+            if (fds) {
+                fds = realloc(fds, sizeof(struct pollfd) * (poll_count + select_events_new_count));
+            } else {
+                fds = malloc(sizeof(struct pollfd) * (poll_count + select_events_new_count));
+            }
 
             fds[0].fd = platform->signal_fd;
             fds[0].events = POLLIN;

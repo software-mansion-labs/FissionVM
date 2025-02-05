@@ -227,6 +227,7 @@ send_after(Time, Dest, Msg) ->
 %% <ul>
 %%      <li><b>heap_size</b> the number of words used in the heap (integer), including the stack but excluding fragments</li>
 %%      <li><b>total_heap_size</b> the number of words used in the heap (integer) including fragments</li>
+%%      <li><b>registered_name</b> - returns `{registered_name, RegisteredName}' where `RegisteredName' is the registered name of the port or process. If the port/process has no registered name, `[]' is returned</li>
 %%      <li><b>stack_size</b> the number of words used in the stack (integer)</li>
 %%      <li><b>message_queue_len</b> the number of messages enqueued for the process (integer)</li>
 %%      <li><b>memory</b> the estimated total number of bytes in use by the process (integer)</li>
@@ -239,6 +240,7 @@ send_after(Time, Dest, Msg) ->
 -spec process_info
     (Pid :: pid(), heap_size) -> {heap_size, non_neg_integer()};
     (Pid :: pid(), total_heap_size) -> {total_heap_size, non_neg_integer()};
+    (Pid :: pid(), registered_name) -> {registered_name, term()} | [];
     (Pid :: pid(), stack_size) -> {stack_size, non_neg_integer()};
     (Pid :: pid(), message_queue_len) -> {message_queue_len, non_neg_integer()};
     (Pid :: pid(), memory) -> {memory, non_neg_integer()};
@@ -270,6 +272,7 @@ process_info(_Pid, _Key) ->
 %%      <li><b>esp32_free_heap_size</b> the number of (noncontiguous) free bytes in the ESP32 heap (integer)</li>
 %%      <li><b>esp32_largest_free_block</b> the number of the largest contiguous free bytes in the ESP32 heap (integer)</li>
 %%      <li><b>esp32_minimum_free_size</b> the smallest number of free bytes in the ESP32 heap since boot (integer)</li>
+%%      <li><b>esp32_chip_info</b> Details about the model and capabilities of the ESP32 device (map)</li>
 %% </ul>
 %%
 %% Additional keys may be supported on some platforms that are not documented here.
@@ -691,7 +694,7 @@ binary_to_integer(_Binary) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec binary_to_integer(Binary :: binary(), Base :: 2..36) -> integer().
-binary_to_integer(_Binary, Base) ->
+binary_to_integer(_Binary, _Base) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------

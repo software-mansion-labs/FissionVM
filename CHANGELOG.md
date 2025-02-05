@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added a limited implementation of the OTP `ets` interface
 - Added `code:all_loaded/0` and `code:all_available/0`
+- Added menuconfig option for enabling USE_USB_SERIAL, eg. serial over USB for certain ESP32-S2 boards etc.
+- Partial support for `erlang:fun_info/2`
+- Added support for `registered_name` in `erlang:process_info/2` and `Process.info/2`
+- Added `net:gethostname/0` on platforms with gethostname(3).
+- Added `socket:getopt/2`
+- Added `supervisor:terminate_child/2`, `supervisor:restart_child/2` and `supervisor:delete_child/2`
+
+### Fixed
+- ESP32: improved sntp sync speed from a cold boot.
+- Utilize reserved `phy_init` partition on ESP32 to store wifi calibration for faster connections.
+
+## [0.6.6] - Unreleased
+
+### Added
+
+- Added the ability to run beams from the CLI for Generic Unix platform (it was already possible with nodejs and emscripten).
+- Added support for 'erlang:--/2'.
+- Added preliminary support for ESP32P4 (no networking support yet).
+
+### Fixed
+
+- Fixed specifications of nifs from `esp_adc` module
+- ESP32: fix `gpio:init/1` on GPIO >= 32
+- Adding missing check, passing a non numeric argument to a function expecting a floating point
+might lead to a crash in certain situations.
+- Fixed several bugs in `http_server` (#1366)
+- Fixed generic\_unix `socket_driver` to return `{gen_tcp, closed}` when socket is closed on Linux instead of `{gen_tcp, {recv, 104}}`
+- Fixed a memory leak where modules were not properly destroyed when the global context is destroyd
+- alisp: fix support to variables that are not binaries or integers.
+- Fixed destruction of ssl-related resources
+- Fix corruption when dealing with specific situations that involve more than 16 x registers when
+certain VM instructions are used.
+- Fixed ESP32 GPIO interrupt trigger `none`
+- Fixed an issue where a timeout would occur immediately in a race condition
+- Fixed SPI close command
+- Added missing lock on socket structure
+- Fixed a race condition affecting multi-core MCUs where a timeout would not be properly cleared
+- Fixed a double free when esp32 uart driver was closed, yielding an assert abort
+- Fixed compilation with latest debian gcc-arm-none-eabi
+- Fix `network:stop/0` on ESP32 so the network can be started again
+- Fix matching of binaries on unaligned boundaries for code compiled with older versions of OTP
+- Fix a memory corruption caused by `binary:split/2,3`
 
 ## [0.6.5] - 2024-10-15
 
