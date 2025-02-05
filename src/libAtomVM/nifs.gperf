@@ -42,6 +42,7 @@ binary:split/3, &binary_split_nif
 binary:replace/3, &binary_replace_nif
 binary:replace/4, &binary_replace_nif
 calendar:system_time_to_universal_time/2, &system_time_to_universal_time_nif
+os:getenv/1, &os_getenv_nif
 erlang:atom_to_binary/1, &atom_to_binary_nif
 erlang:atom_to_binary/2, &atom_to_binary_nif
 erlang:atom_to_list/1, &atom_to_list_nif
@@ -152,7 +153,6 @@ atomvm:add_avm_pack_file/2, &atomvm_add_avm_pack_file_nif
 atomvm:close_avm_pack/2, &atomvm_close_avm_pack_nif
 atomvm:get_start_beam/1, &atomvm_get_start_beam_nif
 atomvm:read_priv/2, &atomvm_read_priv_nif
-atomvm:posix_getenv/1, IF_HAVE_GETENV(&atomvm_posix_getenv_nif)
 atomvm:posix_open/2, IF_HAVE_OPEN_CLOSE(&atomvm_posix_open_nif)
 atomvm:posix_open/3, IF_HAVE_OPEN_CLOSE(&atomvm_posix_open_nif)
 atomvm:posix_close/1, IF_HAVE_OPEN_CLOSE(&atomvm_posix_close_nif)

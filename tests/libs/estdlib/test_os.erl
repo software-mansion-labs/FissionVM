@@ -1,7 +1,7 @@
 %
 % This file is part of AtomVM.
 %
-% Copyright 2019 Fred Dushin <fred@dushin.net>
+% Copyright 2025 Jakub Gonet <jakub.gonet@swmansion.com>
 %
 % Licensed under the Apache License, Version 2.0 (the "License");
 % you may not use this file except in compliance with the License.
@@ -18,16 +18,23 @@
 % SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 %
 
--module(tests).
+-module(test_os).
 
--export([start/0]).
+-export([test/0]).
 
-start() ->
-    etest:test([
-        test_dir,
-        test_file,
-        test_http_server,
-        test_port,
-        test_timer_manager,
-        test_ahttp_client
-    ]).
+-include("etest.hrl").
+
+test() ->
+    ok = test_os_getenv(),
+    ok.
+
+test_os_getenv() ->
+    true =
+        case atomvm:platform() of
+            generic_unix ->
+                is_list(os:getenv("PATH"));
+            _ ->
+                true
+        end,
+    false = os:getenv("NON_EXISTENT_PATH_VAR"),
+    ok.

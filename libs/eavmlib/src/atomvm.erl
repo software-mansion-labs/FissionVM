@@ -35,7 +35,6 @@
     add_avm_pack_file/2,
     close_avm_pack/2,
     get_start_beam/1,
-    posix_getenv/1,
     posix_open/2,
     posix_open/3,
     posix_close/1,
@@ -209,16 +208,6 @@ close_avm_pack(_Name, _Options) ->
 %%-----------------------------------------------------------------------------
 -spec get_start_beam(AVM :: atom()) -> {ok, binary()} | {error, not_found}.
 get_start_beam(_AVM) ->
-    erlang:nif_error(undefined).
-
-%%-----------------------------------------------------------------------------
-%% @param   Key Name of the environment variable
-%% @returns value of the environment variable or undefined if not found.
-%% @doc     Accesses program environment.
-%% @end
-%%-----------------------------------------------------------------------------
--spec posix_getenv(Key :: list()) -> undefined | list().
-posix_getenv(_Key) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------

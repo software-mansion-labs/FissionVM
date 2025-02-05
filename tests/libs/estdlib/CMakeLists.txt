@@ -36,6 +36,7 @@ set(ERLANG_MODULES
     test_logger
     test_maps
     test_net
+    test_os
     test_sets
     test_spawn
     test_ssl

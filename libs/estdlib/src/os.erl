@@ -1,5 +1,6 @@
 %
 % This file is part of AtomVM.
+% ETS based implementation of persistent_term.
 %
 % Copyright 2025 Jakub Gonet <jakub.gonet@swmansion.com>
 %
@@ -17,14 +18,16 @@
 %
 % SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 %
+-module(os).
 
--module(test_getenv).
+-export([getenv/1]).
 
--export([test/0]).
-
--include("etest.hrl").
-
-test() ->
-    Path = atomvm:posix_getenv("PATH"),
-    true = Path =/= undefined,
-    ok.
+%%-----------------------------------------------------------------------------
+%% @param   Name name of the environment variable
+%% @returns the value of environment variable or false if unset
+%% @doc     Get an environment variable value if defined
+%% @end
+%%-----------------------------------------------------------------------------
+-spec getenv(Name :: string()) -> string() | false.
+getenv(_VarName) ->
+    erlang:nif_error(undefined).

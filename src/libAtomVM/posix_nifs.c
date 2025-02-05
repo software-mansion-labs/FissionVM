@@ -47,11 +47,6 @@
 #include <dirent.h>
 #endif
 
-#if HAVE_GETENV
-#include <stdlib.h>
-#include <string.h>
-#endif
-
 #include "defaultatoms.h"
 #include "erl_nif_priv.h"
 #include "globalcontext.h"
@@ -134,35 +129,6 @@ term posix_errno_to_term(int err, GlobalContext *glb)
 #endif
     return term_from_int(err);
 }
-
-#if HAVE_GETENV
-static term nif_atomvm_posix_getenv(Context *ctx, int argc, term argv[])
-{
-    UNUSED(argc);
-
-    term env_var_list = argv[0];
-    VALIDATE_VALUE(env_var_list, term_is_list);
-
-    int ok;
-    const char *env_var = interop_list_to_utf8_string(env_var_list, &ok);
-    if (UNLIKELY(!ok)) {
-        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-    }
-
-    const char *env_var_value = getenv(env_var);
-    if (IS_NULL_PTR(env_var_value)) {
-        return UNDEFINED_ATOM;
-    }
-
-    size_t len = strlen(env_var_value);
-    if (UNLIKELY(memory_ensure_free_opt(ctx, LIST_SIZE(len, 1), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-    }
-
-    return interop_bytes_to_list(env_var_value, len, &ctx->heap);
-}
-
-#endif
 
 #if HAVE_OPEN && HAVE_CLOSE
 #define CLOSED_FD (-1)
@@ -807,12 +773,6 @@ static term nif_atomvm_posix_readdir(Context *ctx, int argc, term argv[])
 
 #endif
 
-#if HAVE_GETENV
-const struct Nif atomvm_posix_getenv_nif = {
-    .base.type = NIFFunctionType,
-    .nif_ptr = nif_atomvm_posix_getenv
-};
-#endif
 #if HAVE_OPEN && HAVE_CLOSE
 const struct Nif atomvm_posix_open_nif = {
     .base.type = NIFFunctionType,
