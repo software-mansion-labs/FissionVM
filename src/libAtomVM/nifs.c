@@ -103,6 +103,7 @@ static term nif_binary_part_3(Context *ctx, int argc, term argv[]);
 static term nif_binary_split(Context *ctx, int argc, term argv[]);
 static term nif_binary_replace(Context *ctx, int argc, term argv[]);
 static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[]);
+static term nif_native_name_encoding(Context *ctx, int argc, term argv[]);
 static term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term argv[]);
 static term nif_os_getenv_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_delete_element_2(Context *ctx, int argc, term argv[]);
@@ -284,6 +285,12 @@ static const struct Nif prim_file_get_cwd_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_prim_file_get_cwd_0
+};
+
+static const struct Nif native_name_encoding_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_native_name_encoding
 };
 
 static const struct Nif make_ref_nif =
@@ -5876,6 +5883,21 @@ static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
     term_put_tuple_element(result_tuple, 0, OK_ATOM);
     term_put_tuple_element(result_tuple, 1, result);
     return result_tuple;
+}
+
+static term nif_native_name_encoding(Context *ctx, int argc, term argv[])
+{
+    UNUSED(ctx)
+    UNUSED(argc)
+    UNUSED(argv)
+    term encoding = LATIN1_ATOM;
+    char *l;
+    if (((l = getenv("LC_ALL")) && *l) || ((l = getenv("LC_CTYPE")) && *l) || ((l = getenv("LANG")) && *l)) {
+        if (strstr(l, "UTF-8")) {
+            encoding = UTF8_ATOM;
+        }
+    }
+    return encoding;
 }
 
 #ifdef WITH_ZLIB
