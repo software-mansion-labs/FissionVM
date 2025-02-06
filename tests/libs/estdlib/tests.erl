@@ -64,5 +64,6 @@ get_tests(_OTPVersion) ->
         test_lists_keyfind,
         test_lists_subtraction,
         test_lists_member,
-        test_persistent_term
+        test_persistent_term,
+        test_os
     ].
