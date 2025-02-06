@@ -1,7 +1,7 @@
 %
 % This file is part of AtomVM.
 %
-% Copyright 2024 Franciszek Kubis <franciszek.kubis@swmansion.com>
+% Copyright 2025 Franciszek Kubis <franciszek.kubis@swmansion.com>
 %
 % Licensed under the Apache License, Version 2.0 (the "License");
 % you may not use this file except in compliance with the License.
@@ -36,5 +36,8 @@ test_binary() ->
 test_iolist() ->
     <<62, 37, 150, 10, 121, 219, 198, 155, 103, 76, 212, 236, 103, 167, 44, 98>> = erlang:md5(
         [72, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100] % "Hello world"
+    ),
+    <<62, 37, 150, 10, 121, 219, 198, 155, 103, 76, 212, 236, 103, 167, 44, 98>> = erlang:md5(
+        [[[[72, 101, 108, 108], 111], 32], "world"]
     ),
     ok.
