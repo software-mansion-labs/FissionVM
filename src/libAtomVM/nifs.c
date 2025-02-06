@@ -5624,10 +5624,17 @@ static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[])
 {
     enum CharDataEncoding in_encoding = UTF8Encoding;
     if (argc == 2) {
-        if (argv[1] == LATIN1_ATOM) {
-            in_encoding = Latin1Encoding;
-        } else if (UNLIKELY((argv[1] != UTF8_ATOM))) {
-            RAISE_ERROR(BADARG_ATOM);
+        switch (term_to_atom_index(argv[1])) {
+            case LATIN1_ATOM_INDEX:
+                in_encoding = Latin1Encoding;
+                break;
+            case UTF8_ATOM_INDEX:
+                break;
+            case UNICODE_ATOM_INDEX:
+                break;
+            default:
+                RAISE_ERROR(BADARG_ATOM);
+                break;
         }
     }
     size_t size;
@@ -5685,18 +5692,26 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
 {
     enum CharDataEncoding in_encoding = UTF8Encoding;
     enum CharDataEncoding out_encoding = UTF8Encoding;
-    if (argc > 1) {
-        if (argv[1] == LATIN1_ATOM) {
-            in_encoding = Latin1Encoding;
-        } else if (UNLIKELY((argv[1] != UTF8_ATOM))) {
-            RAISE_ERROR(BADARG_ATOM);
-        }
-        if (argc == 3) {
-            if (argv[2] == LATIN1_ATOM) {
-                out_encoding = Latin1Encoding;
-            } else if (UNLIKELY((argv[2] != UTF8_ATOM))) {
+    enum CharDataEncoding encoding = UTF8Encoding;
+    for (int i = 1; i < argc; ++i) {
+        switch (term_to_atom_index(argv[i])) {
+            case LATIN1_ATOM_INDEX:
+                encoding = Latin1Encoding;
+                break;
+            case UTF8_ATOM_INDEX:
+                encoding = UTF8Encoding;
+                break;
+            case UNICODE_ATOM_INDEX:
+                encoding = UTF8Encoding;
+                break;
+            default:
                 RAISE_ERROR(BADARG_ATOM);
-            }
+                break;
+        }
+        if (i == 1) {
+            in_encoding = encoding;
+        } else {
+            out_encoding = encoding;
         }
     }
     size_t len;
