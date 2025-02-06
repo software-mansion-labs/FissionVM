@@ -33,6 +33,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <limits.h>
+#include <ctype.h>
 
 #include "atom_table.h"
 #include "avm_version.h"
@@ -3074,6 +3075,58 @@ static term nif_erlang_system_info(Context *ctx, int argc, term argv[])
 #else
         return term_from_int32(1);
 #endif
+    }
+    if (key == OS_TYPE_ATOM) {
+        size_t atom_string_len = strlen(SYSTEM_NAME);
+
+        if (UNLIKELY(atom_string_len > 255)) {
+            RAISE_ERROR(SYSTEM_LIMIT_ATOM);
+        }
+
+        AtomString name_atom = malloc(atom_string_len + 1);
+
+        if (IS_NULL_PTR(name_atom)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+
+        ((uint8_t *) name_atom)[0] = atom_string_len;
+
+        char atom_string[] = SYSTEM_NAME;
+
+        atom_string[0] = tolower(atom_string[0]);
+
+        memcpy(((char *) name_atom) + 1, atom_string, atom_string_len);
+        long global_atom_index = atom_table_ensure_atom(ctx->global->atom_table, name_atom, AtomTableCopyAtom);
+
+        free((void *) name_atom);
+
+        if (UNLIKELY(global_atom_index == ATOM_TABLE_NOT_FOUND)) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
+
+        if (UNLIKELY(global_atom_index == ATOM_TABLE_ALLOC_FAIL)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+
+        if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+
+        term result_tuple = term_alloc_tuple(2, &ctx->heap);
+
+        term unix_atom = globalcontext_make_atom(ctx->global, ATOM_STR("\x4", "unix"));
+        term_put_tuple_element(result_tuple, 0, unix_atom);
+
+        term name_atom_term = term_from_atom_index(global_atom_index);
+        term_put_tuple_element(result_tuple, 1, name_atom_term);
+
+        return result_tuple;
+    }
+    if (key == OTP_RELEASE_ATOM) {
+        if (memory_ensure_free_opt(ctx, TERM_STRING_SIZE(strlen("26")), MEMORY_CAN_SHRINK) != MEMORY_GC_OK) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+        return term_from_string((const uint8_t *) "26", sizeof("26") - 1, &ctx->heap);
     }
     return sys_get_info(ctx, key);
 }
