@@ -3091,7 +3091,7 @@ static term nif_erlang_system_info(Context *ctx, int argc, term argv[])
         return result_tuple;
     }
     if (key == OTP_RELEASE_ATOM) {
-        if (memory_ensure_free_opt(ctx, strlen("26") * CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK) {
+        if (memory_ensure_free_opt(ctx, TERM_STRING_SIZE(strlen("26")), MEMORY_CAN_SHRINK) != MEMORY_GC_OK) {
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
         return term_from_string((const uint8_t *) "26", sizeof("26") - 1, &ctx->heap);
