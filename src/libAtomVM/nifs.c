@@ -3059,13 +3059,18 @@ static term nif_erlang_system_info(Context *ctx, int argc, term argv[])
 
         ((uint8_t *) name_atom)[0] = atom_string_len;
 
-        char atom_string[] = SYSTEM_NAME;
+        char *atom_string = malloc(atom_string_len + 1);
+        if (atom_string == NULL) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+        strcpy(atom_string, SYSTEM_NAME);
         atom_string[0] = tolower(atom_string[0]);
 
         memcpy(((char *) name_atom) + 1, atom_string, atom_string_len);
-        enum AtomTableCopyOpt atom_opts = AtomTableCopyAtom;
-        long global_atom_index = atom_table_ensure_atom(ctx->global->atom_table, name_atom, atom_opts);
+        long global_atom_index = atom_table_ensure_atom(ctx->global->atom_table, name_atom, AtomTableCopyAtom);
+
         free((void *) name_atom);
+        free((void *) atom_string);
 
         if (UNLIKELY(global_atom_index == ATOM_TABLE_NOT_FOUND)) {
             RAISE_ERROR(BADARG_ATOM);
@@ -3090,14 +3095,13 @@ static term nif_erlang_system_info(Context *ctx, int argc, term argv[])
         return result_tuple;
     }
     if (key == OTP_RELEASE_ATOM) {
-        if (memory_ensure_free_opt(ctx, (sizeof("26") - 1), MEMORY_CAN_SHRINK) != MEMORY_GC_OK) {
+        if (memory_ensure_free_opt(ctx, (sizeof("26") - 1) * 2, MEMORY_CAN_SHRINK) != MEMORY_GC_OK) {
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
         return term_from_string((const uint8_t *) "26", sizeof("26") - 1, &ctx->heap);
     }
     return sys_get_info(ctx, key);
 }
-
 
 static term nif_erlang_system_flag(Context *ctx, int argc, term argv[])
 {
