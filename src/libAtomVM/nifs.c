@@ -3059,19 +3059,14 @@ static term nif_erlang_system_info(Context *ctx, int argc, term argv[])
 
         ((uint8_t *) name_atom)[0] = atom_string_len;
 
-        char *atom_string = malloc(atom_string_len + 1);
-        if (atom_string == NULL) {
-            free((void *) name_atom);
-            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-        }
-        strcpy(atom_string, SYSTEM_NAME);
+        char atom_string[] = SYSTEM_NAME;
+
         atom_string[0] = tolower(atom_string[0]);
 
         memcpy(((char *) name_atom) + 1, atom_string, atom_string_len);
         long global_atom_index = atom_table_ensure_atom(ctx->global->atom_table, name_atom, AtomTableCopyAtom);
 
         free((void *) name_atom);
-        free((void *) atom_string);
 
         if (UNLIKELY(global_atom_index == ATOM_TABLE_NOT_FOUND)) {
             RAISE_ERROR(BADARG_ATOM);
