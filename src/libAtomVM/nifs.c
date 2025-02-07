@@ -5688,30 +5688,36 @@ static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[])
     return result_tuple;
 }
 
+static bool encoding_from_atom(term encoding_atom, enum CharDataEncoding *encoding) {
+    switch(encoding_atom) {
+        case LATIN1_ATOM:
+            *encoding = Latin1Encoding;
+            return true;
+        case UTF8_ATOM:
+        case UNICODE_ATOM:
+            *encoding = UTF8Encoding;
+            return true;
+        default:
+            return false;
+    }
+}
+
 static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[])
 {
     enum CharDataEncoding in_encoding = UTF8Encoding;
     enum CharDataEncoding out_encoding = UTF8Encoding;
-    enum CharDataEncoding encoding = UTF8Encoding;
-    for (int i = 1; i < argc; ++i) {
-        switch (term_to_atom_index(argv[i])) {
-            case LATIN1_ATOM_INDEX:
-                encoding = Latin1Encoding;
-                break;
-            case UTF8_ATOM_INDEX:
-                encoding = UTF8Encoding;
-                break;
-            case UNICODE_ATOM_INDEX:
-                encoding = UTF8Encoding;
-                break;
-            default:
-                RAISE_ERROR(BADARG_ATOM);
-                break;
+    bool has_in_encoding = argc > 1;
+    bool has_out_encoding = argc == 3;
+    if(has_in_encoding) {
+        term in_encoding_atom = argv[1];
+        if(!encoding_from_atom(argv[1], &in_encoding)) {
+            RAISE_ERROR(BADARG_ATOM);
         }
-        if (i == 1) {
-            in_encoding = encoding;
-        } else {
-            out_encoding = encoding;
+    }
+    if(has_out_encoding) {
+        term out_encoding_atom = argv[2];
+        if(!encoding_from_atom(out_encoding_atom, &out_encoding)) {
+            RAISE_ERROR(BADARG_ATOM);
         }
     }
     size_t len;
