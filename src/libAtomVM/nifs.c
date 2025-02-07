@@ -856,17 +856,17 @@ static const struct Nif lists_reverse_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_reverse
 };
-static const struct Nif lists_member_nif = 
+static const struct Nif lists_member_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_member
 };
-static const struct Nif lists_keymember_nif = 
+static const struct Nif lists_keymember_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keymember
 };
-static const struct Nif lists_keyfind_nif = 
+static const struct Nif lists_keyfind_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keyfind
@@ -891,12 +891,12 @@ static const struct Nif unicode_characters_to_binary_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_binary
 };
-static const struct Nif erlang_lists_subtract_nif = 
+static const struct Nif erlang_lists_subtract_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_lists_subtract
 };
-static const struct Nif zlib_compress_nif = 
+static const struct Nif zlib_compress_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_zlib_compress_1
@@ -4103,7 +4103,7 @@ static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
         case TYPE_ATOM:
             value = term_is_external_fun(fun) ? EXTERNAL_ATOM : LOCAL_ATOM;
             break;
-            
+
         case ENV_ATOM:
             value = term_nil();
             break;
@@ -5620,21 +5620,29 @@ static term nif_maps_next(Context *ctx, int argc, term argv[])
     return ret;
 }
 
+static bool encoding_from_atom(term encoding_atom, enum CharDataEncoding *encoding)
+{
+    switch (encoding_atom) {
+        case LATIN1_ATOM:
+            *encoding = Latin1Encoding;
+            return true;
+        case UTF8_ATOM:
+        case UNICODE_ATOM:
+            *encoding = UTF8Encoding;
+            return true;
+        default:
+            return false;
+    }
+}
+
 static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[])
 {
     enum CharDataEncoding in_encoding = UTF8Encoding;
-    if (argc == 2) {
-        switch (term_to_atom_index(argv[1])) {
-            case LATIN1_ATOM_INDEX:
-                in_encoding = Latin1Encoding;
-                break;
-            case UTF8_ATOM_INDEX:
-                break;
-            case UNICODE_ATOM_INDEX:
-                break;
-            default:
-                RAISE_ERROR(BADARG_ATOM);
-                break;
+    bool has_in_encoding = argc == 2;
+    if (has_in_encoding) {
+        term in_encoding_atom = argv[1];
+        if (!encoding_from_atom(in_encoding_atom, &in_encoding)) {
+            RAISE_ERROR(BADARG_ATOM);
         }
     }
     size_t size;
@@ -5688,35 +5696,21 @@ static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[])
     return result_tuple;
 }
 
-static bool encoding_from_atom(term encoding_atom, enum CharDataEncoding *encoding) {
-    switch(encoding_atom) {
-        case LATIN1_ATOM:
-            *encoding = Latin1Encoding;
-            return true;
-        case UTF8_ATOM:
-        case UNICODE_ATOM:
-            *encoding = UTF8Encoding;
-            return true;
-        default:
-            return false;
-    }
-}
-
 static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[])
 {
     enum CharDataEncoding in_encoding = UTF8Encoding;
     enum CharDataEncoding out_encoding = UTF8Encoding;
     bool has_in_encoding = argc > 1;
     bool has_out_encoding = argc == 3;
-    if(has_in_encoding) {
+    if (has_in_encoding) {
         term in_encoding_atom = argv[1];
-        if(!encoding_from_atom(argv[1], &in_encoding)) {
+        if (!encoding_from_atom(in_encoding_atom, &in_encoding)) {
             RAISE_ERROR(BADARG_ATOM);
         }
     }
-    if(has_out_encoding) {
+    if (has_out_encoding) {
         term out_encoding_atom = argv[2];
-        if(!encoding_from_atom(out_encoding_atom, &out_encoding)) {
+        if (!encoding_from_atom(out_encoding_atom, &out_encoding)) {
             RAISE_ERROR(BADARG_ATOM);
         }
     }
