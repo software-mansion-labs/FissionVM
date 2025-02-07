@@ -891,7 +891,7 @@ static const struct Nif unicode_characters_to_binary_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_binary
 };
-static const struct Nif erlang_lists_subtract_nif =
+static const struct Nif erlang_lists_subtract_nif = 
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_lists_subtract
@@ -4103,7 +4103,7 @@ static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
         case TYPE_ATOM:
             value = term_is_external_fun(fun) ? EXTERNAL_ATOM : LOCAL_ATOM;
             break;
-            
+
         case ENV_ATOM:
             value = term_nil();
             break;
