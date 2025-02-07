@@ -201,6 +201,7 @@ static term nif_code_all_loaded(Context *ctx, int argc, term argv[]);
 static term nif_code_load_abs(Context *ctx, int argc, term argv[]);
 static term nif_code_load_binary(Context *ctx, int argc, term argv[]);
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[]);
+static term nif_module_loaded(Context *ctx, int argc, term argv[]);
 static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
 static term nif_lists_member(Context *ctx, int argc, term argv[]);
 static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
@@ -852,6 +853,13 @@ static const struct Nif code_ensure_loaded_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_ensure_loaded
 };
+
+static const struct Nif module_loaded_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_module_loaded
+};
+
 static const struct Nif lists_reverse_nif =
 {
     .base.type = NIFFunctionType,
@@ -5402,6 +5410,25 @@ static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
     }
 
     return result;
+}
+
+static term nif_module_loaded(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term module_atom = argv[0];
+    if (UNLIKELY(!term_is_atom(module_atom))) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    AtomString module_string = globalcontext_atomstring_from_term(ctx->global, module_atom);
+    Module *found_module = (Module *) atomshashtable_get_value(ctx->global->modules_table, module_string, (unsigned long) NULL);
+
+    if (!found_module) {
+        return FALSE_ATOM;
+    }
+
+    return TRUE_ATOM;
 }
 
 static term nif_lists_reverse(Context *ctx, int argc, term argv[])
