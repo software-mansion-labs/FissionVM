@@ -856,17 +856,17 @@ static const struct Nif lists_reverse_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_reverse
 };
-static const struct Nif lists_member_nif =
+static const struct Nif lists_member_nif = 
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_member
 };
-static const struct Nif lists_keymember_nif =
+static const struct Nif lists_keymember_nif = 
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keymember
 };
-static const struct Nif lists_keyfind_nif =
+static const struct Nif lists_keyfind_nif = 
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keyfind
@@ -891,12 +891,12 @@ static const struct Nif unicode_characters_to_binary_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_binary
 };
-static const struct Nif erlang_lists_subtract_nif =
+static const struct Nif erlang_lists_subtract_nif = 
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_lists_subtract
 };
-static const struct Nif zlib_compress_nif = 
+static const struct Nif zlib_compress_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_zlib_compress_1
@@ -4103,7 +4103,7 @@ static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
         case TYPE_ATOM:
             value = term_is_external_fun(fun) ? EXTERNAL_ATOM : LOCAL_ATOM;
             break;
-
+            
         case ENV_ATOM:
             value = term_nil();
             break;
