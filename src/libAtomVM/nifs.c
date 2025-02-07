@@ -896,7 +896,7 @@ static const struct Nif erlang_lists_subtract_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_lists_subtract
 };
-static const struct Nif zlib_compress_nif =
+static const struct Nif zlib_compress_nif = 
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_zlib_compress_1
