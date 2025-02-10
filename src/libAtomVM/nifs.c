@@ -854,7 +854,7 @@ static const struct Nif code_ensure_loaded_nif =
     .nif_ptr = nif_code_ensure_loaded
 };
 
-static const struct Nif erlang_module_loaded_nif =
+static const struct Nif module_loaded_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_module_loaded
