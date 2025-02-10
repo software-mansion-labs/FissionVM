@@ -5417,18 +5417,12 @@ static term nif_module_loaded(Context *ctx, int argc, term argv[])
     UNUSED(argc);
 
     term module_atom = argv[0];
-    if (UNLIKELY(!term_is_atom(module_atom))) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
+    VALIDATE_VALUE(module_atom, term_is_atom);
 
     AtomString module_string = globalcontext_atomstring_from_term(ctx->global, module_atom);
     Module *found_module = (Module *) atomshashtable_get_value(ctx->global->modules_table, module_string, (unsigned long) NULL);
 
-    if (!found_module) {
-        return FALSE_ATOM;
-    }
-
-    return TRUE_ATOM;
+    return found_module == NULL ? FALSE_ATOM : TRUE_ATOM;
 }
 
 static term nif_lists_reverse(Context *ctx, int argc, term argv[])

@@ -32,5 +32,5 @@ test_self_module() ->
     ok.
 
 test_non_existing_module() ->
-    false = erlang:module_loaded(i_hope_that_this_name_of_module_will_never_be_included_in_estdlib),
+    false = erlang:module_loaded(undefined_module),
     ok.

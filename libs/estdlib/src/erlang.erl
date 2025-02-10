@@ -1334,9 +1334,9 @@ unique_integer(_Options) ->
 
 %% @param   Module name of module
 %% @returns boolean
-%% @doc     check if module is loaded.
+%% @doc     Returns true if module is loaded without attempting to do it.
 %% @end
 -spec module_loaded(Module) -> boolean() when
-      Module :: module().
+    Module :: module().
 module_loaded(_Module) ->
     erlang:nif_error(undefined).
