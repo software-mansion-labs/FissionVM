@@ -201,7 +201,7 @@ static term nif_code_all_loaded(Context *ctx, int argc, term argv[]);
 static term nif_code_load_abs(Context *ctx, int argc, term argv[]);
 static term nif_code_load_binary(Context *ctx, int argc, term argv[]);
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[]);
-static term nif_module_loaded(Context *ctx, int argc, term argv[]);
+static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[]);
 static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
 static term nif_lists_member(Context *ctx, int argc, term argv[]);
 static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
@@ -854,10 +854,10 @@ static const struct Nif code_ensure_loaded_nif =
     .nif_ptr = nif_code_ensure_loaded
 };
 
-static const struct Nif module_loaded_nif =
+static const struct Nif erlang_module_loaded_nif =
 {
     .base.type = NIFFunctionType,
-    .nif_ptr = nif_module_loaded
+    .nif_ptr = nif_erlang_module_loaded
 };
 
 static const struct Nif lists_reverse_nif =
@@ -5412,7 +5412,7 @@ static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
     return result;
 }
 
-static term nif_module_loaded(Context *ctx, int argc, term argv[])
+static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
 
