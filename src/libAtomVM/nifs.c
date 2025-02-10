@@ -287,7 +287,7 @@ static const struct Nif prim_file_get_cwd_nif =
     .nif_ptr = nif_prim_file_get_cwd_0
 };
 
-static const struct Nif file_native_name_encoding_nif =
+static const struct Nif native_name_encoding_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_file_native_name_encoding
