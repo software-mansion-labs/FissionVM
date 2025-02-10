@@ -103,7 +103,7 @@ static term nif_binary_part_3(Context *ctx, int argc, term argv[]);
 static term nif_binary_split(Context *ctx, int argc, term argv[]);
 static term nif_binary_replace(Context *ctx, int argc, term argv[]);
 static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[]);
-static term nif_native_name_encoding(Context *ctx, int argc, term argv[]);
+static term nif_file_native_name_encoding(Context *ctx, int argc, term argv[]);
 static term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term argv[]);
 static term nif_os_getenv_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_delete_element_2(Context *ctx, int argc, term argv[]);
@@ -287,10 +287,10 @@ static const struct Nif prim_file_get_cwd_nif =
     .nif_ptr = nif_prim_file_get_cwd_0
 };
 
-static const struct Nif native_name_encoding_nif =
+static const struct Nif file_native_name_encoding_nif =
 {
     .base.type = NIFFunctionType,
-    .nif_ptr = nif_native_name_encoding
+    .nif_ptr = nif_file_native_name_encoding
 };
 
 static const struct Nif make_ref_nif =
@@ -5885,19 +5885,21 @@ static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
     return result_tuple;
 }
 
-static term nif_native_name_encoding(Context *ctx, int argc, term argv[])
+static bool is_env_var_utf8(char *env_var)
+{
+    char *locale;
+    return (locale = getenv(env_var)) && *locale && strstr(locale, "UTF-8");
+}
+
+static term nif_file_native_name_encoding(Context *ctx, int argc, term argv[])
 {
     UNUSED(ctx)
     UNUSED(argc)
     UNUSED(argv)
-    term encoding = LATIN1_ATOM;
-    char *l;
-    if (((l = getenv("LC_ALL")) && *l) || ((l = getenv("LC_CTYPE")) && *l) || ((l = getenv("LANG")) && *l)) {
-        if (strstr(l, "UTF-8")) {
-            encoding = UTF8_ATOM;
-        }
+    if (is_env_var_utf8("LC_ALL") || is_env_var_utf8("LC_CTYPE") || is_env_var_utf8("LANG")) {
+        return UTF8_ATOM;
     }
-    return encoding;
+    return LATIN1_ATOM;
 }
 
 #ifdef WITH_ZLIB
