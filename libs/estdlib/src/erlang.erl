@@ -92,6 +92,7 @@
     make_ref/0,
     send/2,
     monitor/2,
+    module_loaded/1,
     demonitor/1,
     demonitor/2,
     exit/1,
@@ -316,9 +317,9 @@ system_flag(_Key, _Value) ->
 %%          https://www.ietf.org/rfc/rfc1321.txt
 %% @end
 %%-----------------------------------------------------------------------------
--spec md5(Data :: binary()) -> binary().
-md5(Data) when is_binary(Data) ->
-    crypto:hash(md5, Data).
+-spec md5(Data :: binary() | iolist()) -> binary().
+md5(Data) when is_binary(Data) orelse is_list(Data) ->
+    erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
 %% @param   Module Name of module
@@ -1329,4 +1330,12 @@ unique_integer() ->
 %%-----------------------------------------------------------------------------
 -spec unique_integer([monotonic | positive]) -> integer().
 unique_integer(_Options) ->
+    erlang:nif_error(undefined).
+
+%% @param   Module name of module
+%% @returns boolean
+%% @doc     Returns true if module is loaded without attempting to do it.
+%% @end
+-spec module_loaded(Module :: atom()) -> boolean().
+module_loaded(_Module) ->
     erlang:nif_error(undefined).

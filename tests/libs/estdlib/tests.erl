@@ -65,6 +65,7 @@ get_tests(_OTPVersion) ->
         test_lists_subtraction,
         test_file_native_name_encoding,
         test_lists_member,
+        test_erlang_module_loaded,
         test_persistent_term,
         test_os
     ].

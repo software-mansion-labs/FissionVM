@@ -47,6 +47,7 @@ set(ERLANG_MODULES
     test_supervisor
     test_lists_subtraction
     test_file_native_name_encoding
+    test_erlang_module_loaded
     test_lists_member
     test_lists_keyfind
     test_lists_keymember
