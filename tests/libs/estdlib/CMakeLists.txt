@@ -46,6 +46,7 @@ set(ERLANG_MODULES
     test_timer
     test_supervisor
     test_lists_subtraction
+    test_erlang_module_loaded
     test_lists_member
     test_lists_keyfind
     test_lists_keymember
