@@ -5885,10 +5885,14 @@ static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
     return result_tuple;
 }
 
-static bool is_env_var_utf8(char *env_var)
+static bool has_env_value(const char *env_var, const char *value)
 {
-    char *locale;
-    return (locale = getenv(env_var)) && *locale && strstr(locale, "UTF-8");
+    // This doesn't work with concurrent threads setting the env
+    const char *env_value = getenv(env_var);
+    if (env_value == NULL) {
+        return false;
+    }
+    return strstr(env_value, value) != NULL;
 }
 
 static term nif_file_native_name_encoding(Context *ctx, int argc, term argv[])
@@ -5896,7 +5900,7 @@ static term nif_file_native_name_encoding(Context *ctx, int argc, term argv[])
     UNUSED(ctx)
     UNUSED(argc)
     UNUSED(argv)
-    if (is_env_var_utf8("LC_ALL") || is_env_var_utf8("LC_CTYPE") || is_env_var_utf8("LANG")) {
+    if (has_env_value("LC_ALL", "UTF-8") || has_env_value("LC_CTYPE", "UTF-8") || has_env_value("LANG", "UTF-8")) {
         return UTF8_ATOM;
     }
     return LATIN1_ATOM;
