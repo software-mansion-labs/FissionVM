@@ -149,6 +149,7 @@ prim_file:get_cwd/0, &prim_file_get_cwd_nif
 ets:delete/2, &ets_delete_nif
 ets:delete/1, &ets_delete_nif
 ets:delete_object/2, &ets_delete_object_nif
+file:native_name_encoding/0, &file_native_name_encoding_nif
 atomvm:add_avm_pack_binary/2, &atomvm_add_avm_pack_binary_nif
 atomvm:add_avm_pack_file/2, &atomvm_add_avm_pack_file_nif
 atomvm:close_avm_pack/2, &atomvm_close_avm_pack_nif
