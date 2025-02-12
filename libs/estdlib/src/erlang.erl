@@ -114,7 +114,8 @@
     universaltime/0,
     localtime/0,
     unique_integer/0,
-    unique_integer/1
+    unique_integer/1,
+    bump_reductions/1
 ]).
 
 -export_type([
@@ -1339,3 +1340,17 @@ unique_integer(_Options) ->
 -spec module_loaded(Module :: atom()) -> boolean().
 module_loaded(_Module) ->
     erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param   Options list of options.
+%% @returns a unique integer
+%% @doc     Return a unique integer. If positive is passed, returned integer is
+%%          positive. If monotonic is passed, returned integer is monotonically increasing
+%%          across all processes.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec bump_reductions(integer()) -> ok.
+bump_reductions(0) ->
+    ok;
+bump_reductions(NumberOfBumps) when NumberOfBumps > 0 ->
+    erlang:bump_reductions(NumberOfBumps-1).

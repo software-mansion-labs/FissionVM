@@ -86,6 +86,8 @@ Context *context_new(GlobalContext *glb)
     list_init(&ctx->dictionary);
 
     ctx->native_handler = NULL;
+    
+    ctx->reductions = 0;
 
     ctx->saved_module = NULL;
     ctx->saved_ip = NULL;
@@ -278,6 +280,7 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
         case MESSAGE_QUEUE_LEN_ATOM:
         case REGISTERED_NAME_ATOM:
         case MEMORY_ATOM:
+        case REDUCTIONS_ATOM:
             ret_size = TUPLE_SIZE(2);
             break;
         case LINKS_ATOM: {
@@ -372,6 +375,14 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
             break;
         }
 
+        case REDUCTIONS_ATOM: {
+            term_put_tuple_element(ret, 0, REDUCTIONS_ATOM);
+            int64_t value = (int64_t)(ctx->reductions);
+            fprintf(stderr, "SIEMA: %lld\n", value);
+            term_put_tuple_element(ret, 1, term_make_maybe_boxed_int64(value, &ctx->heap));
+            break;
+        }
+        
         default:
             UNREACHABLE();
     }
