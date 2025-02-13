@@ -27,6 +27,12 @@ start() ->
     ok = split_compare(<<"Hello:::World:">>, <<"Hello">>, <<"::World:">>),
     ok = split_compare(<<"Test:">>, <<"Test">>, <<>>),
     ok = split_compare(<<":">>, <<>>, <<>>),
+    ok = split_list_compare(<<"Hello.World">>, <<"Hello">>, <<"World">>),
+    ok = split_list_compare(<<"Hello:World">>, <<"Hello">>, <<"World">>),
+    ok = split_list_compare(<<"Hello:.World">>, <<"Hello">>, <<".World">>),
+    ok = split_list_compare(<<"Hello.:World">>, <<"Hello">>, <<":World">>),
+    ok = split_list_compare_global(<<"Hello.World:Here">>, <<"Hello">>, <<"World">>, <<"Here">>),
+    ok = split_list_compare_global(<<"Hello:.World">>, <<"Hello">>, <<>>, <<"World">>),
     ok = split_compare(<<>>, <<>>),
     ok = split_compare(<<"Test">>, <<>>),
     ok = split_compare2(<<"Test">>, <<>>),
@@ -48,6 +54,17 @@ split_compare(Bin, Part1, Part2) ->
     [A, B] = binary:split(Bin, <<":">>),
     ok = compare_bin(Part1, A),
     ok = compare_bin(B, Part2).
+
+split_list_compare(Bin, Part1, Part2) ->
+    [A, B] = binary:split(Bin, [<<":">>, <<".">>]),
+    ok = compare_bin(Part1, A),
+    ok = compare_bin(B, Part2).
+
+split_list_compare_global(Bin, Part1, Part2, Part3) ->
+    [A, B, C] = binary:split(Bin, [<<":">>, <<".">>], [global]),
+    ok = compare_bin(Part1, A),
+    ok = compare_bin(B, Part2),
+    ok = compare_bin(C, Part3).
 
 split_compare2(Bin, Part1) ->
     [A] = binary:split(Bin, <<"SEPARATOR">>),
