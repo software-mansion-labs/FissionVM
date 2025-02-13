@@ -23,27 +23,27 @@
 -export([start/0, process_test/0]).
 
 start() ->
-    {reductions, 0} = process_info(self(), reductions),
-    erlang:bump_reductions(2049),
-    {reductions, 2048} = process_info(self(), reductions),
-    Pid = spawn_opt(fun() -> process_test() end, [link]),
+    {reductions, 1} = erlang:process_info(self(), reductions),
+    erlang:bump_reductions(500),
+    {reductions, 502} = erlang:process_info(self(), reductions),
+    Pid = erlang:spawn_opt(fun() -> process_test() end, [link]),
     Pid ! {ready, self()},
     receive
         {r1, {reductions, Reductions}} ->
-            0 = Reductions
+            2 = Reductions
     end,
     receive
         {r2, {reductions, Reductions2}} ->
-            1024 = Reductions2
+            1029 = Reductions2
     end,
-    erlang:bump_reductions(2049),
-    {reductions, 4096} = process_info(self(), reductions),
+    erlang:bump_reductions(2000),
+    {reductions, 2505} = erlang:process_info(self(), reductions),
     0.
 
 process_test() ->
     receive
         {ready, Pid} ->
-            Pid ! {r1, process_info(self(), reductions)},
-            erlang:bump_reductions(2014),
-            Pid ! {r2, process_info(self(), reductions)}
+            Pid ! {r1, erlang:process_info(self(), reductions)},
+            erlang:bump_reductions(1025),
+            Pid ! {r2, erlang:process_info(self(), reductions)}
     end.

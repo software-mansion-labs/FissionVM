@@ -21,8 +21,6 @@
 cmake_minimum_required (VERSION 3.13)
 project (erlang_tests)
 
-file(COPY ${CMAKE_BINARY_DIR}/libs/estdlib/src/beams/erlang.beam DESTINATION .)
-
 function(compile_erlang module_name)
     add_custom_command(
         OUTPUT ${module_name}.beam

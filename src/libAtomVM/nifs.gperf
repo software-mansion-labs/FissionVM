@@ -215,3 +215,4 @@ math:tan/1, &math_tan_nif
 math:tanh/1, &math_tanh_nif
 zlib:compress/1, &zlib_compress_nif
 erlang:nif_error/1, &erlang_nif_error_nif
+erlang:bump_reductions/1, &erlang_bump_reductions_nif
