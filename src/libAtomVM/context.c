@@ -378,7 +378,6 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
         case REDUCTIONS_ATOM: {
             term_put_tuple_element(ret, 0, REDUCTIONS_ATOM);
             int64_t value = (int64_t)(ctx->reductions);
-            fprintf(stderr, "SIEMA: %lld\n", value);
             term_put_tuple_element(ret, 1, term_make_maybe_boxed_int64(value, &ctx->heap));
             break;
         }

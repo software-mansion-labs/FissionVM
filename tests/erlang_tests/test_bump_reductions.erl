@@ -20,11 +20,11 @@
 
 -module(test_bump_reductions).
 
--export([start/0, process_test/0, elo/1]).
+-export([start/0, process_test/0]).
 
 start() ->
     {reductions, 0} = process_info(self(), reductions),
-    elo(2049),
+    erlang:bump_reductions(2049),
     {reductions, 2048} = process_info(self(), reductions),
     Pid = spawn_opt(fun() -> process_test() end, [link]),
     Pid ! {ready, self()},
@@ -36,7 +36,7 @@ start() ->
         {r2, {reductions, Reductions2}} ->
             1024 = Reductions2
     end,
-    elo(2049),
+    erlang:bump_reductions(2049),
     {reductions, 4096} = process_info(self(), reductions),
     0.
 
@@ -44,12 +44,6 @@ process_test() ->
     receive
         {ready, Pid} ->
             Pid ! {r1, process_info(self(), reductions)},
-            elo(2014),
-%%            erlang:bump_reductions(2014),
+            erlang:bump_reductions(2014),
             Pid ! {r2, process_info(self(), reductions)}
     end.
-
-elo(0) ->
-    ok;
-elo(NumberOfBumps) when NumberOfBumps > 0 ->
-    test_bump_reductions:elo(NumberOfBumps-1).
