@@ -1342,11 +1342,13 @@ module_loaded(_Module) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
-%% @param   
-%% @returns 
-%% @doc     
+%% @param   Reductions  an integer representing a value of which the reduction counter 
+%%          will be incremented by
+%% @returns an atom: true
+%% @doc     Increments the reduction counter for the calling process, a context switch is 
+%%          forced when the counter reaches the maximum number of reductions for a process
 %% @end
 %%-----------------------------------------------------------------------------
--spec bump_reductions(integer()) -> ok.
-bump_reductions(NumberOfBumps) when is_integer(NumberOfBumps), NumberOfBumps > 1 ->
+-spec bump_reductions(integer()) -> true.
+bump_reductions(Reductions) when is_integer(Reductions), NumberOfBumps > 1 ->
     erlang:nif_error(undefined).
