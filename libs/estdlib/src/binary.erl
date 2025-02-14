@@ -86,8 +86,8 @@ encode_hex(Data, lowercase) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec part(Binary :: binary(), Pos :: non_neg_integer(), Len :: integer()) -> binary().
-part(Binary, Pos, Len) ->
-    erlang:binary_part(Binary, Pos, Len).
+part(_Binary, _Pos, _Len) ->
+    erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
 %% @equiv split(Binary, Pattern, [])

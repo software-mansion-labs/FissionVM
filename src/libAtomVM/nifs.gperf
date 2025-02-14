@@ -36,6 +36,7 @@ binary:copy/1, &binary_copy_nif
 binary:copy/2, &binary_copy_nif
 binary:first/1, &binary_first_nif
 binary:last/1, &binary_last_nif
+binary:part/3, &binary_part_nif
 binary:split/2, &binary_split_nif
 binary:split/3, &binary_split_nif
 binary:replace/3, &binary_replace_nif
