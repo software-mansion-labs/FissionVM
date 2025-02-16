@@ -54,6 +54,7 @@ certain VM instructions are used.
 - Add missing out of memory handling in binary_to_atom
 - Fixed potential crashes or memory leaks caused by a mistake in calculation of reference counts
 and a race condition in otp_socket code
+- Fixed an out of memory issue by forcing GC to copy data from message fragments
 
 ## [0.6.5] - 2024-10-15
 
