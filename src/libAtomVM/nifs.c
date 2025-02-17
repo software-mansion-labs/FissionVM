@@ -3348,13 +3348,30 @@ static term nif_binary_part_3(Context *ctx, int argc, term argv[])
     return term_maybe_create_sub_binary(bin_term, pos, len, &ctx->heap, ctx->global);
 }
 
+static const char *find_pattern(const char *bin, size_t bin_size, const char **patterns, const size_t *pattern_sizes, size_t patterns_len, int *matched_pattern_index)
+{
+    for (size_t i = 0; i < bin_size; i++) {
+        for (size_t pattern_i = 0; pattern_i < patterns_len; pattern_i++) {
+            if (pattern_sizes[pattern_i] <= bin_size - i) {
+                if (memcmp(bin + i, patterns[pattern_i], pattern_sizes[pattern_i]) == 0) {
+                    *matched_pattern_index = pattern_i;
+                    return bin + i;
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
 static term nif_binary_split(Context *ctx, int argc, term argv[])
 {
     term bin_term = argv[0];
     term pattern_term = argv[1];
 
     VALIDATE_VALUE(bin_term, term_is_binary);
-    VALIDATE_VALUE(pattern_term, term_is_binary);
+    if (!term_is_binary(pattern_term) && !term_is_nonempty_list(pattern_term)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
 
     bool global = false;
     if (argc == 3) {
@@ -3374,6 +3391,14 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
             global = true;
         }
     }
+    size_t pattern_list_size = 1;
+    if (term_is_list(pattern_term)) {
+        int proper;
+        pattern_list_size = term_list_length(pattern_term, &proper);
+        if (UNLIKELY(!proper)) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
+    }
 
     int bin_size = term_binary_size(bin_term);
     int pattern_size = term_binary_size(pattern_term);
@@ -3383,22 +3408,58 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     }
 
     const char *bin_data = term_binary_data(bin_term);
-    const char *pattern_data = term_binary_data(pattern_term);
+    const char **pattern_data = malloc(sizeof(char *) * pattern_list_size);
+    if (IS_NULL_PTR(pattern_data)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    size_t *sizes = malloc(sizeof(size_t) * pattern_list_size);
+    if (IS_NULL_PTR(sizes)) {
+        free(pattern_data);
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    size_t shortest_pattern_length;
+
+    int i = 0;
+
+    if (!term_is_nonempty_list(pattern_term)) {
+        pattern_data[0] = term_binary_data(pattern_term);
+        sizes[0] = term_binary_size(pattern_term);
+        shortest_pattern_length = sizes[0];
+    }
+
+    while (term_is_nonempty_list(pattern_term)) {
+        term head = term_get_list_head(pattern_term);
+        pattern_data[i] = term_binary_data(head);
+        pattern_term = term_get_list_tail(pattern_term);
+        sizes[i] = term_binary_size(head);
+        if (UNLIKELY(sizes[i] == 0)) {
+            free(pattern_data);
+            free(sizes);
+            RAISE_ERROR(BADARG_ATOM);
+        }
+        if (i == 0 || sizes[i] < shortest_pattern_length) {
+            shortest_pattern_length = sizes[i];
+        }
+        i++;
+    }
 
     // Count segments first to allocate memory once.
     size_t num_segments = 1;
     const char *temp_bin_data = bin_data;
-    int temp_bin_size = bin_size;
+    size_t temp_bin_size = bin_size;
     size_t heap_size = 0;
     do {
-        const char *found = (const char *) memmem(temp_bin_data, temp_bin_size, pattern_data, pattern_size);
-        if (!found) break;
+        int matched_pattern_index;
+        const char *found = find_pattern(temp_bin_data, temp_bin_size, pattern_data, sizes, pattern_list_size, &matched_pattern_index);
+        if (!found)
+            break;
         num_segments++;
         heap_size += CONS_SIZE + term_sub_binary_heap_size(argv[0], found - temp_bin_data);
-        int next_search_offset = found - temp_bin_data + pattern_size;
+        int next_search_offset = found - temp_bin_data + sizes[matched_pattern_index];
         temp_bin_data += next_search_offset;
         temp_bin_size -= next_search_offset;
-    } while (global && temp_bin_size >= pattern_size);
+    } while (global && temp_bin_size >= shortest_pattern_length);
 
     heap_size += CONS_SIZE + term_sub_binary_heap_size(argv[0], temp_bin_size);
 
@@ -3407,6 +3468,8 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     if (num_segments == 1) {
         // not found
         if (UNLIKELY(memory_ensure_free_with_roots(ctx, 2, 1, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            free(pattern_data);
+            free(sizes);
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
 
@@ -3415,6 +3478,8 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     // binary:split/2,3 always return sub binaries, except when copied binaries are as small as sub-binaries.
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, 2, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        free(pattern_data);
+        free(sizes);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
@@ -3425,14 +3490,14 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     // Reset pointers after allocation
     bin_data = term_binary_data(argv[0]);
-    pattern_data = term_binary_data(argv[1]);
 
     term list_cursor = result_list;
     temp_bin_data = bin_data;
     temp_bin_size = bin_size;
     term *list_ptr = term_get_list_ptr(list_cursor);
     do {
-        const char *found = (const char *) memmem(temp_bin_data, temp_bin_size, pattern_data, pattern_size);
+        int matched_pattern_index;
+        const char *found = find_pattern(temp_bin_data, temp_bin_size, pattern_data, sizes, pattern_list_size, &matched_pattern_index);
 
         if (found) {
             term tok = term_maybe_create_sub_binary(argv[0], temp_bin_data - bin_data, found - temp_bin_data, &ctx->heap, ctx->global);
@@ -3441,7 +3506,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
             list_cursor = list_ptr[LIST_TAIL_INDEX];
             list_ptr = term_get_list_ptr(list_cursor);
 
-            int next_search_offset = found - temp_bin_data + pattern_size;
+            int next_search_offset = found - temp_bin_data + sizes[matched_pattern_index];
             temp_bin_data += next_search_offset;
             temp_bin_size -= next_search_offset;
         }
@@ -3453,6 +3518,8 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         }
     } while (!term_is_nil(list_cursor));
 
+    free(pattern_data);
+    free(sizes);
     return result_list;
 }
 
