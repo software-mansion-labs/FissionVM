@@ -393,6 +393,19 @@ term bif_erlang_map_get_2(Context *ctx, uint32_t fail_label, term arg1, term arg
     return term_get_map_value(arg2, pos);
 }
 
+term bif_erlang_node_0(Context *ctx)
+{
+    UNUSED(ctx);
+    return NONODE_NOHOST_ATOM;
+}
+
+term bif_erlang_node_1(Context *ctx, uint32_t fail_label, term arg1)
+{
+    UNUSED(ctx);
+    VALIDATE_VALUE_BIF(fail_label, arg1, term_is_pid);
+    return NONODE_NOHOST_ATOM;
+}
+
 #ifdef AVM_NO_SMP
 static int64_t get_unique_monotonic_integer(void)
 {

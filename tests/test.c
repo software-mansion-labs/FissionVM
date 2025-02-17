@@ -583,6 +583,8 @@ struct Test tests[] = {
 
     TEST_CASE(test_md5),
 
+    TEST_CASE(test_node),
+
     // TEST CRASHES HERE: TEST_CASE(memlimit),
 
     { NULL, 0, false, false }

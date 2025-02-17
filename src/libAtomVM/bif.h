@@ -118,6 +118,9 @@ term bif_erlang_max_2(Context *ctx, uint32_t fail_label, term arg1, term arg2);
 
 term bif_erlang_size_1(Context *ctx, uint32_t fail_label, int live, term arg1);
 
+term bif_erlang_node_0(Context *ctx);
+term bif_erlang_node_1(Context *ctx, uint32_t fail_label, term arg1);
+
 #ifdef __cplusplus
 }
 #endif
