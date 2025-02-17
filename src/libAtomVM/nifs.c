@@ -6131,6 +6131,8 @@ static term nif_erlang_nif_error_1(Context *ctx, int argc, term argv[])
 
 static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[])
 {
+    UNUSED(argc);
+    VALIDATE_VALUE(argv[0], term_is_integer);
     int64_t reductions_to_bump = term_to_int(argv[0]) - 1;
     ctx->reductions += reductions_to_bump;
     return TRUE_ATOM; 
