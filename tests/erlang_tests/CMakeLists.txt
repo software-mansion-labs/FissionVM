@@ -526,6 +526,8 @@ compile_erlang(test_ets)
 
 compile_erlang(test_md5)
 
+compile_erlang(test_node)
+
 add_custom_target(erlang_test_modules DEPENDS
     code_load_files
 
@@ -1016,4 +1018,6 @@ add_custom_target(erlang_test_modules DEPENDS
     test_ets.beam
 
     test_md5.beam
+
+    test_node.beam
 )
