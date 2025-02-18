@@ -3319,7 +3319,16 @@ static term nif_binary_last_1(Context *ctx, int argc, term argv[])
 static term nif_binary_part_3(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
-    return bif_erlang_binary_part_3(ctx, 0, 0, argv[0], argv[1], argv[2]);
+    VALIDATE_VALUE(argv[0], term_is_binary);
+    VALIDATE_VALUE(argv[1], term_is_integer);
+    VALIDATE_VALUE(argv[2], term_is_integer);
+    
+    term result = term_invalid_term();
+    term error_atom = binary_part(ctx, argv[0], argv[1], argv[2], &result);
+    if (error_atom != OK_ATOM) {
+        RAISE_ERROR(error_atom);
+    }
+    return result;
 }
 
 static term nif_binary_split(Context *ctx, int argc, term argv[])
