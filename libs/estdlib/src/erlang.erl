@@ -115,7 +115,8 @@
     localtime/0,
     unique_integer/0,
     unique_integer/1,
-    bump_reductions/1]).
+    bump_reductions/1
+]).
 
 -export_type([
     time_unit/0,
@@ -246,7 +247,7 @@ send_after(Time, Dest, Msg) ->
     (Pid :: pid(), message_queue_len) -> {message_queue_len, non_neg_integer()};
     (Pid :: pid(), memory) -> {memory, non_neg_integer()};
     (Pid :: pid(), links) -> {links, [pid()]};
-    (Pid :: pid(), reductions) -> {reductions, [pid()]}.
+    (Pid :: pid(), reductions) -> {reductions, [pos_integer()]}.
 process_info(_Pid, _Key) ->
     erlang:nif_error(undefined).
 
