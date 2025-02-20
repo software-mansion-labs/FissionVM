@@ -1803,7 +1803,7 @@ HOT_FUNC int scheduler_entry_point(GlobalContext *glb)
     Module *prev_mod;
     term *x_regs;
     const uint8_t *pc;
-    int remaining_reductions;
+    uint64_t max_reductions;
 
     Context *ctx = scheduler_run(glb);
 #ifndef AVM_NO_SMP
@@ -1826,7 +1826,7 @@ schedule_in:
     code = mod->code->code;
     x_regs = ctx->x;
     JUMP_TO_ADDRESS(ctx->saved_ip);
-    remaining_reductions = DEFAULT_REDUCTIONS_AMOUNT;
+    max_reductions = ctx->reductions + DEFAULT_REDUCTIONS_AMOUNT;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
@@ -1908,8 +1908,8 @@ schedule_in:
                 #ifdef IMPL_EXECUTE_LOOP
                     ctx->cp = module_address(mod->module_index, pc - code);
 
-                    remaining_reductions--;
-                    if (LIKELY(remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (LIKELY(ctx->reductions < max_reductions)) {
                         TRACE_CALL(ctx, mod, "call", label, arity);
                         JUMP_TO_ADDRESS(mod->labels[label]);
                     } else {
@@ -1939,8 +1939,8 @@ schedule_in:
 
                     DEBUG_DUMP_STACK(ctx);
 
-                    remaining_reductions--;
-                    if (LIKELY(remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (LIKELY(ctx->reductions < max_reductions)) {
                         TRACE_CALL(ctx, mod, "call_last", label, arity);
                         JUMP_TO_ADDRESS(mod->labels[label]);
                     } else {
@@ -1961,8 +1961,8 @@ schedule_in:
                 USED_BY_TRACE(label);
 
                 #ifdef IMPL_EXECUTE_LOOP
-                    remaining_reductions--;
-                    if (LIKELY(remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (LIKELY(ctx->reductions < max_reductions)) {
                         TRACE_CALL(ctx, mod, "call_only", label, arity);
                         JUMP_TO_ADDRESS(mod->labels[label]);
                     } else {
@@ -1977,8 +1977,8 @@ schedule_in:
                     // save pc in case of error
                     const uint8_t *orig_pc = pc - 1;
 
-                    remaining_reductions--;
-                    if (UNLIKELY(!remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, orig_pc);
                     }
                 #endif
@@ -2056,8 +2056,8 @@ schedule_in:
                     // save pc in case of error
                     const uint8_t *orig_pc = pc - 1;
 
-                    remaining_reductions--;
-                    if (UNLIKELY(!remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, orig_pc);
                     }
                 #endif
@@ -3223,8 +3223,8 @@ wait_timeout_trap_handler:
                 USED_BY_TRACE(label);
 
                 #ifdef IMPL_EXECUTE_LOOP
-                    remaining_reductions--;
-                    if (LIKELY(remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (LIKELY(ctx->reductions < max_reductions)) {
                         JUMP_TO_ADDRESS(mod->labels[label]);
                     } else {
                         SCHEDULE_NEXT(mod, mod->labels[label]);
@@ -3463,8 +3463,8 @@ wait_timeout_trap_handler:
 
             case OP_CALL_FUN: {
                 #ifdef IMPL_EXECUTE_LOOP
-                    remaining_reductions--;
-                    if (UNLIKELY(!remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, pc - 1);
                     }
                 #endif
@@ -3519,8 +3519,8 @@ wait_timeout_trap_handler:
 
             case OP_CALL_EXT_ONLY: {
                 #ifdef IMPL_EXECUTE_LOOP
-                    remaining_reductions--;
-                    if (UNLIKELY(!remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, pc - 1);
                     }
                 #endif
@@ -5191,8 +5191,8 @@ wait_timeout_trap_handler:
                     // save pc in case of error
                     const uint8_t *orig_pc = pc - 1;
 
-                    remaining_reductions--;
-                    if (UNLIKELY(!remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, orig_pc);
                     }
                 #endif
@@ -5244,8 +5244,8 @@ wait_timeout_trap_handler:
 
             case OP_APPLY_LAST: {
                 #ifdef IMPL_EXECUTE_LOOP
-                    remaining_reductions--;
-                    if (UNLIKELY(!remaining_reductions)) {
+                    ++ctx->reductions;
+                    if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, pc - 1);
                     }
                 #endif

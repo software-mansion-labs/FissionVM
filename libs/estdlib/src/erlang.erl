@@ -114,7 +114,8 @@
     universaltime/0,
     localtime/0,
     unique_integer/0,
-    unique_integer/1
+    unique_integer/1,
+    bump_reductions/1
 ]).
 
 -export_type([
@@ -245,7 +246,8 @@ send_after(Time, Dest, Msg) ->
     (Pid :: pid(), stack_size) -> {stack_size, non_neg_integer()};
     (Pid :: pid(), message_queue_len) -> {message_queue_len, non_neg_integer()};
     (Pid :: pid(), memory) -> {memory, non_neg_integer()};
-    (Pid :: pid(), links) -> {links, [pid()]}.
+    (Pid :: pid(), links) -> {links, [pid()]};
+    (Pid :: pid(), reductions) -> {reductions, [pos_integer()]}.
 process_info(_Pid, _Key) ->
     erlang:nif_error(undefined).
 
@@ -1338,4 +1340,16 @@ unique_integer(_Options) ->
 %% @end
 -spec module_loaded(Module :: atom()) -> boolean().
 module_loaded(_Module) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param   Reductions  an integer representing a value of which the reduction counter
+%%          will be incremented by.
+%% @returns true
+%% @doc     Increments the reduction counter for the calling process, a context switch is
+%%          forced when the counter reaches the maximum number of reductions for a process.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec bump_reductions(pos_integer()) -> true.
+bump_reductions(Reductions) when is_integer(Reductions), Reductions > 1 ->
     erlang:nif_error(undefined).
