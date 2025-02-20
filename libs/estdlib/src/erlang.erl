@@ -1344,10 +1344,10 @@ module_loaded(_Module) ->
 
 %%-----------------------------------------------------------------------------
 %% @param   Reductions  an integer representing a value of which the reduction counter
-%%          will be incremented by
+%%          will be incremented by.
 %% @returns true
 %% @doc     Increments the reduction counter for the calling process, a context switch is
-%%          forced when the counter reaches the maximum number of reductions for a process
+%%          forced when the counter reaches the maximum number of reductions for a process.
 %% @end
 %%-----------------------------------------------------------------------------
 -spec bump_reductions(pos_integer()) -> true.

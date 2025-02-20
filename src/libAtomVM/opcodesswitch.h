@@ -1908,7 +1908,7 @@ schedule_in:
                 #ifdef IMPL_EXECUTE_LOOP
                     ctx->cp = module_address(mod->module_index, pc - code);
 
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (LIKELY(ctx->reductions < max_reductions)) {
                         TRACE_CALL(ctx, mod, "call", label, arity);
                         JUMP_TO_ADDRESS(mod->labels[label]);
@@ -1939,7 +1939,7 @@ schedule_in:
 
                     DEBUG_DUMP_STACK(ctx);
 
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (LIKELY(ctx->reductions < max_reductions)) {
                         TRACE_CALL(ctx, mod, "call_last", label, arity);
                         JUMP_TO_ADDRESS(mod->labels[label]);
@@ -1961,7 +1961,7 @@ schedule_in:
                 USED_BY_TRACE(label);
 
                 #ifdef IMPL_EXECUTE_LOOP
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (LIKELY(ctx->reductions < max_reductions)) {
                         TRACE_CALL(ctx, mod, "call_only", label, arity);
                         JUMP_TO_ADDRESS(mod->labels[label]);
@@ -1977,7 +1977,7 @@ schedule_in:
                     // save pc in case of error
                     const uint8_t *orig_pc = pc - 1;
 
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, orig_pc);
                     }
@@ -2056,7 +2056,7 @@ schedule_in:
                     // save pc in case of error
                     const uint8_t *orig_pc = pc - 1;
 
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, orig_pc);
                     }
@@ -3223,7 +3223,7 @@ wait_timeout_trap_handler:
                 USED_BY_TRACE(label);
 
                 #ifdef IMPL_EXECUTE_LOOP
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (LIKELY(ctx->reductions < max_reductions)) {
                         JUMP_TO_ADDRESS(mod->labels[label]);
                     } else {
@@ -3463,7 +3463,7 @@ wait_timeout_trap_handler:
 
             case OP_CALL_FUN: {
                 #ifdef IMPL_EXECUTE_LOOP
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, pc - 1);
                     }
@@ -3519,7 +3519,7 @@ wait_timeout_trap_handler:
 
             case OP_CALL_EXT_ONLY: {
                 #ifdef IMPL_EXECUTE_LOOP
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, pc - 1);
                     }
@@ -5191,7 +5191,7 @@ wait_timeout_trap_handler:
                     // save pc in case of error
                     const uint8_t *orig_pc = pc - 1;
 
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, orig_pc);
                     }
@@ -5244,7 +5244,7 @@ wait_timeout_trap_handler:
 
             case OP_APPLY_LAST: {
                 #ifdef IMPL_EXECUTE_LOOP
-                    ctx->reductions++;
+                    ++ctx->reductions;
                     if (UNLIKELY(ctx->reductions >= max_reductions)) {
                         SCHEDULE_NEXT(mod, pc - 1);
                     }
