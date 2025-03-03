@@ -124,6 +124,7 @@ struct Module
     struct ListHead line_ref_offsets;
 
     const struct ExportedFunction **imported_funcs;
+    int functions_count;
 
     const uint8_t **labels;
 
