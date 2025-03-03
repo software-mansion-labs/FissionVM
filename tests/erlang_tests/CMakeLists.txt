@@ -1020,4 +1020,6 @@ add_custom_target(erlang_test_modules DEPENDS
     test_ets.beam
 
     test_md5.beam
+
+    test_bump_reductions.beam
 )
