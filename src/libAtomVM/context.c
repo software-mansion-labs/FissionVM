@@ -282,6 +282,7 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
         case REGISTERED_NAME_ATOM:
         case MEMORY_ATOM:
         case REDUCTIONS_ATOM:
+        case CURRENT_STACKTRACE_ATOM:
             ret_size = TUPLE_SIZE(2);
             break;
         case LINKS_ATOM: {
@@ -357,6 +358,14 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
             term_put_tuple_element(ret, 0, MEMORY_ATOM);
             unsigned long value = context_size(ctx);
             term_put_tuple_element(ret, 1, term_from_int32(value));
+            break;
+        }
+
+        case CURRENT_STACKTRACE_ATOM: {
+            term_put_tuple_element(ret, 0, CURRENT_STACKTRACE_ATOM);
+            // FIXME: since it's unclear how to build stacktrace here,
+            // this mock implementation returns an empty list
+            term_put_tuple_element(ret, 1, term_nil());
             break;
         }
 

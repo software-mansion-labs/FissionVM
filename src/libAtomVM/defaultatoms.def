@@ -175,3 +175,5 @@ X(OTP_RELEASE_ATOM, "\xB", "otp_release")
 X(SHUTDOWN_ATOM, "\x8", "shutdown")
 
 X(NONODE_NOHOST_ATOM, "\xD", "nonode@nohost")
+
+X(CURRENT_STACKTRACE_ATOM, "\x12", "current_stacktrace")
