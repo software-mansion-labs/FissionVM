@@ -946,12 +946,11 @@ term bif_erlang_fdiv_2(Context *ctx, uint32_t fail_label, int live, term arg1, t
     }
     avm_float_t farg1 = term_conv_to_float(arg1);
     avm_float_t farg2 = term_conv_to_float(arg2);
-    avm_float_t fresult;
     
     if (UNLIKELY(farg2 == 0)) {
       RAISE_ERROR_BIF(fail_label, BADARITH_ATOM);
     }
-    fresult = farg1 / farg2;
+    avm_float_t fresult = farg1 / farg2;
     
     if (UNLIKELY(!isfinite(fresult))) {
         RAISE_ERROR_BIF(fail_label, BADARITH_ATOM);
