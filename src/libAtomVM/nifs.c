@@ -1312,7 +1312,7 @@ static term do_spawn(Context *ctx, Context *new_ctx, term opts_term)
     term max_heap_size_term = interop_proplist_get_value(opts_term, MAX_HEAP_SIZE_ATOM);
     term link_term = interop_proplist_get_value(opts_term, LINK_ATOM);
     term monitor_term = interop_proplist_get_value(opts_term, MONITOR_ATOM);
-    term heap_growth_strategy = interop_proplist_get_value_default(opts_term, ATOMVM_HEAP_GROWTH_ATOM, FIBONACCI_ATOM);
+    term heap_growth_strategy = interop_proplist_get_value_default(opts_term, ATOMVM_HEAP_GROWTH_ATOM, BOUNDED_FREE_ATOM);
 
     if (min_heap_size_term != term_nil()) {
         if (UNLIKELY(!term_is_integer(min_heap_size_term))) {
