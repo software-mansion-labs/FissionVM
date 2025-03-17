@@ -3360,6 +3360,7 @@ static const char *find_pattern(const char *bin, size_t bin_size, const char **p
 
 static term nif_binary_split(Context *ctx, int argc, term argv[])
 {
+    printf("FKUBIS--------------------------------------------------------------\n");
     term bin_term = argv[0];
     term pattern_term = argv[1];
 
@@ -3367,25 +3368,42 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     if (!term_is_binary(pattern_term) && !term_is_nonempty_list(pattern_term)) {
         RAISE_ERROR(BADARG_ATOM);
     }
-
+    printf("FKUBIS2--------------------------------------------------------------\n");
+    printf("FKUBIS2--------------------------------------------------------------\n");
+    term_display(stdout, argv[0], ctx);
+    printf("\n");
+    term_display(stdout, argv[1], ctx);
+    printf("\n");
+    term_display(stdout, argv[2], ctx);
+    printf("\n");
     bool global = false;
     if (argc == 3) {
         term options = argv[2];
+        printf("FKUBIS3--------------------------------------------------------------\n");
         if (UNLIKELY(!term_is_list(options))) {
             RAISE_ERROR(BADARG_ATOM);
         }
+        printf("FKUBIS4--------------------------------------------------------------\n");
         if (term_is_nonempty_list(options)) {
             term head = term_get_list_head(options);
             term tail = term_get_list_tail(options);
+            term_display(stdout, head, ctx);
+            printf("\n");
+            term_display(stdout, tail, ctx);
+            printf("\n");
+            printf("FKUBIS5--------------------------------------------------------------\n");
             if (UNLIKELY(head != GLOBAL_ATOM)) {
+                printf("FKUBIS6--------------------------------------------------------------\n");
                 RAISE_ERROR(BADARG_ATOM);
             }
             if (UNLIKELY(!term_is_nil(tail))) {
+                printf("FKUBIS7--------------------------------------------------------------\n");
                 RAISE_ERROR(BADARG_ATOM);
             }
             global = true;
         }
     }
+    printf("FKUBIS3--------------------------------------------------------------\n");
     size_t pattern_list_size = 1;
     if (term_is_list(pattern_term)) {
         int proper;
@@ -3394,6 +3412,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
             RAISE_ERROR(BADARG_ATOM);
         }
     }
+    printf("FKUBIS4--------------------------------------------------------------\n");
 
     int bin_size = term_binary_size(bin_term);
     int pattern_size = term_binary_size(pattern_term);
@@ -3402,12 +3421,14 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
+    printf("FKUBIS5--------------------------------------------------------------\n");
     const char *bin_data = term_binary_data(bin_term);
     const char **pattern_data = malloc(sizeof(char *) * pattern_list_size);
     if (IS_NULL_PTR(pattern_data)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
+    printf("FKUBIS6--------------------------------------------------------------\n");
     size_t *sizes = malloc(sizeof(size_t) * pattern_list_size);
     if (IS_NULL_PTR(sizes)) {
         free(pattern_data);
@@ -3417,12 +3438,14 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     int i = 0;
 
+    printf("FKUBIS7--------------------------------------------------------------\n");
     if (!term_is_nonempty_list(pattern_term)) {
         pattern_data[0] = term_binary_data(pattern_term);
         sizes[0] = term_binary_size(pattern_term);
         shortest_pattern_length = sizes[0];
     }
 
+    printf("FKUBIS8--------------------------------------------------------------\n");
     while (term_is_nonempty_list(pattern_term)) {
         term head = term_get_list_head(pattern_term);
         pattern_data[i] = term_binary_data(head);
@@ -3439,6 +3462,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         i++;
     }
 
+    printf("FKUBIS9--------------------------------------------------------------\n");
     // Count segments first to allocate memory once.
     size_t num_segments = 1;
     const char *temp_bin_data = bin_data;
@@ -3460,6 +3484,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     term result_list = term_nil();
 
+    printf("FKUBIS10--------------------------------------------------------------\n");
     if (num_segments == 1) {
         // not found
         if (UNLIKELY(memory_ensure_free_with_roots(ctx, 2, 1, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
@@ -3478,6 +3503,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
+    printf("FKUBIS11--------------------------------------------------------------\n");
     // Allocate list first
     for (size_t index_segments = 0; index_segments < num_segments; index_segments++) {
         result_list = term_list_prepend(term_nil(), result_list, &ctx->heap);
@@ -3513,6 +3539,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         }
     } while (!term_is_nil(list_cursor));
 
+    printf("FKUBISend--------------------------------------------------------------\n");
     free(pattern_data);
     free(sizes);
     return result_list;
