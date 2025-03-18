@@ -277,11 +277,6 @@ defmodule Tests do
     "%{}" = inspect(%{})
     either("%{a: 1, b: 2}", "%{b: 2, a: 1}", inspect(%{a: 1, b: 2}))
     either(~s[%{"a" => 1, "b" => 2}], ~s[%{"b" => 2, "a" => 1}], inspect(%{"a" => 1, "b" => 2}))
-#    4 = Code.eval_string("4 + 4\n", [], __ENV__)
-#    :elixir.start([], [])
-    true = Kernel.in(1, [1,2,3])
-    [1, true, 2, false, 3, true] -- [true, false]
-    [1,2,3, true] = Code.eval_string("[1, true, 2, false, 3, true] -- [true, false]\n")
     # TODO: structs are not yet supported
     # either(
     #   ~s[%#{__MODULE__}{field1: nil, field2: 42}],

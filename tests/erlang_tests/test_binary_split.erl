@@ -37,6 +37,9 @@ start() ->
     ok = split_compare(<<"Test">>, <<>>),
     ok = split_compare2(<<"Test">>, <<>>),
     ok = split_compare2(<<"helloSEPARATORworld">>, <<"hello">>, <<"world">>),
+    ok = split_trim_compare(),
+    ok = split_trim_all_global_compare(),
+    ok = split_trim_global_compare(),
     ok = fail_split(<<>>),
     ok = fail_split({1, 2}),
     ok = fail_split2({1, 2}),
@@ -84,6 +87,21 @@ compare_bin(Bin1, Bin2, Index) ->
     B1 = binary:at(Bin1, Index),
     B1 = binary:at(Bin2, Index),
     compare_bin(Bin1, Bin2, Index - 1).
+
+split_trim_compare() ->
+    [A, B] = binary:split(<<"Hello World ">>, <<" ">>, [trim]),
+    ok = compare_bin(<<"Hello">>, A),
+    ok = compare_bin(<<"World ">>, B).
+
+split_trim_all_global_compare() ->
+    [A, B] = binary:split(<<" Hello World ">>, <<" ">>, [global, trim_all]),
+    ok = compare_bin(<<"Hello">>, A),
+    ok = compare_bin(<<"World">>, B).
+
+split_trim_global_compare() ->
+    [A, B] = binary:split(<<"Hello World ">>, <<" ">>, [global, trim]),
+    ok = compare_bin(<<"Hello">>, A),
+    ok = compare_bin(<<"World">>, B).
 
 fail_split(Separator) ->
     try binary:split(<<"TESTBIN">>, Separator) of
