@@ -5551,7 +5551,6 @@ static term nif_lists_reverse(Context *ctx, int argc, term argv[])
         // term is a proper list as verified above
         term *list_ptr = term_get_list_ptr(list_crsr);
         result = term_list_prepend(list_ptr[LIST_HEAD_INDEX], result, &ctx->heap);
-        
         list_crsr = list_ptr[LIST_TAIL_INDEX];
     }
     return result;
