@@ -3378,7 +3378,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         }
         term head;
         term tail = options;
-        do {
+        while (term_is_nonempty_list(tail)) {
             head = term_get_list_head(tail);
             tail = term_get_list_tail(tail);
             switch (head) {
@@ -3394,7 +3394,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
                 default:
                     RAISE_ERROR(BADARG_ATOM);
             }
-        } while (term_is_nonempty_list(tail));
+        }
     }
     size_t pattern_list_size = 1;
     if (term_is_list(pattern_term)) {
@@ -3493,7 +3493,6 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         result_list = term_list_prepend(term_nil(), result_list, &ctx->heap);
     }
     
-    printf("num_segments: %i\n", num_segments);
     // Reset pointers after allocation
     bin_data = term_binary_data(argv[0]);
 
@@ -3532,16 +3531,16 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         list_ptr = term_get_list_ptr(list_cursor);
         
         if (trim && term_is_nil(list_ptr[LIST_TAIL_INDEX]) && (term_binary_size(list_ptr[LIST_HEAD_INDEX]) == 0)) {
-            prev[LIST_TAIL_INDEX] = list_ptr[LIST_TAIL_INDEX];
+            if(!IS_NULL_PTR(prev)) {
+                prev[LIST_TAIL_INDEX] = list_ptr[LIST_TAIL_INDEX];
+            }
         }
         
         if (trim_all && term_binary_size(list_ptr[LIST_HEAD_INDEX]) == 0) {
             if(!IS_NULL_PTR(prev)) {
                 prev[LIST_TAIL_INDEX] = list_ptr[LIST_TAIL_INDEX];
-//              free(list_ptr);
             } else {
                 result_list = list_ptr[LIST_TAIL_INDEX];
-//              free(list_ptr);
             }
         } else {
             prev = term_get_list_ptr(list_cursor);
