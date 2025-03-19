@@ -232,7 +232,7 @@ defmodule Tests do
   def test_chars_protocol() do
     "" = String.Chars.to_string(nil)
     "hello" = String.Chars.to_string(:hello)
-#    "hellø" = String.Chars.to_string(:hellø)
+    "hellø" = String.Chars.to_string(:hellø)
     "123" = String.Chars.to_string(123)
     "1.0" = String.Chars.to_string(1.0)
     "abc" = String.Chars.to_string(~c"abc")
@@ -246,7 +246,7 @@ defmodule Tests do
     "nil" = inspect(nil)
 
     ":test" = inspect(:test)
-#    ":アトム" = inspect(:アトム)
+    ":アトム" = inspect(:アトム)
     "Test" = inspect(Test)
 
     "5" = inspect(5)
@@ -277,6 +277,7 @@ defmodule Tests do
     "%{}" = inspect(%{})
     either("%{a: 1, b: 2}", "%{b: 2, a: 1}", inspect(%{a: 1, b: 2}))
     either(~s[%{"a" => 1, "b" => 2}], ~s[%{"b" => 2, "a" => 1}], inspect(%{"a" => 1, "b" => 2}))
+
     # TODO: structs are not yet supported
     # either(
     #   ~s[%#{__MODULE__}{field1: nil, field2: 42}],

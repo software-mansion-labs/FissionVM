@@ -3370,7 +3370,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     bool global = false;
     bool trim = false;
     bool trim_all = false;
-    
+
     if (argc == 3) {
         term options = argv[2];
         if (UNLIKELY(!term_is_list(options))) {
@@ -3492,7 +3492,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     for (size_t index_segments = 0; index_segments < num_segments; index_segments++) {
         result_list = term_list_prepend(term_nil(), result_list, &ctx->heap);
     }
-    
+
     // Reset pointers after allocation
     bin_data = term_binary_data(argv[0]);
 
@@ -3503,7 +3503,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     do {
         int matched_pattern_index;
         const char *found = find_pattern(temp_bin_data, temp_bin_size, pattern_data, sizes, pattern_list_size, &matched_pattern_index);
-        
+
         if (found) {
             term tok = term_maybe_create_sub_binary(argv[0], temp_bin_data - bin_data, found - temp_bin_data, &ctx->heap, ctx->global);
             list_ptr[LIST_HEAD_INDEX] = tok;
@@ -3523,21 +3523,20 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         }
     } while (!term_is_nil(list_cursor));
 
-
     list_cursor = result_list;
     list_ptr = NULL;
     term *prev = NULL;
     while (!term_is_nil(list_cursor)) {
         list_ptr = term_get_list_ptr(list_cursor);
-        
+
         if (trim && term_is_nil(list_ptr[LIST_TAIL_INDEX]) && (term_binary_size(list_ptr[LIST_HEAD_INDEX]) == 0)) {
-            if(!IS_NULL_PTR(prev)) {
+            if (!IS_NULL_PTR(prev)) {
                 prev[LIST_TAIL_INDEX] = list_ptr[LIST_TAIL_INDEX];
             }
         }
-        
+
         if (trim_all && term_binary_size(list_ptr[LIST_HEAD_INDEX]) == 0) {
-            if(!IS_NULL_PTR(prev)) {
+            if (!IS_NULL_PTR(prev)) {
                 prev[LIST_TAIL_INDEX] = list_ptr[LIST_TAIL_INDEX];
             } else {
                 result_list = list_ptr[LIST_TAIL_INDEX];
@@ -3547,7 +3546,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         }
         list_cursor = list_ptr[LIST_TAIL_INDEX];
     }
-    
+
     free(pattern_data);
     free(sizes);
     return result_list;
@@ -6169,7 +6168,7 @@ static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[])
     VALIDATE_VALUE(argv[0], term_is_integer);
     int64_t reductions_to_bump = term_to_int(argv[0]) - 1;
     ctx->reductions += reductions_to_bump;
-    return TRUE_ATOM; 
+    return TRUE_ATOM;
 }
 
 //
