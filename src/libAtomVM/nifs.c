@@ -3523,28 +3523,36 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         }
     } while (!term_is_nil(list_cursor));
 
-    list_cursor = result_list;
-    list_ptr = NULL;
-    term *prev = NULL;
-    while (!term_is_nil(list_cursor)) {
-        list_ptr = term_get_list_ptr(list_cursor);
+    term list_cursor2 = result_list;
+    term next = term_get_list_tail(list_cursor2);
+    term* prev_ptr = NULL;
+    
+    while (!term_is_nil(next)) {
+        term head = term_get_list_head(list_cursor2);
+        bool is_head_empty = term_binary_size(head) == 0;
 
-        if (trim && term_is_nil(list_ptr[LIST_TAIL_INDEX]) && (term_binary_size(list_ptr[LIST_HEAD_INDEX]) == 0)) {
-            if (!IS_NULL_PTR(prev)) {
-                prev[LIST_TAIL_INDEX] = list_ptr[LIST_TAIL_INDEX];
-            }
+        if (trim_all && is_head_empty) {
+            term* list_ptr = term_get_list_ptr(list_cursor2);
+            term* next_ptr = term_get_list_ptr(next);
+            list_ptr[LIST_HEAD_INDEX] = next_ptr[LIST_HEAD_INDEX];
+            list_ptr[LIST_TAIL_INDEX] = next_ptr[LIST_TAIL_INDEX];
+            next = term_get_list_tail(next);
         }
+        prev_ptr = term_get_list_ptr(list_cursor2);
+        list_cursor2 = term_get_list_tail(list_cursor2);
+        next = term_get_list_tail(next);
+    }
 
-        if (trim_all && term_binary_size(list_ptr[LIST_HEAD_INDEX]) == 0) {
-            if (!IS_NULL_PTR(prev)) {
-                prev[LIST_TAIL_INDEX] = list_ptr[LIST_TAIL_INDEX];
-            } else {
-                result_list = list_ptr[LIST_TAIL_INDEX];
-            }
+    term head = term_get_list_head(list_cursor2);
+    bool last_empty = term_binary_size(head) == 0;
+    bool first = prev == NULL;
+    if ((trim || trim_all) && last_empty) {
+        if(first) {
+            result_list = term_nil();
         } else {
-            prev = term_get_list_ptr(list_cursor);
+            term* list_ptr = term_get_list_ptr(list_cursor2);
+            prev[LIST_TAIL_INDEX] = term_nil();
         }
-        list_cursor = list_ptr[LIST_TAIL_INDEX];
     }
 
     free(pattern_data);
