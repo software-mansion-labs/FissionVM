@@ -36,6 +36,8 @@ option(AVM_CREATE_STACKTRACES "Create stacktraces" ON)
 option(AVM_BUILD_RUNTIME_ONLY "Only build the AtomVM runtime" OFF)
 option(COVERAGE "Build for code coverage" OFF)
 set(SANITIZER "address" CACHE STRING "Enable Address Sanitizer") # Include address, memory, or undefined sanitizer
+option(DEBUG_ASSERTIONS ON)
+option(DEBUG_GC "Sets MIN_FREE_SPACE_SIZE in memory.h to 0, to trigger GC more often" OFF)
 
 if((${CMAKE_SYSTEM_NAME} STREQUAL "Darwin") OR
    (${CMAKE_SYSTEM_NAME} STREQUAL "Linux") OR

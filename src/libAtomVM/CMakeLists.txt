@@ -302,3 +302,11 @@ if (COVERAGE)
     include(CodeCoverage)
     append_coverage_compiler_flags_to_target(libAtomVM)
 endif()
+
+if (DEBUG_ASSERTIONS)
+    target_compile_definitions(libAtomVM PUBLIC AVM_DEBUG_ASSERTIONS)
+endif()
+
+if (DEBUG_GC)
+    target_compile_definitions(libAtomVM PUBLIC AVM_DEBUG_GC)
+endif()

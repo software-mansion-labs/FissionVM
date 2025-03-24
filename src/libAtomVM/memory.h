@@ -21,7 +21,9 @@
 #ifndef _MEMORY_H_
 #define _MEMORY_H_
 
-// #define DEBUG_HEAP_ALLOC
+#ifdef AVM_DEBUG_ASSERTIONS
+#define DEBUG_HEAP_ALLOC
+#endif
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -39,7 +41,12 @@ extern "C" {
 #endif
 
 #define HEAP_NEED_GC_SHRINK_THRESHOLD_COEFF 64
+
+#ifdef AVM_DEBUG_GC
+#define MIN_FREE_SPACE_SIZE 0
+#else
 #define MIN_FREE_SPACE_SIZE 16
+#endif
 
 #ifndef TYPEDEF_CONTEXT
 #define TYPEDEF_CONTEXT
