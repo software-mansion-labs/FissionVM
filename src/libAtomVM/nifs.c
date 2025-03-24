@@ -77,7 +77,13 @@
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #endif
 
+#ifndef MIN
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#endif
+
 #define NOT_FOUND (0xFF)
+
+#define INVALID_INDEX (SIZE_MAX)
 
 #ifdef ENABLE_ADVANCED_TRACE
 static const char *const trace_calls_atom = "\xB" "trace_calls";
@@ -5891,96 +5897,109 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
     return result_tuple;
 }
 
+static size_t invalidate_first_matching(term *cons_arr, size_t n, term pattern, Context *ctx)
+{
+    for (size_t i = 0; i < n; ++i) {
+        term cons_pair = cons_arr[i];
+        if (term_is_invalid_term(cons_pair)) {
+            continue;
+        }
+
+        term item = term_get_list_head(cons_pair);
+        TermCompareResult cmp_result = term_compare(item, pattern, TermCompareExact, ctx->global);
+        if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+            return INVALID_INDEX;
+        }
+
+        if (cmp_result == TermEquals) {
+            cons_arr[i] = term_invalid_term();
+            return i;
+        }
+    }
+    return INVALID_INDEX;
+}
+
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc)
 
-    term list1 = argv[0];
-    term list2 = argv[1];
+    term list = argv[0];
+    term patterns = argv[1];
 
-    VALIDATE_VALUE(list1, term_is_list);
-    VALIDATE_VALUE(list2, term_is_list);
+    VALIDATE_VALUE(list, term_is_list);
+    VALIDATE_VALUE(patterns, term_is_list);
 
     int proper;
-    int len = term_list_length(list1, &proper);
+    const size_t length = term_list_length(list, &proper);
     if (UNLIKELY(!proper)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
     int proper2;
-    term_list_length(list2, &proper2);
+    term_list_length(patterns, &proper2);
     if (UNLIKELY(!proper2)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    if (term_is_nil(list1)) {
+    if (term_is_nil(list)) {
         return term_nil();
     }
 
-    if (term_is_nil(list2)) {
-        return list1;
+    if (term_is_nil(patterns)) {
+        return list;
     }
 
-    term *cons = malloc(len * sizeof(term));
+    TERM_DEBUG_ASSERT(length > 0);
+    term *cons = malloc(length * sizeof(term));
     if (IS_NULL_PTR(cons)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-    int i = 0;
-    term list = list1;
 
-    while (!term_is_nil(list)) {
-        cons[i] = list;
-        list = term_get_list_tail(list);
-        i++;
+    term iter = list;
+    for (size_t i = 0; i < length; ++i) {
+        cons[i] = iter;
+        iter = term_get_list_tail(iter);
     }
 
-    int last_filtered_idx = -1;
+    size_t last_filtered_index = INVALID_INDEX;
+    while (!term_is_nil(patterns)) {
+        term pattern = term_get_list_head(patterns);
+        size_t filtered_index = invalidate_first_matching(cons, length, pattern, ctx);
 
-    while (!term_is_nil(list2)) {
-        term to_nullify = term_get_list_head(list2);
-
-        for (int i = 0; i < len; i++) {
-            if (term_is_invalid_term(cons[i])) {
-                continue;
-            }
-            term item = term_get_list_head(cons[i]);
-            TermCompareResult cmp_result = term_compare(to_nullify, item, TermCompareExact, ctx->global);
-
-            if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
-                free(cons);
-                RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-            }
-            if (cmp_result == TermEquals) {
-                if (last_filtered_idx < i) {
-                    last_filtered_idx = i;
-                }
-                cons[i] = term_invalid_term();
-                break;
-            }
+        bool not_initialized = last_filtered_index == INVALID_INDEX;
+        bool is_further = filtered_index != INVALID_INDEX && last_filtered_index < filtered_index;
+        if (not_initialized || is_further) {
+            last_filtered_index = filtered_index;
         }
-        list2 = term_get_list_tail(list2);
+        patterns = term_get_list_tail(patterns);
     }
 
-    if (last_filtered_idx == -1) {
+    bool unfiltered = last_filtered_index == INVALID_INDEX;
+    if (unfiltered) {
         free(cons);
-        return list1;
+        return list;
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, (last_filtered_idx + 1) * CONS_SIZE, last_filtered_idx + 1, cons, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    // include element after last filtered
+    size_t copied_n = MIN(last_filtered_index + 2, length);
+    TERM_DEBUG_ASSERT(copied_n <= length);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, copied_n * CONS_SIZE, copied_n, cons, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(cons);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    term result = term_nil();
-    if (last_filtered_idx < len - 1) {
-        result = cons[last_filtered_idx + 1];
-    }
+    TERM_DEBUG_ASSERT(copied_n >= 1);
+    size_t copied_tail_i = copied_n - 1;
+    term result = copied_tail_i == last_filtered_index ? term_nil() : cons[copied_tail_i];
 
-    for (int i = last_filtered_idx - 1; i >= 0; i--) {
-        if (!term_is_invalid_term(cons[i])) {
-            term item = term_get_list_head(cons[i]);
-            result = term_list_prepend(item, result, &ctx->heap);
+    for (long long i = copied_tail_i - 1; i >= 0; --i) {
+        term cons_pair = cons[i];
+        if (term_is_invalid_term(cons_pair)) {
+            continue;
         }
+
+        term item = term_get_list_head(cons_pair);
+        result = term_list_prepend(item, result, &ctx->heap);
     }
 
     free(cons);
