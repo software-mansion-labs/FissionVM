@@ -3358,6 +3358,48 @@ static const char *find_pattern(const char *bin, size_t bin_size, const char **p
     return NULL;
 }
 
+term reverse_proper_list(term list, term tail, Context *ctx)
+{
+    term result = tail;
+    term list_crsr = list;
+    while (!term_is_nil(list_crsr)) {
+        term *list_ptr = term_get_list_ptr(list_crsr);
+        result = term_list_prepend(list_ptr[LIST_HEAD_INDEX], result, &ctx->heap);
+        list_crsr = list_ptr[LIST_TAIL_INDEX];
+    }
+    return result;
+}
+
+term trim_list(term list, bool all, Context *ctx)
+{
+    if(term_is_nil(list))
+        return list;
+        
+    term reversed_list = reverse_proper_list(list, term_nil(), ctx);
+    term trimmed_list = term_nil();
+    term list_cursor = reversed_list;
+    term head = term_get_list_head(list_cursor);
+    bool is_head_empty = term_binary_size(head) == 0;
+    
+    while (is_head_empty) {
+        list_cursor = term_get_list_tail(list_cursor);
+        if(term_is_nil(list_cursor))
+            break;
+        head = term_get_list_head(list_cursor);
+        is_head_empty = term_binary_size(head) == 0;
+    }
+    
+    while (!term_is_nil(list_cursor)) {
+        is_head_empty = term_binary_size(head) == 0;
+        if (!(is_head_empty && all)) {
+            trimmed_list = term_list_prepend(head, trimmed_list, &ctx->heap);
+        }
+        list_cursor = term_get_list_tail(list_cursor);
+    }
+    
+    return trimmed_list;
+}
+
 static term nif_binary_split(Context *ctx, int argc, term argv[])
 {
     term bin_term = argv[0];
@@ -3523,36 +3565,14 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         }
     } while (!term_is_nil(list_cursor));
 
-    term list_cursor2 = result_list;
-    term next = term_get_list_tail(list_cursor2);
-    term* prev_ptr = NULL;
-    
-    while (!term_is_nil(next)) {
-        term head = term_get_list_head(list_cursor2);
-        bool is_head_empty = term_binary_size(head) == 0;
-
-        if (trim_all && is_head_empty) {
-            term* list_ptr = term_get_list_ptr(list_cursor2);
-            term* next_ptr = term_get_list_ptr(next);
-            list_ptr[LIST_HEAD_INDEX] = next_ptr[LIST_HEAD_INDEX];
-            list_ptr[LIST_TAIL_INDEX] = next_ptr[LIST_TAIL_INDEX];
-            next = term_get_list_tail(next);
-        }
-        prev_ptr = term_get_list_ptr(list_cursor2);
-        list_cursor2 = term_get_list_tail(list_cursor2);
-        next = term_get_list_tail(next);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, 1, &result_list, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        free(pattern_data);
+        free(sizes);
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    term head = term_get_list_head(list_cursor2);
-    bool last_empty = term_binary_size(head) == 0;
-    bool first = prev == NULL;
-    if ((trim || trim_all) && last_empty) {
-        if(first) {
-            result_list = term_nil();
-        } else {
-            term* list_ptr = term_get_list_ptr(list_cursor2);
-            prev[LIST_TAIL_INDEX] = term_nil();
-        }
+    if (trim || trim_all) {
+        result_list = trim_list(result_list, trim_all, ctx);
     }
 
     free(pattern_data);
@@ -5550,18 +5570,12 @@ static term nif_lists_reverse(Context *ctx, int argc, term argv[])
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    term result = term_nil();
+    term tail = term_nil();
     if (argc == 2) {
-        result = argv[1];
+        tail = argv[1];
     }
-    term list_crsr = argv[0];
-    while (!term_is_nil(list_crsr)) {
-        // term is a proper list as verified above
-        term *list_ptr = term_get_list_ptr(list_crsr);
-        result = term_list_prepend(list_ptr[LIST_HEAD_INDEX], result, &ctx->heap);
-        list_crsr = list_ptr[LIST_TAIL_INDEX];
-    }
-    return result;
+    // term is a proper list as verified above 
+    return reverse_proper_list(argv[0], tail, ctx);
 }
 
 static term nif_lists_member(Context *ctx, int argc, term argv[])
