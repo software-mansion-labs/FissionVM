@@ -91,15 +91,25 @@ compare_bin(Bin1, Bin2, Index) ->
 split_trim_compare() ->
     [A, B] = binary:split(<<"Hello World ">>, <<" ">>, [trim]),
     ok = compare_bin(<<"Hello">>, A),
-    ok = compare_bin(<<"World ">>, B).
+    ok = compare_bin(<<"World ">>, B),
+    [C] = binary:split(<<"Hello World{">>, <<"{">>, [trim]),
+    ok = compare_bin(<<"Hello World">>, C).
 
 split_trim_all_global_compare() ->
     [A, B] = binary:split(<<" Hello World ">>, <<" ">>, [global, trim_all]),
     ok = compare_bin(<<"Hello">>, A),
-    ok = compare_bin(<<"World">>, B).
+    ok = compare_bin(<<"World">>, B),
+    [A, B] = binary:split(<<"::Hello:::World">>, <<":">>, [global, trim_all]),
+    ok = compare_bin(<<"Hello">>, A),
+    ok = compare_bin(<<"World">>, B),
+    [] = binary:split(<<":::::">>, <<":">>, [global, trim_all]),
+    ok.
 
 split_trim_global_compare() ->
     [A, B] = binary:split(<<"Hello World ">>, <<" ">>, [global, trim]),
+    ok = compare_bin(<<"Hello">>, A),
+    ok = compare_bin(<<"World">>, B),
+    [A, B] = binary:split(<<"HellogWorldggggggggg">>, <<"g">>, [global, trim]),
     ok = compare_bin(<<"Hello">>, A),
     ok = compare_bin(<<"World">>, B).
 

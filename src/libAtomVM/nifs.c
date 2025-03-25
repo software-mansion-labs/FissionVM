@@ -3372,23 +3372,23 @@ term reverse_proper_list(term list, term tail, Context *ctx)
 
 term trim_list(term list, bool all, Context *ctx)
 {
-    if(term_is_nil(list))
+    if (term_is_nil(list))
         return list;
-        
+
     term reversed_list = reverse_proper_list(list, term_nil(), ctx);
     term trimmed_list = term_nil();
     term list_cursor = reversed_list;
     term head = term_get_list_head(list_cursor);
     bool is_head_empty = term_binary_size(head) == 0;
-    
+
     while (is_head_empty) {
         list_cursor = term_get_list_tail(list_cursor);
-        if(term_is_nil(list_cursor))
+        if (term_is_nil(list_cursor))
             break;
         head = term_get_list_head(list_cursor);
         is_head_empty = term_binary_size(head) == 0;
     }
-    
+
     while (!term_is_nil(list_cursor)) {
         is_head_empty = term_binary_size(head) == 0;
         if (!(is_head_empty && all)) {
@@ -3396,7 +3396,7 @@ term trim_list(term list, bool all, Context *ctx)
         }
         list_cursor = term_get_list_tail(list_cursor);
     }
-    
+
     return trimmed_list;
 }
 
@@ -5574,7 +5574,7 @@ static term nif_lists_reverse(Context *ctx, int argc, term argv[])
     if (argc == 2) {
         tail = argv[1];
     }
-    // term is a proper list as verified above 
+    // term is a proper list as verified above
     return reverse_proper_list(argv[0], tail, ctx);
 }
 
