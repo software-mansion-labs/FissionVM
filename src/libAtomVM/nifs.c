@@ -6011,13 +6011,12 @@ static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
     UNUSED(argc)
     UNUSED(argv)
 
-    if (UNLIKELY(memory_ensure_free(ctx, TUPLE_SIZE(2)) != MEMORY_GC_OK)) {
-        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-    }
-    term result_tuple = term_alloc_tuple(2, &ctx->heap);
-
     char cwd[PATH_MAX];
     if (IS_NULL_PTR(getcwd(cwd, PATH_MAX))) {
+        if (UNLIKELY(memory_ensure_free(ctx, TUPLE_SIZE(2)) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+        term result_tuple = term_alloc_tuple(2, &ctx->heap);
         term reason = UNDEFINED_ATOM;
         switch (errno) {
             case EACCES:
@@ -6039,9 +6038,10 @@ static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
     }
 
     size_t cwd_length = strlen(cwd);
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, term_binary_heap_size(cwd_length), 1, &result_tuple, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free(ctx, TUPLE_SIZE(2) + term_binary_heap_size(cwd_length)) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
     term cwd_binary = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
 
     term_put_tuple_element(result_tuple, 0, OK_ATOM);
