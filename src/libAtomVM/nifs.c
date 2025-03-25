@@ -3390,6 +3390,7 @@ term trim_list(term list, bool all, Context *ctx)
     }
 
     while (!term_is_nil(list_cursor)) {
+        head = term_get_list_head(list_cursor);
         is_head_empty = term_binary_size(head) == 0;
         if (!(is_head_empty && all)) {
             trimmed_list = term_list_prepend(head, trimmed_list, &ctx->heap);
