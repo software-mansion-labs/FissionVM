@@ -248,7 +248,7 @@ static inline const term *term_to_const_term_ptr(term t)
 static inline bool term_is_atom(term t)
 {
     /* atom: | atom index | 00 10 11 */
-    return ((t & 0x3F) == 0xB);
+    return ((t & TERM_BOXED_TAG_MASK) == 0xB);
 }
 
 /**
@@ -273,7 +273,7 @@ static inline bool term_is_invalid_term(term t)
 static inline bool term_is_nil(term t)
 {
     /* nil: 11 10 11 */
-    return ((t & 0x3F) == 0x3B);
+    return ((t & TERM_BOXED_TAG_MASK) == 0x3B);
 }
 
 /**
@@ -457,7 +457,7 @@ static inline bool term_is_any_integer(term t)
 
 static inline bool term_is_catch_label(term t)
 {
-    return (t & 0x3F) == TERM_CATCH_TAG;
+    return (t & TERM_BOXED_TAG_MASK) == TERM_CATCH_TAG;
 }
 
 /**
@@ -484,7 +484,7 @@ static inline bool term_is_tuple(term t)
 {
     if (term_is_boxed(t)) {
         const term *boxed_value = term_to_const_term_ptr(t);
-        if ((boxed_value[0] & 0x3F) == 0) {
+        if ((boxed_value[0] & TERM_BOXED_TAG_MASK) == 0) {
             return true;
         }
     }
@@ -503,7 +503,7 @@ static inline bool term_is_reference(term t)
 {
     if (term_is_boxed(t)) {
         const term *boxed_value = term_to_const_term_ptr(t);
-        if ((boxed_value[0] & 0x3F) == TERM_BOXED_REF) {
+        if ((boxed_value[0] & TERM_BOXED_TAG_MASK) == TERM_BOXED_REF) {
             return true;
         }
     }
@@ -523,7 +523,7 @@ static inline bool term_is_function(term t)
 {
     if (term_is_boxed(t)) {
         const term *boxed_value = term_to_const_term_ptr(t);
-        if ((boxed_value[0] & 0x3F) == TERM_BOXED_FUN) {
+        if ((boxed_value[0] & TERM_BOXED_TAG_MASK) == TERM_BOXED_FUN) {
             return true;
         }
     }
@@ -1550,7 +1550,7 @@ static inline bool term_is_match_state(term t)
 {
     if (term_is_boxed(t)) {
         const term *boxed_value = term_to_const_term_ptr(t);
-        if ((boxed_value[0] & 0x3F) == TERM_BOXED_BIN_MATCH_STATE) {
+        if ((boxed_value[0] & TERM_BOXED_TAG_MASK) == TERM_BOXED_BIN_MATCH_STATE) {
             return true;
         }
     }
