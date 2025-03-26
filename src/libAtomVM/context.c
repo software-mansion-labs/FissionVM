@@ -393,6 +393,7 @@ bool context_get_process_info(Context *ctx, term *out, term atom_key)
             }
             int64_t reductions = (int64_t) ctx->reductions;
             size_t reductions_size = term_boxed_integer_size(reductions);
+            term_put_tuple_element(ret, 1, term_invalid_term());
             if (UNLIKELY(memory_ensure_free_with_roots(ctx, reductions_size, 1, &ret, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
                 *out = OUT_OF_MEMORY_ATOM;
                 return false;
