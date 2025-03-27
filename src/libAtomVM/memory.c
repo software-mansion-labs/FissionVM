@@ -812,6 +812,9 @@ HOT_FUNC static term memory_shallow_copy_term(HeapFragment *old_fragment, term t
     } else if (term_is_pid(t)) {
         return t;
 
+    } else if (term_is_invalid_term(t)) {
+        return t;
+
     } else if (term_is_cp(t)) {
         // CP is valid only on stack
         return t;
