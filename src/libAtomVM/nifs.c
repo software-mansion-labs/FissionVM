@@ -1318,7 +1318,11 @@ static term do_spawn(Context *ctx, Context *new_ctx, term opts_term)
     term max_heap_size_term = interop_proplist_get_value(opts_term, MAX_HEAP_SIZE_ATOM);
     term link_term = interop_proplist_get_value(opts_term, LINK_ATOM);
     term monitor_term = interop_proplist_get_value(opts_term, MONITOR_ATOM);
+    #ifdef AVM_DEBUG_GC
+    term heap_growth_strategy = MINIMUM_ATOM;
+    #else
     term heap_growth_strategy = interop_proplist_get_value_default(opts_term, ATOMVM_HEAP_GROWTH_ATOM, BOUNDED_FREE_ATOM);
+    #endif
 
     if (min_heap_size_term != term_nil()) {
         if (UNLIKELY(!term_is_integer(min_heap_size_term))) {
@@ -1359,6 +1363,7 @@ static term do_spawn(Context *ctx, Context *new_ctx, term opts_term)
             context_destroy(new_ctx);
             RAISE_ERROR(BADARG_ATOM);
     }
+
     uint64_t ref_ticks = 0;
 
     if (link_term == TRUE_ATOM) {

@@ -42,11 +42,7 @@ extern "C" {
 
 #define HEAP_NEED_GC_SHRINK_THRESHOLD_COEFF 64
 
-#ifdef AVM_DEBUG_GC
-#define MIN_FREE_SPACE_SIZE 0
-#else
 #define MIN_FREE_SPACE_SIZE 16
-#endif
 
 #ifndef TYPEDEF_CONTEXT
 #define TYPEDEF_CONTEXT
