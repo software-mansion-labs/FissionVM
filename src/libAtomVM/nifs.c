@@ -5570,7 +5570,7 @@ static term nif_lists_reverse(Context *ctx, int argc, term argv[])
     if (argc == 2) {
         result = argv[1];
     }
-    term list_crsr = list;
+    term list_crsr = argv[0];
     while (!term_is_nil(list_crsr)) {
         // term is a proper list as verified above
         term *list_ptr = term_get_list_ptr(list_crsr);
