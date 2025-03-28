@@ -1842,6 +1842,7 @@ static term nif_os_getenv_1(Context *ctx, int argc, term argv[])
     }
 
     const char *env_var_value = getenv(env_var);
+    free((void *) env_var);
     if (IS_NULL_PTR(env_var_value)) {
         return FALSE_ATOM;
     }
