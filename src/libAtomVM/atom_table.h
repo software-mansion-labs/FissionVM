@@ -43,7 +43,7 @@ enum AtomTableCopyOpt
 
 typedef const void *atom_ref_t;
 
-struct AtomTable *atom_table_new();
+struct AtomTable *atom_table_new(void);
 void atom_table_destroy(struct AtomTable *table);
 
 int atom_table_count(struct AtomTable *table);
