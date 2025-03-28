@@ -1478,17 +1478,20 @@ static term nif_erlang_spawn_opt(Context *ctx, int argc, term argv[])
 
     Module *found_module = globalcontext_get_module(ctx->global, module_string);
     if (UNLIKELY(!found_module)) {
+        context_destroy(new_ctx);
         return UNDEFINED_ATOM;
     }
 
     int proper;
     int args_len = term_list_length(argv[2], &proper);
     if (UNLIKELY(!proper)) {
+        context_destroy(new_ctx);
         RAISE_ERROR(BADARG_ATOM);
     }
     int label = module_search_exported_function(found_module, function_string, args_len, ctx->global);
     //TODO: fail here if no function has been found
     if (UNLIKELY(label == 0)) {
+        context_destroy(new_ctx);
         AVM_ABORT();
     }
     new_ctx->saved_module = found_module;
