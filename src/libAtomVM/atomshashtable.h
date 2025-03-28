@@ -45,6 +45,7 @@ struct AtomsHashTable
 };
 
 struct AtomsHashTable *atomshashtable_new();
+void atomshashtable_destroy(struct AtomsHashTable *);
 int atomshashtable_insert(struct AtomsHashTable *hash_table, AtomString string, unsigned long value);
 unsigned long atomshashtable_get_value(const struct AtomsHashTable *hash_table, AtomString string, unsigned long default_value);
 int atomshashtable_has_key(const struct AtomsHashTable *hash_table, AtomString string);

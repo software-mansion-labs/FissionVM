@@ -256,6 +256,9 @@ COLD_FUNC void globalcontext_destroy(GlobalContext *glb)
     synclist_destroy(&glb->registered_processes);
     synclist_destroy(&glb->processes_table);
 
+    atom_table_destroy(glb->atom_table);
+    atomshashtable_destroy(glb->modules_table);
+    free(glb->modules_by_index);
     free(glb);
 }
 
