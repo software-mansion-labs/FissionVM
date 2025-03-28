@@ -23,6 +23,7 @@
 #include "smp.h"
 #include "utils.h"
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -78,6 +79,24 @@ struct AtomsHashTable *atomshashtable_new()
 #endif
 
     return htable;
+}
+
+void atomshashtable_destroy(struct AtomsHashTable *hash_table)
+{
+    size_t capacity = hash_table->capacity;
+    for (size_t i = 0; i < capacity; i++) {
+        struct HNode *node = hash_table->buckets[i];
+        while (node) {
+            struct HNode *next = node->next;
+            free(node);
+            node = next;
+        }
+    }
+#ifndef AVM_NO_SMP
+    smp_rwlock_destroy(hash_table->lock);
+#endif
+    free(hash_table->buckets);
+    free(hash_table);
 }
 
 int atomshashtable_insert(struct AtomsHashTable *hash_table, AtomString string, unsigned long value)
