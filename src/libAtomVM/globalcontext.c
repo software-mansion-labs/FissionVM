@@ -58,7 +58,7 @@ struct RegisteredProcess
     int local_process_id;
 };
 
-GlobalContext *globalcontext_new()
+GlobalContext *globalcontext_new(void)
 {
     GlobalContext *glb = malloc(sizeof(GlobalContext));
     if (IS_NULL_PTR(glb)) {
