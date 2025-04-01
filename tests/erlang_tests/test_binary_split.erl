@@ -40,6 +40,7 @@ start() ->
     ok = split_trim_compare(),
     ok = split_trim_all_global_compare(),
     ok = split_trim_global_compare(),
+    ok = split_check_input(),
     ok = fail_split(<<>>),
     ok = fail_split({1, 2}),
     ok = fail_split2({1, 2}),
@@ -89,27 +90,36 @@ compare_bin(Bin1, Bin2, Index) ->
     compare_bin(Bin1, Bin2, Index - 1).
 
 split_trim_compare() ->
-    [A, B] = binary:split(<<"Hello World ">>, <<" ">>, [trim]),
+    [A, B] = binary:split(id(<<"Hello World ">>), id(<<" ">>), [trim]),
     ok = compare_bin(<<"Hello">>, A),
     ok = compare_bin(<<"World ">>, B),
-    [C] = binary:split(<<"Hello World{">>, <<"{">>, [trim]),
+    [C] = binary:split(id(<<"Hello World{">>), id(<<"{">>), [trim]),
     ok = compare_bin(<<"Hello World">>, C).
 
 split_trim_all_global_compare() ->
-    [A, B] = binary:split(<<" Hello World ">>, <<" ">>, [global, trim_all]),
+    [A, B] = binary:split(id(<<" Hello World ">>), id(<<" ">>), [global, trim_all]),
     ok = compare_bin(<<"Hello">>, A),
     ok = compare_bin(<<"World">>, B),
-    [A, B] = binary:split(<<"::Hello:::World">>, <<":">>, [global, trim_all]),
+    [A, B] = binary:split(id(<<"::Hello:::World">>), id(<<":">>), [global, trim_all]),
     ok = compare_bin(<<"Hello">>, A),
     ok = compare_bin(<<"World">>, B),
-    [] = binary:split(<<":::::">>, <<":">>, [global, trim_all]),
+    [] = binary:split(id(<<":::::">>), id(<<":">>), [global, trim_all]),
     ok.
 
 split_trim_global_compare() ->
-    [A, B] = binary:split(<<"Hello World ">>, <<" ">>, [global, trim]),
+    [A, B] = binary:split(id(<<"Hello World ">>), id(<<" ">>), [global, trim]),
     ok = compare_bin(<<"Hello">>, A),
     ok = compare_bin(<<"World">>, B),
-    [A, B] = binary:split(<<"HellogWorldggggggggg">>, <<"g">>, [global, trim]),
+    [A, B] = binary:split(id(<<"HellogWorldggggggggg">>), id(<<"g">>), [global, trim]),
+    ok = compare_bin(<<"Hello">>, A),
+    ok = compare_bin(<<"World">>, B).
+
+split_check_input() ->
+    InString = <<"Hello World ">>,
+    InSeparator = <<" ">>,
+    [A, B] = binary:split(id(InString), id(InSeparator), [global, trim]),
+    ok = compare_bin(<<"Hello World ">>, InString),
+    ok = compare_bin(<<" ">>, InSeparator),
     ok = compare_bin(<<"Hello">>, A),
     ok = compare_bin(<<"World">>, B).
 
