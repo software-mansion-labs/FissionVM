@@ -3358,6 +3358,49 @@ static const char *find_pattern(const char *bin, size_t bin_size, const char **p
     return NULL;
 }
 
+term trim_list(Context *ctx, term list, size_t heap_size, bool trim, bool trim_all)
+{
+    int proper;
+    size_t length = term_list_length(list, &proper);
+    UNUSED(proper);
+    term* cons = malloc(length * sizeof(term));
+    if (IS_NULL_PTR(cons)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, 1, &list, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        free(cons);
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    
+    term iter = list;
+    
+    for(size_t i = 0; i < length; ++i) {
+        cons[i] = iter;
+        iter = term_get_list_tail(iter);
+    }
+    
+    bool found_non_empty = false;
+    term trimmed = term_nil();
+    for(long long i = length - 1; i >= 0; --i) {
+        term head = term_get_list_head(cons[i]);
+        
+        bool is_empty = term_binary_size(head) == 0;
+        if (is_empty) {
+            bool trim_tail = trim && !found_non_empty;
+            if (!trim_tail && !trim_all) {
+                trimmed = term_list_prepend(head, trimmed, &ctx->heap);
+            }
+        } else {
+            trimmed = term_list_prepend(head, trimmed, &ctx->heap);
+            found_non_empty = true;
+        }
+    }
+    
+    free(cons);
+    return trimmed;
+}
+
 static term nif_binary_split(Context *ctx, int argc, term argv[])
 {
     term bin_term = argv[0];
@@ -3367,23 +3410,33 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     if (!term_is_binary(pattern_term) && !term_is_nonempty_list(pattern_term)) {
         RAISE_ERROR(BADARG_ATOM);
     }
-
     bool global = false;
+    bool trim = false;
+    bool trim_all = false;
+
     if (argc == 3) {
         term options = argv[2];
         if (UNLIKELY(!term_is_list(options))) {
             RAISE_ERROR(BADARG_ATOM);
         }
-        if (term_is_nonempty_list(options)) {
-            term head = term_get_list_head(options);
-            term tail = term_get_list_tail(options);
-            if (UNLIKELY(head != GLOBAL_ATOM)) {
-                RAISE_ERROR(BADARG_ATOM);
+        term head;
+        term tail = options;
+        while (term_is_nonempty_list(tail)) {
+            head = term_get_list_head(tail);
+            tail = term_get_list_tail(tail);
+            switch (head) {
+                case GLOBAL_ATOM:
+                    global = true;
+                    break;
+                case TRIM_ATOM:
+                    trim = true;
+                    break;
+                case TRIM_ALL_ATOM:
+                    trim_all = true;
+                    break;
+                default:
+                    RAISE_ERROR(BADARG_ATOM);
             }
-            if (UNLIKELY(!term_is_nil(tail))) {
-                RAISE_ERROR(BADARG_ATOM);
-            }
-            global = true;
         }
     }
     size_t pattern_list_size = 1;
@@ -3515,6 +3568,11 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     free(pattern_data);
     free(sizes);
+    
+    if (trim || trim_all) {
+        result_list = trim_list(ctx, result_list, heap_size, trim, trim_all);
+    }
+
     return result_list;
 }
 
@@ -6133,7 +6191,7 @@ static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[])
     VALIDATE_VALUE(argv[0], term_is_integer);
     int64_t reductions_to_bump = term_to_int(argv[0]) - 1;
     ctx->reductions += reductions_to_bump;
-    return TRUE_ATOM; 
+    return TRUE_ATOM;
 }
 
 //

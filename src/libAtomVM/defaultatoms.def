@@ -177,3 +177,6 @@ X(SHUTDOWN_ATOM, "\x8", "shutdown")
 X(NONODE_NOHOST_ATOM, "\xD", "nonode@nohost")
 
 X(CURRENT_STACKTRACE_ATOM, "\x12", "current_stacktrace")
+
+X(TRIM_ATOM, "\x4", "trim")
+X(TRIM_ALL_ATOM, "\x8", "trim_all")
