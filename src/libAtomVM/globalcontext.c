@@ -253,6 +253,11 @@ COLD_FUNC void globalcontext_destroy(GlobalContext *glb)
     smp_mutex_destroy(glb->schedulers_mutex);
     smp_rwlock_destroy(glb->modules_lock);
 #endif
+    struct ListHead *registered_processes = synclist_nolock(&glb->registered_processes);
+    MUTABLE_LIST_FOR_EACH (item, tmp, registered_processes) {
+        struct RegisteredProcess *registered_process = GET_LIST_ENTRY(item, struct RegisteredProcess, registered_processes_list_head);
+        free(registered_process);
+    }
     synclist_destroy(&glb->registered_processes);
     synclist_destroy(&glb->processes_table);
 
