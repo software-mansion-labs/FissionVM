@@ -3469,15 +3469,16 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         if (UNLIKELY(!proper)) {
             RAISE_ERROR(BADARG_ATOM);
         }
-        for (size_t i = 0; term_is_nonempty_list(pattern_term); ++i) {
-            term head = term_get_list_head(pattern_term);
+        term iter = pattern_term;
+        while (term_is_nonempty_list(iter)) {
+            term head = term_get_list_head(iter);
             if (UNLIKELY(term_binary_size(head) == 0)) {
                 RAISE_ERROR(BADARG_ATOM);
             }
-            pattern_term = term_get_list_tail(pattern_term);
+            iter = term_get_list_tail(iter);
         }
     } else if (term_is_binary(pattern_term)) {
-        int pattern_size = term_binary_size(pattern_term);
+        size_t pattern_size = term_binary_size(pattern_term);
         if (UNLIKELY(pattern_size == 0)) {
             RAISE_ERROR(BADARG_ATOM);
         }
