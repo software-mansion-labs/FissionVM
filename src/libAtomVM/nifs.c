@@ -3499,7 +3499,6 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     }
     size_t shortest_pattern_length;
 
-    pattern_term = argv[1];
     get_pattern_data_with_sizes(pattern_term, pattern_data, sizes, &shortest_pattern_length);
 
     // Count segments first to allocate memory once.
