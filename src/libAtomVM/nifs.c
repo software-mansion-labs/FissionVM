@@ -3729,21 +3729,21 @@ static BinaryPosLen find_pattern_in_binary(term binary_term, BinaryPosLen scope_
     const char *pattern = term_binary_data(pattern_term);
     size_t pattern_size = term_binary_size(pattern_term);
 
-    BinaryPosLen pattern_slice = term_invalid_binary_pos_len();
+    BinaryPosLen match_slice = term_nomatch_binary_pos_len();
     const char *sub_binary = memmem(binary, size, pattern, pattern_size);
     if (sub_binary != NULL) {
-        pattern_slice.len = pattern_size;
-        pattern_slice.pos = (sub_binary - binary) + scope_slice.pos;
+        match_slice.len = pattern_size;
+        match_slice.pos = (sub_binary - binary) + scope_slice.pos;
     }
-    return pattern_slice;
+    return match_slice;
 }
 
 static BinaryPosLen select_earlier_slice(BinaryPosLen old_slice, BinaryPosLen new_slice)
 {
-    if (term_is_invalid_binary_pos_len(new_slice)) {
+    if (term_is_nomatch_binary_pos_len(new_slice)) {
         return old_slice;
     }
-    if (term_is_invalid_binary_pos_len(old_slice)) {
+    if (term_is_nomatch_binary_pos_len(old_slice)) {
         return new_slice;
     }
     if (new_slice.pos < old_slice.pos) {
@@ -3771,7 +3771,7 @@ static term nif_binary_match(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    BinaryPosLen match_slice = term_invalid_binary_pos_len();
+    BinaryPosLen match_slice = term_nomatch_binary_pos_len();
     if (term_is_binary(pattern_or_patterns_term)) {
         term pattern_term = pattern_or_patterns_term;
         match_slice = find_pattern_in_binary(binary_term, scope_slice, pattern_term);
@@ -3785,7 +3785,7 @@ static term nif_binary_match(Context *ctx, int argc, term argv[])
         }
     }
 
-    if (term_is_invalid_binary_pos_len(match_slice)) {
+    if (term_is_nomatch_binary_pos_len(match_slice)) {
         return nomatch_atom;
     }
 

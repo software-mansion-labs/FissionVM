@@ -1120,6 +1120,15 @@ static inline term term_create_empty_binary(size_t size, Heap *heap, GlobalConte
     return t;
 }
 
+/**
+* @brief Transforms (pos, len) pair to version that is inside the binary and len is positive.
+*
+* @param binary the binary (pos, len) is checked against
+* @param pos the starting position of the slice
+* @param len the length of the slice
+* @param pos_len
+* @return true if the input (pos, len) are valid, false otherwise
+*/
 static inline bool term_normalize_binary_pos_len(term binary, avm_int_t pos, avm_int_t len, BinaryPosLen *pos_len)
 {
     avm_int_t size = (avm_int_t) term_binary_size(binary);
@@ -1137,12 +1146,12 @@ static inline bool term_normalize_binary_pos_len(term binary, avm_int_t pos, avm
     return true;
 }
 
-static inline bool term_is_invalid_binary_pos_len(BinaryPosLen pos_len)
+static inline bool term_is_nomatch_binary_pos_len(BinaryPosLen pos_len)
 {
     return pos_len.pos == -1 && pos_len.len == -1;
 }
 
-static inline BinaryPosLen term_invalid_binary_pos_len(void)
+static inline BinaryPosLen term_nomatch_binary_pos_len(void)
 {
     return (BinaryPosLen) { .pos = -1, .len = -1 };
 }

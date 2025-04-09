@@ -49,9 +49,11 @@ test_match() ->
     ?ASSERT_EXCEPTION(binary:match(<<"">>, []), error, badarg),
     ?ASSERT_EXCEPTION(binary:match(<<"a">>, []), error, badarg),
     ?ASSERT_EXCEPTION(binary:match(<<"a">>, [<<"">>]), error, badarg),
+    ?ASSERT_EXCEPTION(binary:match(<<"a">>, [<<"a">>, <<"">>]), error, badarg),
     ?ASSERT_MATCH(binary:match(<<"a">>, [<<"a">>]), {0, 1}),
     ?ASSERT_MATCH(binary:match(<<"a">>, [<<"a">>, <<"a">>]), {0, 1}),
     ?ASSERT_MATCH(binary:match(<<"aa">>, [<<"a">>, <<"aa">>]), {0, 2}),
+    ?ASSERT_MATCH(binary:match(<<"abcde">>, [<<"bcde">>, <<"cd">>]), {1,4}),
 
     % scope opt
     ?ASSERT_MATCH(binary:match(<<"a">>, <<"a">>, [{scope, {0, 0}}]), nomatch),
