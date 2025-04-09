@@ -295,6 +295,12 @@ TEST_CASE("test_list_to_binary", "[test_run]")
     TEST_ASSERT(ret_value == OK_ATOM);
 }
 
+TEST_CASE("test_list_to_bitstring", "[test_run]")
+{
+    term ret_value = avm_test_case("test_list_to_bitstring.beam");
+    TEST_ASSERT(ret_value == OK_ATOM);
+}
+
 TEST_CASE("test_md5", "[test_run]")
 {
     term ret_value = avm_test_case("test_md5.beam");

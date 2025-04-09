@@ -137,6 +137,7 @@ static term nif_erlang_link(Context *ctx, int argc, term argv[]);
 static term nif_erlang_float_to_binary(Context *ctx, int argc, term argv[]);
 static term nif_erlang_float_to_list(Context *ctx, int argc, term argv[]);
 static term nif_erlang_list_to_binary_1(Context *ctx, int argc, term argv[]);
+static term nif_erlang_list_to_bitstring_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_list_to_integer(Context *ctx, int argc, term argv[]);
 static term nif_erlang_list_to_float_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_list_to_atom_1(Context *ctx, int argc, term argv[]);
@@ -438,6 +439,12 @@ static const struct Nif list_to_binary_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_binary_1
+};
+
+static const struct Nif list_to_bitstring_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_list_to_bitstring_1
 };
 
 static const struct Nif list_to_integer_nif =
@@ -2742,6 +2749,11 @@ static term nif_erlang_list_to_binary_1(Context *ctx, int argc, term argv[])
         RAISE_ERROR(result);
     }
     return ret;
+}
+
+static term nif_erlang_list_to_bitstring_1(Context *ctx, int argc, term argv[])
+{
+    return nif_erlang_list_to_binary_1(ctx, argc, argv);
 }
 
 static avm_int_t to_digit_index(avm_int_t character)

@@ -52,6 +52,7 @@
     list_to_atom/1,
     list_to_existing_atom/1,
     list_to_binary/1,
+    list_to_bitstring/1,
     list_to_integer/1,
     list_to_integer/2,
     list_to_tuple/1,
@@ -613,6 +614,17 @@ list_to_existing_atom(_String) ->
 %%-----------------------------------------------------------------------------
 -spec list_to_binary(IOList :: iolist()) -> binary().
 list_to_binary(_IOList) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param   IOList   iolist to convert to binary
+%% @returns a binary composed of bytes and binaries from the list
+%% @doc     Convert a list into a binary.
+%% Errors with `badarg' if the list is not an iolist.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec list_to_bitstring(IOList :: iolist()) -> binary().
+list_to_bitstring(_IOList) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
