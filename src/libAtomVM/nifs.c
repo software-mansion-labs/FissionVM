@@ -3405,6 +3405,25 @@ term trim_list(Context *ctx, term list, size_t heap_size, bool trim, bool trim_a
     return trimmed;
 }
 
+static void get_pattern_data_with_sizes(term pattern_term, const char **pattern_data, size_t *sizes, size_t *shortest_pattern_length)
+{
+    if (term_is_binary(pattern_term)) {
+        pattern_data[0] = term_binary_data(pattern_term);
+        sizes[0] = term_binary_size(pattern_term);
+        *shortest_pattern_length = sizes[0];
+    }
+
+    for (size_t i = 0; term_is_nonempty_list(pattern_term); ++i) {
+        term head = term_get_list_head(pattern_term);
+        pattern_data[i] = term_binary_data(head);
+        sizes[i] = term_binary_size(head);
+        if (i == 0 || sizes[i] < *shortest_pattern_length) {
+            *shortest_pattern_length = sizes[i];
+        }
+        pattern_term = term_get_list_tail(pattern_term);
+    }
+}
+
 static term nif_binary_split(Context *ctx, int argc, term argv[])
 {
     term bin_term = argv[0];
@@ -3450,14 +3469,22 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
         if (UNLIKELY(!proper)) {
             RAISE_ERROR(BADARG_ATOM);
         }
+        term iter = pattern_term;
+        while (term_is_nonempty_list(iter)) {
+            term head = term_get_list_head(iter);
+            if (UNLIKELY(term_binary_size(head) == 0)) {
+                RAISE_ERROR(BADARG_ATOM);
+            }
+            iter = term_get_list_tail(iter);
+        }
+    } else if (term_is_binary(pattern_term)) {
+        size_t pattern_size = term_binary_size(pattern_term);
+        if (UNLIKELY(pattern_size == 0)) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
     }
 
     int bin_size = term_binary_size(bin_term);
-    int pattern_size = term_binary_size(pattern_term);
-
-    if (UNLIKELY(pattern_size == 0)) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
 
     const char *bin_data = term_binary_data(bin_term);
     const char **pattern_data = malloc(sizeof(char *) * pattern_list_size);
@@ -3472,29 +3499,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     }
     size_t shortest_pattern_length;
 
-    int i = 0;
-
-    if (!term_is_nonempty_list(pattern_term)) {
-        pattern_data[0] = term_binary_data(pattern_term);
-        sizes[0] = term_binary_size(pattern_term);
-        shortest_pattern_length = sizes[0];
-    }
-
-    while (term_is_nonempty_list(pattern_term)) {
-        term head = term_get_list_head(pattern_term);
-        pattern_data[i] = term_binary_data(head);
-        pattern_term = term_get_list_tail(pattern_term);
-        sizes[i] = term_binary_size(head);
-        if (UNLIKELY(sizes[i] == 0)) {
-            free(pattern_data);
-            free(sizes);
-            RAISE_ERROR(BADARG_ATOM);
-        }
-        if (i == 0 || sizes[i] < shortest_pattern_length) {
-            shortest_pattern_length = sizes[i];
-        }
-        i++;
-    }
+    get_pattern_data_with_sizes(pattern_term, pattern_data, sizes, &shortest_pattern_length);
 
     // Count segments first to allocate memory once.
     size_t num_segments = 1;
@@ -3542,6 +3547,9 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     // Reset pointers after allocation
     bin_data = term_binary_data(argv[0]);
+
+    pattern_term = argv[1];
+    get_pattern_data_with_sizes(pattern_term, pattern_data, sizes, &shortest_pattern_length);
 
     term list_cursor = result_list;
     temp_bin_data = bin_data;
