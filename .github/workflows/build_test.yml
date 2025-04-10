@@ -40,7 +40,7 @@ jobs:
         export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3
         mkdir build
         cd build
-        cmake -DAVM_BUILD_RUNTIME_ONLY=ON -DSANITIZER=OFF -DDEBUG_ASSERTIONS=ON ..
+        cmake -DAVM_BUILD_RUNTIME_ONLY=ON -DSANITIZER=OFF -DDEBUG_GC=ON -DDEBUG_ASSERTIONS=ON ..
         make -j
     # - name: Test
     #   run: |
