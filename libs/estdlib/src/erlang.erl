@@ -607,7 +607,7 @@ list_to_existing_atom(_String) ->
 
 %%-----------------------------------------------------------------------------
 %% @param   IOList   iolist to convert to binary
-%% @returns a binary composed of bytes and binaries from the list
+%% @returns a binary composed of chars and binaries from the list
 %% @doc     Convert a list into a binary.
 %% Errors with `badarg' if the list is not an iolist.
 %% @end
@@ -618,7 +618,7 @@ list_to_binary(_IOList) ->
 
 %%-----------------------------------------------------------------------------
 %% @param   IOList   iolist to convert to binary
-%% @returns a binary composed of bytes and binaries from the list
+%% @returns a binary composed of chars and binaries from the list
 %% @doc     Convert a list into a binary.
 %% Errors with `badarg' if the list is not an iolist.
 %% @end

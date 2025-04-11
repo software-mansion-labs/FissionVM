@@ -1,7 +1,7 @@
 %
 % This file is part of AtomVM.
 %
-% Copyright 2019 Davide Bettio <davide@uninstall.it>
+% Copyright 2025 Franciszek Kubis <franciszek.kubis@swmansion.com>
 %
 % Licensed under the Apache License, Version 2.0 (the "License");
 % you may not use this file except in compliance with the License.
@@ -36,21 +36,21 @@ test_concat() ->
     ok.
 
 test_iolist() ->
-    <<"Hello world">> = list_to_bitstring(id([<<"Hello ">>, [<<"wor">>, [$l, $d]]])),
+    <<"Hello world">> = list_to_bitstring(?MODULE:id([<<"Hello ">>, [<<"wor">>, [$l, $d]]])),
     ok.
 
 test_empty_list_to_binary() ->
-    <<"">> = erlang:list_to_bitstring([]),
+    <<"">> = erlang:list_to_bitstring(?MODULE:id([])),
     ok.
 
 concat(A, B) ->
-    list_to_bitstring(A ++ " " ++ B).
+    list_to_bitstring(?MODULE:id(A ++ " " ++ B)).
 
 concat2(A, B) ->
-    list_to_bitstring(A ++ B).
+    list_to_bitstring(?MODULE:id(A ++ B)).
 
 invalid(A) ->
-    try list_to_bitstring(A) of
+    try list_to_bitstring(?MODULE:id(A)) of
         Any -> byte_size(Any)
     catch
         error:badarg -> 0;

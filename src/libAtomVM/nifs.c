@@ -2753,6 +2753,7 @@ static term nif_erlang_list_to_binary_1(Context *ctx, int argc, term argv[])
 
 static term nif_erlang_list_to_bitstring_1(Context *ctx, int argc, term argv[])
 {
+//  TODO: implement proper list_to_bitstring function when the bitstrings are supported
     return nif_erlang_list_to_binary_1(ctx, argc, argv);
 }
 
