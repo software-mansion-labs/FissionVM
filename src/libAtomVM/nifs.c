@@ -213,6 +213,7 @@ static term nif_code_all_loaded(Context *ctx, int argc, term argv[]);
 static term nif_code_load_abs(Context *ctx, int argc, term argv[]);
 static term nif_code_load_binary(Context *ctx, int argc, term argv[]);
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[]);
+static term nif_code_get_object_code(Context *ctx, int argc, term argv[]);
 static term nif_code_which(Context *ctx, int argc, term argv[]);
 static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[]);
 static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
@@ -894,6 +895,11 @@ static const struct Nif code_ensure_loaded_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_ensure_loaded
+};
+
+static const struct Nif code_get_object_code_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_code_get_object_code
 };
 
 static const struct Nif code_which_nif = {
@@ -5760,6 +5766,33 @@ static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
         term_put_tuple_element(result, 0, MODULE_ATOM);
         term_put_tuple_element(result, 1, module_atom);
     }
+
+    return result;
+}
+
+static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term module_atom = argv[0];
+    if (UNLIKELY(!term_is_atom(module_atom))) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);
+    Module *module = globalcontext_get_module(ctx->global, module_name);
+    if (IS_NULL_PTR(module)) {
+        return BADARG_ATOM;
+    }
+
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size), argc, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term binary = term_from_literal_binary(module->binary, module->binary_size, &ctx->heap, ctx->global);
+
+    term result = term_alloc_tuple(3, &ctx->heap);
+    term_put_tuple_element(result, 0, module_atom);
+    term_put_tuple_element(result, 1, binary);
+    term_put_tuple_element(result, 2, UNDEFINED_ATOM);
 
     return result;
 }
