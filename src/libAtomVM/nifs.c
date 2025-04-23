@@ -210,6 +210,7 @@ static term nif_code_all_loaded(Context *ctx, int argc, term argv[]);
 static term nif_code_load_abs(Context *ctx, int argc, term argv[]);
 static term nif_code_load_binary(Context *ctx, int argc, term argv[]);
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[]);
+static term nif_code_which(Context *ctx, int argc, term argv[]);
 static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[]);
 static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
 static term nif_lists_member(Context *ctx, int argc, term argv[]);
@@ -880,6 +881,11 @@ static const struct Nif code_ensure_loaded_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_ensure_loaded
+};
+
+static const struct Nif code_which_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_code_which
 };
 
 static const struct Nif module_loaded_nif =
@@ -5692,6 +5698,29 @@ static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
     }
 
     return result;
+}
+
+static term nif_code_which(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    
+    term module_atom = argv[0];
+    if (UNLIKELY(!term_is_atom(module_atom))) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);
+    Module *module = globalcontext_get_module(ctx->global, module_name);
+    if (IS_NULL_PTR(module)) {
+        return globalcontext_make_atom(ctx->global, ATOM_STR("\xC", "non_existing"));
+    }
+    long mod_offset = MODULE_OFFSET_FROM_CP(ctx->cp);
+    struct LineRef line_ref = module_find_line(module, (unsigned int) mod_offset);
+    struct ModuleFilename filename = module->filenames[line_ref.filename_idx];
+    if (UNLIKELY(memory_ensure_free(ctx, filename.len) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term filename_term = term_from_string(filename.data, filename.len, &ctx->heap);
+    return filename_term;
 }
 
 static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[])

@@ -533,6 +533,7 @@ struct Test tests[] = {
 
     TEST_CASE(test_code_all_available_loaded),
     TEST_CASE_EXPECTED(test_code_load_binary, 24),
+    TEST_CASE(test_code_which),
     TEST_CASE_EXPECTED(test_code_load_abs, 24),
     TEST_CASE(test_code_ensure_loaded),
     TEST_CASE_ATOMVM_ONLY(test_add_avm_pack_binary, 24),
@@ -583,7 +584,7 @@ struct Test tests[] = {
     TEST_CASE(test_ets),
 
     TEST_CASE(test_md5),
-    
+
     TEST_CASE(test_bump_reductions),
 
     // TEST CRASHES HERE: TEST_CASE(memlimit),

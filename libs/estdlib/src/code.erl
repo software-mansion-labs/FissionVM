@@ -29,7 +29,8 @@
     all_loaded/0,
     load_abs/1,
     load_binary/3,
-    ensure_loaded/1
+    ensure_loaded/1,
+    which/1
 ]).
 
 %%-----------------------------------------------------------------------------
@@ -97,4 +98,16 @@ load_binary(_Module, _Filename, _Binary) ->
 -spec ensure_loaded(Module) -> {module, Module} | {error, embedded | any()} when
     Module :: atom().
 ensure_loaded(_Module) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param   Module      module to get filename from
+%% @returns Filename or `non_existing' atom
+%% @doc     Return a filename of a loaded module. If module is not loaded return
+%% `non_existing' atom.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec which(Module) -> Filename | non_existing when
+    Module :: atom(), Filename :: string().
+which(_Module) ->
     erlang:nif_error(undefined).
