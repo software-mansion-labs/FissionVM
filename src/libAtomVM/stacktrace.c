@@ -34,12 +34,14 @@ term stacktrace_create_raw(Context *ctx, Module *mod, int current_offset, term e
     return exception_class;
 }
 
-bool stacktrace_is_built(term stack_info_or_stacktrace) {
+bool stacktrace_is_built(term stack_info_or_stacktrace)
+{
     UNUSED(stack_info_or_stacktrace);
     return true;
 }
 
-term stacktrace_ensure_built(Context *ctx, term *stack_info_or_stacktrace, uint32_t live) {
+term stacktrace_ensure_built(Context *ctx, term *stack_info_or_stacktrace, uint32_t live)
+{
     UNUSED(ctx);
     UNUSED(stack_info_or_stacktrace);
     UNUSED(live);
@@ -218,14 +220,16 @@ struct ModulePathPair
     term path;
 };
 
-bool stacktrace_is_built(term stack_info_or_stacktrace) {
+bool stacktrace_is_built(term stack_info_or_stacktrace)
+{
+    TERM_DEBUG_ASSERT(term_is_tuple(stack_info_or_stacktrace) || term_is_list(stack_info_or_stacktrace));
     if (term_is_tuple(stack_info_or_stacktrace)) {
         return false;
     } else if (term_is_list(stack_info_or_stacktrace)) {
         return true;
     } else {
         fprintf(stderr, "Error: invalid stack_info or stacktrace passed to stacktrace_is_built");
-        AVM_ABORT();
+        return false;
     }
 }
 
