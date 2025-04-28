@@ -237,9 +237,8 @@ term stacktrace_ensure_built(Context *ctx, term *stack_info_or_stacktrace, uint3
 {
     if (stacktrace_is_built(*stack_info_or_stacktrace)) {
         return *stack_info_or_stacktrace;
-    } else {
-        return stacktrace_build(ctx, stack_info_or_stacktrace, live);
     }
+    return stacktrace_build(ctx, stack_info_or_stacktrace, live);
 }
 
 term stacktrace_build(Context *ctx, term *stack_info, uint32_t live)
