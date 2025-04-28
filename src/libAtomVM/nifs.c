@@ -5775,24 +5775,24 @@ static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
     UNUSED(argc);
 
     term module_atom = argv[0];
-    if (UNLIKELY(!term_is_atom(module_atom))) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
+    VALIDATE_VALUE(module_atom, term_is_atom);
     AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);
     Module *module = globalcontext_get_module(ctx->global, module_name);
     if (IS_NULL_PTR(module)) {
-        return BADARG_ATOM;
+        return ERROR_ATOM;
     }
-
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size), argc, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, result_size, argc, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
+    // Note: this assumes constness of module->binary and could be use-after-free if we allowed changing module bitcode at runtime.
     term binary = term_from_literal_binary(module->binary, module->binary_size, &ctx->heap, ctx->global);
-
+    term unspecified_file_term = term_from_string((const uint8_t *) "nofile", sizeof("nofile") - 1, &ctx->heap);
     term result = term_alloc_tuple(3, &ctx->heap);
+
     term_put_tuple_element(result, 0, module_atom);
     term_put_tuple_element(result, 1, binary);
-    term_put_tuple_element(result, 2, UNDEFINED_ATOM);
+    term_put_tuple_element(result, 2, unspecified_file_term);
 
     return result;
 }

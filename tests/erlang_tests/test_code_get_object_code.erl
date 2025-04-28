@@ -27,6 +27,11 @@
 start() ->
     ok = get_object_from_export_test_module(),
     ok = get_object_from_already_loaded_test_module(),
+    ok = get_object_from_non_existing_module(),
+    ok = get_object_wrong_argument("a string"),
+    ok = get_object_wrong_argument(123),
+    ok = get_object_wrong_argument({1, "a"}),
+    ok = get_object_wrong_argument([1, b, 3]),
     0.
 
 get_object_from_already_loaded_test_module() ->
@@ -46,3 +51,15 @@ get_object_from_export_test_module() ->
     {export_test_module, Bin, _Filename} = code:get_object_code(export_test_module),
     24 = export_test_module:exported_func(4),
     ok.
+
+get_object_from_non_existing_module() ->
+    error = code:get_object_code(non_existing_module),
+    ok.
+
+get_object_wrong_argument(Argument) ->
+    try code:get_object_code(Argument) of
+        _ -> not_badarg
+    catch
+        error:badarg -> ok;
+        _:_ -> not_badarg
+    end.
