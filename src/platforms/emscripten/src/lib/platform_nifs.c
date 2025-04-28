@@ -202,7 +202,7 @@ static bool get_callback_target(Context *ctx, term t, const char **target, char 
 
 static bool get_register_callback_parameters(Context *ctx, int argc, term argv[], const char **target, struct HTMLEventUserDataResource **resource, bool *use_capture)
 {
-    if (argc > 1 && !term_is_atom(argv[1]) && !term_is_list(argv[1])) {
+    if (argc >= 2 && !term_is_atom(argv[1]) && !term_is_list(argv[1])) {
         return false;
     }
     bool use_capture_opt = false;
