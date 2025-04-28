@@ -109,7 +109,7 @@ ensure_loaded(_Module) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec get_object_code(Module) -> {Module, Binary, Filename} when
-    Module :: atom(), Binary :: binary(), Filename :: term().
+    Module :: atom(), Binary :: binary(), Filename :: string().
 get_object_code(_Module) ->
     erlang:nif_error(undefined).
 
