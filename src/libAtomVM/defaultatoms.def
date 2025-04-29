@@ -180,3 +180,5 @@ X(CURRENT_STACKTRACE_ATOM, "\x12", "current_stacktrace")
 
 X(TRIM_ATOM, "\x4", "trim")
 X(TRIM_ALL_ATOM, "\x8", "trim_all")
+
+X(NON_EXISTING_ATOM, "\xC", "non_existing")
