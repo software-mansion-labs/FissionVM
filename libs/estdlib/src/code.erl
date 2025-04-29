@@ -103,8 +103,12 @@ ensure_loaded(_Module) ->
 %%-----------------------------------------------------------------------------
 %% @param   Module      module to get filename from
 %% @returns Filename or `non_existing' atom
-%% @doc     Return a filename of a loaded module. If module is not loaded return
-%% `non_existing' atom.
+%% @doc     Return a filename of a loaded module. The returned filename is just a
+%% stringified module name as multiple of AtomVM running environments does not support
+%% filesystem operations. If module is not loaded return `non_existing' atom.
+%% Unlike Erlang/OTP AtomVM does not support neither preloaded nor cover-compiled modules, so this
+%% function will not return `preloaded' nor `cover_compiled' values. It also does not
+%% search for not loaded module.
 %% @end
 %%-----------------------------------------------------------------------------
 -spec which(Module) -> Filename | non_existing when

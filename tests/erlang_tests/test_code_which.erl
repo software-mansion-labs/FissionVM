@@ -1,7 +1,7 @@
 %
 % This file is part of AtomVM.
 %
-% Copyright 2023 Davide Bettio <davide@uninstall.it>
+% Copyright 2025 Franciszek Kubis <franciszek.kubis@swmansion.com>
 %
 % Licensed under the Apache License, Version 2.0 (the "License");
 % you may not use this file except in compliance with the License.
@@ -25,25 +25,36 @@
 -include("code_load/export_test_module_data.hrl").
 
 start() ->
-    Bin = ?EXPORT_TEST_MODULE_DATA,
-    {error, _} = code:ensure_loaded(export_test_module),
-    {module, export_test_module} = code:load_binary(
-        export_test_module, "export_test_module.beam", Bin
-    ),
-    Filename = code:which(export_test_module),
-    true = compare_last_chars(Filename,"export_test_module.erl"),
-    {module, export_test_module} = code:ensure_loaded(export_test_module),
-    24 = export_test_module:exported_func(4),
+    ok = code_which_new_loaded_module(),
+    ok = code_which_loaded_module(),
+    ok = code_which_non_existing_module(),
+    ok = code_which_wrong_argument("a string"),
+    ok = code_which_wrong_argument(123),
+    ok = code_which_wrong_argument({1, "a"}),
+    ok = code_which_wrong_argument([1, b, 3]),
     0.
 
-compare_last_chars(L1,L2) ->
-    compare_last_chars0(lists:reverse(L1),lists:reverse(L2)).
+code_which_new_loaded_module() ->
+    Bin = ?EXPORT_TEST_MODULE_DATA,
+    non_existing = code:which(export_test_module),
+    {module, export_test_module} = code:load_binary(
+        export_test_module, "export_test_module", Bin
+    ),
+    "export_test_module" = code:which(export_test_module),
+    ok.
 
-compare_last_chars0([], _) ->
-    true;
-compare_last_chars0(_, []) ->
-    true;
-compare_last_chars0([H|T1],[H|T2]) ->
-    compare_last_chars0(T1, T2);
-compare_last_chars0(_,_) ->
-    false.
+code_which_loaded_module() ->
+    "test_code_which" = code:which(?MODULE),
+    ok.
+
+code_which_non_existing_module() ->
+    non_existing = code:which(non_existing_module),
+    ok.
+
+code_which_wrong_argument(Argument) ->
+    try code:which(Argument) of
+        _ -> not_badarg
+    catch
+        error:badarg -> ok;
+        _:_ -> not_badarg
+    end.
