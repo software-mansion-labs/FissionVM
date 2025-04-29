@@ -114,6 +114,7 @@ struct EmscriptenPlatformData
 };
 
 void sys_enqueue_emscripten_cast_message(GlobalContext *glb, const char *target, const char *message);
+size_t sys_get_next_remote_object_key(GlobalContext *glb);
 em_promise_t sys_enqueue_emscripten_call_message(GlobalContext *glb, const char *target, const char *message);
 void sys_enqueue_emscripten_htmlevent_message(GlobalContext *glb, int32_t target_pid, term message, term user_data, HeapFragment *heap);
 void sys_enqueue_emscripten_unregister_htmlevent_message(GlobalContext *glb, struct HTMLEventUserDataResource *rsrc);

@@ -124,7 +124,7 @@ static term nif_emscripten_run_script(Context *ctx, int argc, term argv[])
 
 static char *annotate_js_fn_with_storage(atomic_size_t key, char *js_fn)
 {
-    const char *pattern = "try { remoteObjectsMap.set(%d, (%.*s)()) } catch(e) { console.error(e) }";
+    const char *pattern = "try { remoteObjectsMap.set(%d, (%.*s)(Module)) } catch(e) { console.error(e) }";
     size_t injected_size = strlen(pattern) - 2 - 4; // don't count patterns
     size_t number_size = snprintf(NULL, 0, "%ld", key);
     size_t js_fn_size = strlen(js_fn);

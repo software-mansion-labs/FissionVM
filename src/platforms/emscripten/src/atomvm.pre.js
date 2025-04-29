@@ -24,5 +24,8 @@ Module['call'] = async function(name, message) {
     const promiseId = ccall("call", 'integer', ['string', 'string'], [name, message]);
     return promiseMap.get(promiseId).promise;
 };
+Module['nextRemoteObjectKey'] = function() {
+    ccall("next_remote_object_key", 'integer', [], []);
+};
 var remoteObjectsMap = new Map();
 Module['remoteObjectsMap'] = remoteObjectsMap;

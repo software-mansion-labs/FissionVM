@@ -35,6 +35,7 @@
 #include <emscripten/promise.h>
 
 #include "emscripten_sys.h"
+#include "lib/emscripten_sys.h"
 
 static GlobalContext *global = NULL;
 static Module *main_module = NULL;
@@ -143,6 +144,12 @@ EMSCRIPTEN_KEEPALIVE
 em_promise_t call(const char *name, const char *message)
 {
     return sys_enqueue_emscripten_call_message(global, name, message);
+}
+
+EMSCRIPTEN_KEEPALIVE
+size_t next_remote_object_key()
+{
+    return sys_get_next_remote_object_key(global);
 }
 
 /**

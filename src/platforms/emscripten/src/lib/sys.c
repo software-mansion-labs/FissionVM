@@ -81,6 +81,12 @@ void sys_promise_resolve_str_and_destroy(em_promise_t promise, em_promise_result
     emscripten_promise_destroy(promise);
 }
 
+size_t sys_get_next_remote_object_key(GlobalContext *glb)
+{
+    struct EmscriptenPlatformData *platform = glb->platform_data;
+    return platform->next_remote_object_index++;
+}
+
 static void promise_dtor(ErlNifEnv *caller_env, void *obj)
 {
     UNUSED(caller_env);
