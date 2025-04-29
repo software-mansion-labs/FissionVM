@@ -52,6 +52,11 @@ struct HTMLEventUserDataResource
     term storage[];
 };
 
+struct RemoteObjectResource
+{
+    int32_t key;
+};
+
 enum EmscriptenMessageType
 {
     Cast,
@@ -102,8 +107,10 @@ struct EmscriptenPlatformData
     pthread_mutex_t poll_mutex;
     pthread_cond_t poll_cond;
     struct ListHead messages;
+    atomic_size_t next_remote_object_index;
     ErlNifResourceType *promise_resource_type;
     ErlNifResourceType *htmlevent_user_data_resource_type;
+    ErlNifResourceType *remote_object_resource_type;
 };
 
 void sys_enqueue_emscripten_cast_message(GlobalContext *glb, const char *target, const char *message);
