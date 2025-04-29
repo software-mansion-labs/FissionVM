@@ -5781,18 +5781,19 @@ static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
     if (IS_NULL_PTR(module)) {
         return ERROR_ATOM;
     }
-    size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size);
+    struct ModuleFilename filename = module->filenames[0];
+    size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size) + filename.len * CONS_SIZE;
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, result_size, argc, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     // Note: this assumes constness of module->binary and could be use-after-free if we allowed changing module bitcode at runtime.
     term binary = term_from_literal_binary(module->binary, module->binary_size, &ctx->heap, ctx->global);
-    term unspecified_file_term = term_from_string((const uint8_t *) "nofile", sizeof("nofile") - 1, &ctx->heap);
+    term filename_term = term_from_string(filename.data, filename.len, &ctx->heap);
     term result = term_alloc_tuple(3, &ctx->heap);
 
     term_put_tuple_element(result, 0, module_atom);
     term_put_tuple_element(result, 1, binary);
-    term_put_tuple_element(result, 2, unspecified_file_term);
+    term_put_tuple_element(result, 2, filename_term);
 
     return result;
 }
