@@ -1,0 +1,53 @@
+name: Build artifacts
+
+on:
+  push:
+    branches:
+      - swm
+      - bb/EXW-263/wasm-ci
+    tags:
+      - "v*.*.*"
+
+#TODO: concurrency
+
+jobs:
+  wasm_build_web:
+    runs-on: ubuntu-24.04
+    container: emscripten/emsdk
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: "Install deps"
+        run: sudo apt update -y && sudo apt install -y cmake gperf
+
+      - name: Build wasm build for web
+        shell: bash
+        working-directory: ./src/platforms/emscripten/
+        run: |
+          set -euo pipefail
+          mkdir build
+          cd build
+          emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
+          emmake make -j
+
+      - name: Upload wasm build for web
+        uses: actions/upload-artifact@v4
+        with:
+          name: atomvm-js-web
+          path: |
+            src/platforms/emscripten/build/**/*.wasm
+            src/platforms/emscripten/build/**/*.js
+          retention-days: 1
+
+      # - name: "Release (web)"
+      #   uses: softprops/action-gh-release@v2
+      #   if: github.ref_type == 'tag'
+      #   with:
+      #     draft: true
+      #     fail_on_unmatched_files: true
+      #     files: |
+      #       src/platforms/emscripten/build/src/AtomVM-web-${{ github.ref_name }}.js
+      #       src/platforms/emscripten/build/src/AtomVM-web-${{ github.ref_name }}.js.sha256
+      #       src/platforms/emscripten/build/src/AtomVM-web-${{ github.ref_name }}.wasm
+      #       src/platforms/emscripten/build/src/AtomVM-web-${{ github.ref_name }}.wasm.sha256
