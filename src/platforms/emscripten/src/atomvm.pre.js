@@ -17,15 +17,20 @@
  *
  * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
-Module['cast'] = function(name, message) {
-    ccall("cast", 'void', ['string', 'string'], [name, message]);
+Module["cast"] = function (name, message) {
+  ccall("cast", "void", ["string", "string"], [name, message]);
 };
-Module['call'] = async function(name, message) {
-    const promiseId = ccall("call", 'integer', ['string', 'string'], [name, message]);
-    return promiseMap.get(promiseId).promise;
+Module["call"] = async function (name, message) {
+  const promiseId = ccall(
+    "call",
+    "integer",
+    ["string", "string"],
+    [name, message],
+  );
+  return promiseMap.get(promiseId).promise;
 };
-Module['nextRemoteObjectKey'] = function() {
-    ccall("next_remote_object_key", 'integer', [], []);
+Module["nextRemoteObjectKey"] = function () {
+  ccall("next_remote_object_key", "integer", [], []);
 };
-var remoteObjectsMap = new Map();
-Module['remoteObjectsMap'] = remoteObjectsMap;
+Module["remoteObjectsMap"] = new Map();
+Module["onRemoteObjectDelete"] = (_key) => {};

@@ -100,7 +100,10 @@ static void promise_dtor(ErlNifEnv *caller_env, void *obj)
 
 static void do_remove_remote_object(atomic_size_t key)
 {
-    EM_ASM({ remoteObjectsMap.delete($0); }, key);
+    EM_ASM({
+        Module['onRemoteObjectDelete']($0);
+        Module['remoteObjectsMap'].delete($0);
+    }, key);
 }
 
 static void remote_object_dtor(ErlNifEnv *caller_env, void *obj)
