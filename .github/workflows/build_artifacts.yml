@@ -44,8 +44,10 @@ jobs:
         working-directory: ${{ steps.setup.outputs.artifacts_dir }}
         run: |
           mv AtomVM.mjs "${{ steps.setup.outputs.fissionvm_js }}"
+          gzip -k "${{ steps.setup.outputs.fissionvm_js }}"
           sha256sum "${{ steps.setup.outputs.fissionvm_js }}" > "${{ steps.setup.outputs.fissionvm_js }}.sha256"
           mv AtomVM.wasm "${{ steps.setup.outputs.fissionvm_wasm }}"
+          gzip -k  "${{ steps.setup.outputs.fissionvm_wasm }}"
           sha256sum "${{ steps.setup.outputs.fissionvm_wasm }}" > "${{ steps.setup.outputs.fissionvm_wasm }}.sha256"
 
       - name: "Release (web)"
@@ -55,6 +57,8 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_js }}
+            ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_js }}.gz
             ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_js }}.sha256
             ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_wasm }}
+            ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_wasm }}.gz
             ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_wasm }}.sha256
