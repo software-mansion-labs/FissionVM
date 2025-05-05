@@ -42,6 +42,7 @@
     foreach/2,
     keydelete/3,
     keyfind/3,
+    keysearch/3,
     keymember/3,
     keyreplace/4,
     keystore/4,
@@ -289,6 +290,24 @@ keyfind(K, I, [H | T]) when is_tuple(H) ->
     end;
 keyfind(K, I, [_H | T]) ->
     keyfind(K, I, T).
+
+%%-----------------------------------------------------------------------------
+%% @param   K the key to match
+%% @param   I the position in the tuple to compare (1..tuple_size)
+%% @param   L the list from which to find the element
+%% @returns tuple {value, T} where the T is the tuple in L who's Ith element matches K; the atom false, otherwise
+%% @doc     Find the entry in L whose Ith element matches K. Retained for compatibility, prefer keyfind/3.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec keysearch(K :: term(), I :: pos_integer(), L :: list(tuple())) -> {value, tuple()} | false.
+keysearch(K, I, TupleList) ->
+    case keyfind(K, I, TupleList) of
+        false ->
+            false;
+        Value ->
+            {value, Value}
+    end.
+
 
 %%-----------------------------------------------------------------------------
 %% @param   K the key to match
