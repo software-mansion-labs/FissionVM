@@ -10,19 +10,24 @@ on:
 
 #TODO: concurrency
 
+permissions:
+  contents: write
+
 jobs:
   wasm_build_web:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
     container: emscripten/emsdk
     steps:
-      - name: Checkout repo
+      - name: ⬇️ Checkout repo
         uses: actions/checkout@v4
 
-      - name: "Install deps"
+      - name: ⚙️ Install deps
         run: sudo apt update -y && sudo apt install -y cmake gperf
 
-      - name: Build wasm build for web
-        shell: bash
+      - name: 🏗️ Build WASM for web
         working-directory: ./src/platforms/emscripten/
         run: |
           set -euo pipefail
@@ -31,23 +36,30 @@ jobs:
           emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
           emmake make -j
 
-      - name: Upload wasm build for web
-        uses: actions/upload-artifact@v4
-        with:
-          name: atomvm-js-web
-          path: |
-            src/platforms/emscripten/build/**/*.wasm
-            src/platforms/emscripten/build/**/*.js
-          retention-days: 1
+      - name: Setup name
+        id: setup
+        run: |
+          set -euo pipefail
+          VERSION=$([[ $GITHUB_REF_TYPE = "tag" ]] && echo $GITHUB_REF_NAME || echo ${GITHUB_SHA::8})
+          echo "fissionvm_js=FissionVM-web-${VERSION}.mjs" >> $GITHUB_OUTPUT
+          echo "fissionvm_wasm=FissionVM-web-${VERSION}.wasm" >> $GITHUB_OUTPUT
 
-      # - name: "Release (web)"
-      #   uses: softprops/action-gh-release@v2
-      #   if: github.ref_type == 'tag'
-      #   with:
-      #     draft: true
-      #     fail_on_unmatched_files: true
-      #     files: |
-      #       src/platforms/emscripten/build/src/AtomVM-web-${{ github.ref_name }}.js
-      #       src/platforms/emscripten/build/src/AtomVM-web-${{ github.ref_name }}.js.sha256
-      #       src/platforms/emscripten/build/src/AtomVM-web-${{ github.ref_name }}.wasm
-      #       src/platforms/emscripten/build/src/AtomVM-web-${{ github.ref_name }}.wasm.sha256
+      - name: "Rename artifacts"
+        working-directory: src/platforms/emscripten/build/src
+        run: |
+          mv AtomVM.mjs "${{ steps.setup.outputs.fissionvm_js }}"
+          sha256sum "${{ steps.setup.outputs.fissionvm_js }}" > "${{ steps.setup.outputs.fissionvm_js }}.sha256"
+          mv AtomVM.wasm "${{ steps.setup.outputs.fissionvm_wasm }}"
+          sha256sum "${{ steps.setup.outputs.fissionvm_wasm }}" > "${{ steps.setup.outputs.fissionvm_wasm }}.sha256"
+
+      - name: "Release (web)"
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: ${{ github.ref_type == 'branch' }}
+          draft: ${{ github.ref_type != 'branch' }}
+          fail_on_unmatched_files: true
+          files: |
+            src/platforms/emscripten/build/src/${{ steps.setup.outputs.fissionvm_js }}
+            src/platforms/emscripten/build/src/${{ steps.setup.outputs.fissionvm_js }}.sha256
+            src/platforms/emscripten/build/src/${{ steps.setup.outputs.fissionvm_wasm }}
+            src/platforms/emscripten/build/src/${{ steps.setup.outputs.fissionvm_wasm }}.sha256
