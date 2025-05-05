@@ -29,7 +29,7 @@ jobs:
           mkdir build
           cd build
           emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
-          emmake make -j
+          emmake make -j $(nproc)
 
       - name: Vars setup
         id: setup
