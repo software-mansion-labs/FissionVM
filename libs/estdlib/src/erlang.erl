@@ -44,8 +44,10 @@
     min/2,
     max/2,
     memory/1,
+    get/0,
     get/1,
     put/2,
+    erase/0,
     erase/1,
     function_exported/3,
     display/1,
@@ -526,6 +528,15 @@ monotonic_time(_Unit) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
+%% @returns the process directory
+%% @doc     Return all values from the process dictionary
+%% @end
+%%-----------------------------------------------------------------------------
+-spec get() -> [{any(), any()}].
+get() ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
 %% @param   Key     key in the process dictionary
 %% @returns value associated with this key or undefined
 %% @doc     Return a value associated with a given key in the process dictionary
@@ -544,6 +555,15 @@ get(_Key) ->
 %%-----------------------------------------------------------------------------
 -spec put(Key :: any(), Value :: any()) -> any().
 put(_Key, _Value) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @returns the previous process dictionary.
+%% @doc     Erase all keys from the process dictionary.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec erase() -> [{any(), any()}].
+erase() ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
