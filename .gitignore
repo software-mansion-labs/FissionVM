@@ -26,3 +26,7 @@ src/platforms/esp32/sdkconfig
 .DS_Store
 .cache
 .clang-tidy
+
+# Allow multiple build directories
+/build*/
+/src/platforms/emscripten/build*/

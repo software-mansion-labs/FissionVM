@@ -21,12 +21,16 @@
 #include "platform_defaultatoms.h"
 
 static const char *const emscripten_atom = ATOM_STR("\xA", "emscripten");
+static const char *const key_atom = ATOM_STR("\x3", "key");
+static const char *const value_atom = ATOM_STR("\x5", "value");
 
 void platform_defaultatoms_init(GlobalContext *glb)
 {
     int ok = 1;
 
     ok &= globalcontext_insert_atom(glb, emscripten_atom) == EMSCRIPTEN_ATOM_INDEX;
+    ok &= globalcontext_insert_atom(glb, key_atom) == KEY_ATOM_INDEX;
+    ok &= globalcontext_insert_atom(glb, value_atom) == VALUE_ATOM_INDEX;
 
     if (!ok) {
         AVM_ABORT();

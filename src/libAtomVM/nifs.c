@@ -125,6 +125,7 @@ static term nif_erlang_binary_to_list_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_binary_to_existing_atom_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_concat_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_display_1(Context *ctx, int argc, term argv[]);
+static term nif_erlang_erase_0(Context *ctx, int argc, term argv[]);
 static term nif_erlang_erase_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_error(Context *ctx, int argc, term argv[]);
 static term nif_erlang_exit(Context *ctx, int argc, term argv[]);
@@ -166,6 +167,7 @@ static term nif_erlang_process_flag(Context *ctx, int argc, term argv[]);
 static term nif_erlang_processes(Context *ctx, int argc, term argv[]);
 static term nif_erlang_process_info(Context *ctx, int argc, term argv[]);
 static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[]);
+static term nif_erlang_get_0(Context *ctx, int argc, term argv[]);
 static term nif_erlang_put_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_system_info(Context *ctx, int argc, term argv[]);
 static term nif_erlang_system_flag(Context *ctx, int argc, term argv[]);
@@ -373,8 +375,12 @@ static const struct Nif display_nif =
     .nif_ptr = nif_erlang_display_1
 };
 
-static const struct Nif erase_nif =
-{
+static const struct Nif erase_0_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_erase_0
+};
+
+static const struct Nif erase_1_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_erase_1
 };
@@ -616,6 +622,11 @@ static const struct Nif process_info_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_process_info
+};
+
+static const struct Nif get_0_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_get_0
 };
 
 static const struct Nif put_nif =
@@ -901,17 +912,17 @@ static const struct Nif lists_reverse_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_reverse
 };
-static const struct Nif lists_member_nif = 
+static const struct Nif lists_member_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_member
 };
-static const struct Nif lists_keymember_nif = 
+static const struct Nif lists_keymember_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keymember
 };
-static const struct Nif lists_keyfind_nif = 
+static const struct Nif lists_keyfind_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keyfind
@@ -940,12 +951,12 @@ static const struct Nif unicode_characters_to_binary_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_binary
 };
-static const struct Nif erlang_lists_subtract_nif = 
+static const struct Nif erlang_lists_subtract_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_lists_subtract
 };
-static const struct Nif zlib_compress_nif = 
+static const struct Nif zlib_compress_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_zlib_compress_1
@@ -3361,16 +3372,26 @@ static term nif_binary_last_1(Context *ctx, int argc, term argv[])
 static term nif_binary_part_3(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
-    VALIDATE_VALUE(argv[0], term_is_binary);
-    VALIDATE_VALUE(argv[1], term_is_integer);
-    VALIDATE_VALUE(argv[2], term_is_integer);
-    
-    term result = term_invalid_term();
-    term error_atom = binary_part(ctx, argv[0], argv[1], argv[2], &result);
-    if (error_atom != OK_ATOM) {
-        RAISE_ERROR(error_atom);
+    term pattern_term = argv[0];
+    term pos_term = argv[1];
+    term len_term = argv[2];
+    VALIDATE_VALUE(pattern_term, term_is_binary);
+    VALIDATE_VALUE(pos_term, term_is_integer);
+    VALIDATE_VALUE(len_term, term_is_integer);
+
+    avm_int_t pos = term_to_int(pos_term);
+    avm_int_t len = term_to_int(len_term);
+    BinaryPosLen slice;
+    if (UNLIKELY(!term_normalize_binary_pos_len(pattern_term, pos, len, &slice))) {
+        RAISE_ERROR(BADARG_ATOM);
     }
-    return result;
+
+    size_t heap_size = term_sub_binary_heap_size(pattern_term, len);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, 1, &pattern_term, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    return term_maybe_create_sub_binary(pattern_term, slice.pos, slice.len, &ctx->heap, ctx->global);
 }
 
 static const char *find_pattern(const char *bin, size_t bin_size, const char **patterns, const size_t *pattern_sizes, size_t patterns_len, int *matched_pattern_index)
@@ -3397,24 +3418,24 @@ term trim_list(Context *ctx, term list, size_t heap_size, bool trim, bool trim_a
     if (IS_NULL_PTR(cons)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-    
+
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, 1, &list, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(cons);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-    
+
     term iter = list;
-    
+
     for(size_t i = 0; i < length; ++i) {
         cons[i] = iter;
         iter = term_get_list_tail(iter);
     }
-    
+
     bool found_non_empty = false;
     term trimmed = term_nil();
     for(long long i = length - 1; i >= 0; --i) {
         term head = term_get_list_head(cons[i]);
-        
+
         bool is_empty = term_binary_size(head) == 0;
         if (is_empty) {
             bool trim_tail = trim && !found_non_empty;
@@ -3426,7 +3447,7 @@ term trim_list(Context *ctx, term list, size_t heap_size, bool trim, bool trim_a
             found_non_empty = true;
         }
     }
-    
+
     free(cons);
     return trimmed;
 }
@@ -3606,7 +3627,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     free(pattern_data);
     free(sizes);
-    
+
     if (trim || trim_all) {
         result_list = trim_list(ctx, result_list, heap_size, trim, trim_all);
     }
@@ -4457,7 +4478,7 @@ static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
         case TYPE_ATOM:
             value = term_is_external_fun(fun) ? EXTERNAL_ATOM : LOCAL_ATOM;
             break;
-            
+
         case ENV_ATOM:
             value = term_nil();
             break;
@@ -4475,6 +4496,32 @@ static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
     return fun_info_tuple;
 }
 
+static term nif_erlang_get_0(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    UNUSED(argv);
+
+    term result = term_nil();
+    size_t size = 0;
+    struct ListHead *dictionary = &ctx->dictionary;
+    struct ListHead *item;
+    LIST_FOR_EACH (item, dictionary) {
+        size++;
+    }
+    if (UNLIKELY(memory_ensure_free(ctx, LIST_SIZE(size, TUPLE_SIZE(2))) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    LIST_FOR_EACH (item, dictionary) {
+        struct DictEntry *dict_entry = GET_LIST_ENTRY(item, struct DictEntry, head);
+        term tuple = term_alloc_tuple(2, &ctx->heap);
+        term_put_tuple_element(tuple, 0, dict_entry->key);
+        term_put_tuple_element(tuple, 1, dict_entry->value);
+        result = term_list_prepend(tuple, result, &ctx->heap);
+    }
+
+    return result;
+}
+
 static term nif_erlang_put_2(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
@@ -4486,6 +4533,19 @@ static term nif_erlang_put_2(Context *ctx, int argc, term argv[])
     }
 
     return old;
+}
+
+static term nif_erlang_erase_0(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term result = nif_erlang_get_0(ctx, argc, argv);
+    if (LIKELY(!term_is_invalid_term(result))) {
+        dictionary_destroy(&ctx->dictionary);
+        list_init(&ctx->dictionary);
+    }
+
+    return result;
 }
 
 static term nif_erlang_erase_1(Context *ctx, int argc, term argv[])
@@ -5707,7 +5767,7 @@ static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
 static term nif_code_which(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
-    
+
     term module_atom = argv[0];
     VALIDATE_VALUE(module_atom, term_is_atom);
     AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);

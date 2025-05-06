@@ -117,19 +117,30 @@ term bif_erlang_bit_size_1(Context *ctx, uint32_t fail_label, int live, term arg
 }
 
 term bif_erlang_binary_part_3(Context *ctx, uint32_t fail_label, int live, term arg1, term arg2, term arg3)
-{
-    UNUSED(live);
-    VALIDATE_VALUE_BIF(fail_label, arg1, term_is_binary);
-    VALIDATE_VALUE_BIF(fail_label, arg2, term_is_integer);
-    VALIDATE_VALUE_BIF(fail_label, arg3, term_is_integer);
-    
-    term result = term_invalid_term();
-    term error_atom = binary_part(ctx, arg1, arg2, arg3, &result);
-    if (error_atom != OK_ATOM) {
-        RAISE_ERROR_BIF(fail_label, error_atom);
-    }
-    return result;
-}
+ {
+     VALIDATE_VALUE_BIF(fail_label, arg1, term_is_binary);
+
+
+     VALIDATE_VALUE_BIF(fail_label, arg2, term_is_integer);
+     VALIDATE_VALUE_BIF(fail_label, arg3, term_is_integer);
+
+     avm_int_t pos = term_to_int(arg2);
+     avm_int_t len = term_to_int(arg3);
+     BinaryPosLen slice;
+     if (UNLIKELY(!term_normalize_binary_pos_len(arg1, pos, len, &slice))) {
+         RAISE_ERROR_BIF(fail_label, BADARG_ATOM);
+     }
+
+     TERM_DEBUG_ASSERT((sizeof(ctx->x) / sizeof(ctx->x[0])) >= MAX_REG + 1);
+     ctx->x[live] = arg1;
+     size_t heap_size = term_sub_binary_heap_size(arg1, len);
+     if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, live + 1, ctx->x, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+         RAISE_ERROR_BIF(fail_label, OUT_OF_MEMORY_ATOM);
+     }
+     arg1 = ctx->x[live];
+
+     return term_maybe_create_sub_binary(arg1, slice.pos, slice.len, &ctx->heap, ctx->global);
+ }
 
 term binary_part(Context *ctx, term bin_term, term pos_term, term len_term, term *result)
 {
@@ -141,7 +152,7 @@ term binary_part(Context *ctx, term bin_term, term pos_term, term len_term, term
         pos += len;
         len = -len;
     }
-    
+
     if (UNLIKELY((pos < 0) || (pos > bin_size) || (pos + len > bin_size))) {
         return BADARG_ATOM;
     }
@@ -150,7 +161,7 @@ term binary_part(Context *ctx, term bin_term, term pos_term, term len_term, term
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, size, 1, &bin_term, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         return OUT_OF_MEMORY_ATOM;
     }
-    
+
     *result = term_maybe_create_sub_binary(bin_term, pos, len, &ctx->heap, ctx->global);
     return OK_ATOM;
 }
@@ -992,12 +1003,12 @@ term bif_erlang_fdiv_2(Context *ctx, uint32_t fail_label, int live, term arg1, t
     }
     avm_float_t farg1 = term_conv_to_float(arg1);
     avm_float_t farg2 = term_conv_to_float(arg2);
-    
+
     if (UNLIKELY(farg2 == 0)) {
       RAISE_ERROR_BIF(fail_label, BADARITH_ATOM);
     }
     avm_float_t fresult = farg1 / farg2;
-    
+
     if (UNLIKELY(!isfinite(fresult))) {
         RAISE_ERROR_BIF(fail_label, BADARITH_ATOM);
     }

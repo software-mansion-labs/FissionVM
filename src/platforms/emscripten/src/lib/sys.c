@@ -57,15 +57,9 @@
 void sys_promise_resolve_int_and_destroy(em_promise_t promise, em_promise_result_t result, int value)
 {
     if (result == EM_PROMISE_FULFILL) {
-        EM_ASM({
-            promiseMap.get($0).resolve($1);
-        },
-            promise, value);
+        EM_ASM({ promiseMap.get($0).resolve($1); }, promise, value);
     } else {
-        EM_ASM({
-            promiseMap.get($0).reject($1);
-        },
-            promise, value);
+        EM_ASM({ promiseMap.get($0).reject($1); }, promise, value);
     }
     emscripten_promise_destroy(promise);
 }
@@ -80,17 +74,17 @@ void sys_promise_resolve_int_and_destroy(em_promise_t promise, em_promise_result
 void sys_promise_resolve_str_and_destroy(em_promise_t promise, em_promise_result_t result, int value)
 {
     if (result == EM_PROMISE_FULFILL) {
-        EM_ASM({
-            promiseMap.get($0).resolve(UTF8ToString($1));
-        },
-            promise, value);
+        EM_ASM({ promiseMap.get($0).resolve(UTF8ToString($1)); }, promise, value);
     } else {
-        EM_ASM({
-            promiseMap.get($0).reject(UTF8ToString($1));
-        },
-            promise, value);
+        EM_ASM({ promiseMap.get($0).reject(UTF8ToString($1)); }, promise, value);
     }
     emscripten_promise_destroy(promise);
+}
+
+size_t sys_get_next_remote_object_key(GlobalContext *glb)
+{
+    struct EmscriptenPlatformData *platform = glb->platform_data;
+    return platform->next_remote_object_index++;
 }
 
 static void promise_dtor(ErlNifEnv *caller_env, void *obj)
@@ -102,6 +96,22 @@ static void promise_dtor(ErlNifEnv *caller_env, void *obj)
         emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIII, sys_promise_resolve_str_and_destroy, NULL, promise_rsrc->promise, EM_PROMISE_REJECT, "noproc");
         promise_rsrc->resolved = true;
     }
+}
+
+static void do_remove_remote_object(atomic_size_t key)
+{
+    EM_ASM({
+        Module['onRemoteObjectDelete']($0);
+        Module['remoteObjectsMap'].delete($0);
+    }, key);
+}
+
+static void remote_object_dtor(ErlNifEnv *caller_env, void *obj)
+{
+    UNUSED(caller_env);
+
+    struct RemoteObjectResource *remote_object_rsrc = (struct RemoteObjectResource *) obj;
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VI, do_remove_remote_object, NULL, remote_object_rsrc->key);
 }
 
 static void htmlevent_user_data_dtor(ErlNifEnv *caller_env, void *obj)
@@ -141,6 +151,11 @@ static const ErlNifResourceTypeInit htmlevent_user_data_resource_type_init = {
     .down = htmlevent_user_data_down,
 };
 
+static const ErlNifResourceTypeInit remote_object_resource_type_init = {
+    .members = 1,
+    .dtor = remote_object_dtor,
+};
+
 void sys_init_platform(GlobalContext *glb)
 {
     struct EmscriptenPlatformData *platform = malloc(sizeof(struct EmscriptenPlatformData));
@@ -157,6 +172,7 @@ void sys_init_platform(GlobalContext *glb)
         AVM_ABORT();
     }
     list_init(&platform->messages);
+    platform->next_remote_object_index = 0;
     ErlNifEnv env;
     erl_nif_env_partial_init_from_globalcontext(&env, glb);
     platform->promise_resource_type = enif_init_resource_type(&env, "promise", &promise_resource_type_init, ERL_NIF_RT_CREATE, NULL);
@@ -166,7 +182,12 @@ void sys_init_platform(GlobalContext *glb)
     }
     platform->htmlevent_user_data_resource_type = enif_init_resource_type(&env, "htmlevent_user_data", &htmlevent_user_data_resource_type_init, ERL_NIF_RT_CREATE, NULL);
     if (IS_NULL_PTR(platform->htmlevent_user_data_resource_type)) {
-        fprintf(stderr, "Cannot initialize promise_resource_type");
+        fprintf(stderr, "Cannot initialize htmlevent_user_data_resource_type");
+        AVM_ABORT();
+    }
+    platform->remote_object_resource_type = enif_init_resource_type(&env, "remote_object", &remote_object_resource_type_init, ERL_NIF_RT_CREATE, NULL);
+    if (IS_NULL_PTR(platform->remote_object_resource_type)) {
+        fprintf(stderr, "Cannot initialize remote_object_resource_type");
         AVM_ABORT();
     }
     glb->platform_data = platform;
