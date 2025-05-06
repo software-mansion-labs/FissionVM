@@ -182,3 +182,5 @@ X(TRIM_ATOM, "\x4", "trim")
 X(TRIM_ALL_ATOM, "\x8", "trim_all")
 
 X(NON_EXISTING_ATOM, "\xC", "non_existing")
+
+X(VALUE_ATOM, "\x5", "value")

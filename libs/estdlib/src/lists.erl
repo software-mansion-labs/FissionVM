@@ -300,13 +300,8 @@ keyfind(K, I, [_H | T]) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec keysearch(K :: term(), I :: pos_integer(), L :: list(tuple())) -> {value, tuple()} | false.
-keysearch(K, I, TupleList) ->
-    case keyfind(K, I, TupleList) of
-        false ->
-            false;
-        Value ->
-            {value, Value}
-    end.
+keysearch(_K, _I, _TupleList) -> 
+    erlang:nif_error(undefined).
 
 
 %%-----------------------------------------------------------------------------

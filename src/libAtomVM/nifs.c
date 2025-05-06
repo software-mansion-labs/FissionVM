@@ -217,6 +217,7 @@ static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
 static term nif_lists_member(Context *ctx, int argc, term argv[]);
 static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
 static term nif_lists_keyfind(Context *ctx, int argc, term argv[]);
+static term nif_lists_keysearch(Context *ctx, int argc, term argv[]);
 static term nif_maps_from_keys(Context *ctx, int argc, term argv[]);
 static term nif_maps_next(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[]);
@@ -914,6 +915,10 @@ static const struct Nif lists_keyfind_nif =
 {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_keyfind
+};
+static const struct Nif lists_keysearch_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_lists_keysearch
 };
 static const struct Nif maps_from_keys_nif =
 {
@@ -5942,6 +5947,18 @@ static term nif_maps_from_keys(Context *ctx, int argc, term argv[])
     }
 
     return map;
+}
+
+static term nif_lists_keysearch(Context *ctx, int argc, term argv[])
+{
+    term found_value = nif_lists_keyfind(ctx, argc, argv);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 1, &found_value, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(result_tuple, 0, VALUE_ATOM);
+    term_put_tuple_element(result_tuple, 1, found_value);
+    return found_value == FALSE_ATOM ? FALSE_ATOM : result_tuple;
 }
 
 static term nif_maps_next(Context *ctx, int argc, term argv[])
