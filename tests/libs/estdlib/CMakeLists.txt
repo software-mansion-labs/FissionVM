@@ -50,6 +50,7 @@ set(ERLANG_MODULES
     test_erlang_module_loaded
     test_lists_member
     test_lists_keyfind
+    test_lists_keysearch
     test_lists_keymember
     test_persistent_term
     test_tcp_socket
