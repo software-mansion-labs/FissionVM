@@ -62,6 +62,7 @@ get_tests(_OTPVersion) ->
         test_supervisor,
         test_lists_keymember,
         test_lists_keyfind,
+        test_lists_keysearch,
         test_lists_subtraction,
         test_file_native_name_encoding,
         test_lists_member,
