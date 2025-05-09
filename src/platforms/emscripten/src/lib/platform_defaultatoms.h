@@ -24,11 +24,7 @@
 #include "defaultatoms.h"
 
 #define EMSCRIPTEN_ATOM_INDEX (PLATFORM_ATOMS_BASE_INDEX + 0)
-#define KEY_ATOM_INDEX (PLATFORM_ATOMS_BASE_INDEX + 1)
-#define VALUE_ATOM_INDEX (PLATFORM_ATOMS_BASE_INDEX + 2)
 
 #define EMSCRIPTEN_ATOM term_from_atom_index(EMSCRIPTEN_ATOM_INDEX)
-#define KEY_ATOM term_from_atom_index(KEY_ATOM_INDEX)
-#define VALUE_ATOM term_from_atom_index(VALUE_ATOM_INDEX)
 
 #endif
