@@ -44,6 +44,7 @@ get_object_from_already_loaded_test_module() ->
 
 get_object_from_export_test_module() ->
     Bin = ?EXPORT_TEST_MODULE_DATA,
+    error = code:get_object_code(export_test_module),
     {module, export_test_module} = code:load_binary(
         export_test_module, "export_test_module.beam", Bin
     ),
