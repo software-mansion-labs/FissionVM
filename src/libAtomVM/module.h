@@ -117,7 +117,7 @@ struct Module
     void *fun_table;
     void *str_table;
     size_t str_table_len;
-    void *binary;
+    uint8_t *binary;
     unsigned long binary_size;
 
     struct LineRef *line_refs;

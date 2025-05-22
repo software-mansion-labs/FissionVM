@@ -5694,8 +5694,6 @@ static term nif_code_load_binary(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    term file_name = argv[1];
-
     term binary = argv[2];
     if (UNLIKELY(!term_is_binary(binary))) {
         RAISE_ERROR(BADARG_ATOM);
@@ -5781,13 +5779,14 @@ static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
     if (IS_NULL_PTR(module)) {
         return ERROR_ATOM;
     }
+    assert(module->num_filenames >= 1);
     struct ModuleFilename filename = module->filenames[0];
     size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size) + filename.len * CONS_SIZE;
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, result_size, argc, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free(ctx, result_size) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     // Note: this assumes constness of module->binary and could be use-after-free if we allowed changing module bitcode at runtime.
-    term binary = term_from_literal_binary(module->binary, module->binary_size, &ctx->heap, ctx->global);
+    term binary = term_from_literal_binary((void *) module->binary, module->binary_size, &ctx->heap, ctx->global);
     term filename_term = term_from_string(filename.data, filename.len, &ctx->heap);
     term result = term_alloc_tuple(3, &ctx->heap);
 
