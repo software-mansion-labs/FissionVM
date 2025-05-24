@@ -41,6 +41,7 @@
 // #define ENABLE_TRACE
 #include <trace.h>
 
+#include "emscripten/emscripten.h"
 #include "emscripten_sys.h"
 #include "exportedfunction.h"
 #include "memory.h"
@@ -122,27 +123,10 @@ static term nif_emscripten_run_script(Context *ctx, int argc, term argv[])
     return ret;
 }
 
-static char *annotate_js_fn_with_storage(atomic_size_t key, char *js_fn)
-{
-    const char *pattern = "try { Module['remoteObjectsMap'].set(%d, (%.*s)(Module, %d)) } catch(e) { console.error(e) }";
-    size_t injected_size = strlen(pattern) - 2 - 4 - 2; // don't count patterns
-    size_t number_size = 2 * snprintf(NULL, 0, "%ld", key);
-    size_t js_fn_size = strlen(js_fn);
-    size_t total_size = injected_size + number_size + js_fn_size + 1;
-    char *buffer = malloc(total_size);
-    if (IS_NULL_PTR(buffer)) {
-        return NULL;
-    }
-
-    snprintf(buffer, total_size, pattern, key, js_fn_size, js_fn, key);
-
-    return buffer;
-}
-
-static term term_remote_object_from_key(Context *ctx, atomic_size_t key)
+static term term_tracked_object_from_key(Context *ctx, atomic_size_t key)
 {
     struct EmscriptenPlatformData *platform = ctx->global->platform_data;
-    struct RemoteObjectResource *rsrc_obj = enif_alloc_resource(platform->remote_object_resource_type, sizeof(struct RemoteObjectResource));
+    struct TrackedObjectResource *rsrc_obj = enif_alloc_resource(platform->tracked_object_resource_type, sizeof(struct TrackedObjectResource));
     if (IS_NULL_PTR(rsrc_obj)) {
         return term_invalid_term();
     }
@@ -152,89 +136,171 @@ static term term_remote_object_from_key(Context *ctx, atomic_size_t key)
     return obj;
 }
 
-static term nif_emscripten_run_remote_object_script_fn(Context *ctx, int argc, term argv[])
+// clang-format off
+EM_JS(uint32_t *, js_tracked_eval, (const char *code, uint32_t *size), {
+    const indirectEval = eval;
+    const result = indirectEval(UTF8ToString(code));
+    const keys = Module['onRunTrackedJs'](result);
+    const ptr = Module['_malloc'](keys.length * HEAPU32.BYTES_PER_ELEMENT);
+    HEAPU32.set([keys.length], size / HEAPU32.BYTES_PER_ELEMENT);
+    HEAPU32.set(keys, ptr / HEAPU32.BYTES_PER_ELEMENT);
+    return ptr;
+});
+
+EM_JS(char **, js_get_tracked_object, (uint32_t keys, uint32_t *len, uint32_t *strings_size, uint8_t* status), {
+    const objects = Module['getTrackedObjects'](keys);
+
+    for (const object of objects) {
+    }
+    const objects_ptr = Module['_malloc'](keys.length * HEAPU32.BYTES_PER_ELEMENT);
+    if (result === undefined) {
+        return 0;
+    }
+    if (typeof result !== "string") {
+        throw Error("Only tracked objects holding strings can be transferred");
+    }
+    HEAPU32.set([result.length], size / HEAPU32.BYTES_PER_ELEMENT);
+    return stringToNewUTF8(result);
+});
+// clang-format on
+
+static void do_run_tracked_script(Context *ctx, char *script, int sync_caller_pid, term reply)
+{
+    uint32_t n;
+    uint32_t *keys = js_tracked_eval(script, &n);
+
+    if (UNLIKELY(memory_ensure_free_opt(ctx, LIST_SIZE(n, TERM_BOXED_REFC_BINARY_SIZE), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        term_put_tuple_element(reply, 0, ERROR_ATOM);
+        term_put_tuple_element(reply, 1, OUT_OF_MEMORY_ATOM);
+        goto send_reply;
+    }
+
+    term list = term_nil();
+    for (long i = n - 1; i >= 0; --i) {
+        term obj = term_tracked_object_from_key(ctx, keys[i]);
+        if (UNLIKELY(term_is_invalid_term(obj))) {
+            // already allocated remote objects will be cleaned on next GC
+            term_put_tuple_element(reply, 0, ERROR_ATOM);
+            term_put_tuple_element(reply, 1, OUT_OF_MEMORY_ATOM);
+            goto send_reply;
+        }
+        list = term_list_prepend(obj, list, &ctx->heap);
+    }
+
+    term_put_tuple_element(reply, 0, OK_ATOM);
+    term_put_tuple_element(reply, 1, list);
+
+    Context *target = NULL;
+send_reply:
+    free(keys);
+    target = globalcontext_get_process_lock(ctx->global, sync_caller_pid);
+    if (target) {
+        mailbox_send_term_signal(target, TrapAnswerSignal, reply);
+        globalcontext_get_process_unlock(ctx->global, target);
+    } // else: sender died
+}
+
+static term nif_emscripten_run_tracked_js(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
-
-    int ok;
-    char *str = interop_term_to_string(argv[0], &ok);
-    if (UNLIKELY(!ok)) {
+    if (UNLIKELY(!term_is_binary(argv[0]) || !term_is_list(argv[0]))) {
         RAISE_ERROR(BADARG_ATOM);
     }
-    struct EmscriptenPlatformData *platform = ctx->global->platform_data;
-    atomic_size_t key = platform->next_remote_object_index++;
-    char *script = annotate_js_fn_with_storage(key, str);
-    free(str);
-    if (IS_NULL_PTR(script)) {
-        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-    }
 
-    bool main_thread = false;
-    bool async = false;
-    if (argc == 2) {
-        term main_thread_t = interop_kv_get_value_default(argv[1], ATOM_STR("\xB", "main_thread"), FALSE_ATOM, ctx->global);
-        main_thread = main_thread_t == TRUE_ATOM;
+    int ok;
+    char *script = interop_term_to_string(argv[0], &ok);
 
-        if (!main_thread) {
-            RAISE_ERROR(BADARG_ATOM);
-        }
-
-        term async_t = interop_kv_get_value_default(argv[1], ATOM_STR("\x5", "async"), FALSE_ATOM, ctx->global);
-        async = async_t == TRUE_ATOM;
-        if (!main_thread && async) {
-            RAISE_ERROR(BADARG_ATOM);
-        }
+    if (UNLIKELY(!ok)) {
+        RAISE_ERROR(BADARG_ATOM);
     }
 
     if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-    term obj = term_remote_object_from_key(ctx, key);
-    if (UNLIKELY(term_is_invalid_term(obj))) {
-        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-    }
-    term ret = term_alloc_tuple(2, &ctx->heap);
-    term_put_tuple_element(ret, 0, OK_ATOM);
-    term_put_tuple_element(ret, 1, obj);
+    term reply = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(reply, 0, OK_ATOM);
+    term_put_tuple_element(reply, 1, term_invalid_term());
 
-    if (main_thread) {
-        if (async) {
-            // script will be freed as it's passed as satellite
-            emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIIIII, do_run_script, script, ctx->global, script, false, 0, ret);
-        } else {
-            // Trap caller waiting for completion
-            context_update_flags(ctx, ~NoFlags, Trap);
-            // script will be freed as it's passed as satellite
-            emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIIIII, do_run_script, script, ctx->global, script, true, ctx->process_id, ret);
-            ret = term_invalid_term();
-        }
-    } else {
-        emscripten_run_script(script);
-        free(script);
-    }
-
-    return ret;
+    // Trap caller waiting for completion
+    context_update_flags(ctx, ~NoFlags, Trap);
+    // script will be freed as it's passed as satellite
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIIII, do_run_tracked_script, script, ctx, script, ctx->process_id, reply);
+    return term_invalid_term();
 }
+//=---------------------------------------------------------------------------------------------------------------
 
-static void do_get_remote_object(Context *ctx, atomic_size_t key, int sync_caller_pid)
+#define PACKED __attribute__((__packed__))
+
+typedef struct PACKED TrackedObjectArray
+{
+    uint32_t len;
+    uint32_t total_size;
+    uint32_t *sizes;
+    char **objects;
+    uint8_t *status;
+} TrackedObjectArray;
+
+enum TrackedObjectStatus
+{
+    TO_OK = 0,
+    TO_BAD_KEY = 1,
+    TO_NOT_STRING = 2,
+};
+
+// clang-format off
+EM_JS(char **, js_get_tracked_object, (uint32_t* keys, uint32_t len, uint32_t objects_len, uint32_t *object_sizes, uint8_t* object_status), {
+    var stringToNewUTF8 = (str) => {
+        var size = lengthBytesUTF8(str) + 1;
+        var ret = _malloc(size);
+        if (ret) stringToUTF8(str, ret, size);
+        return ret;
+    };
+    const OK = 0;
+    const BAD_KEY = 1;
+    const NOT_STRING = 2;
+
+
+    const objects = Module['getTrackedObjects'](keys);
+    const n = objects.length;
+
+    let total_size = 0;
+    const status = new Array(n);
+    const sizes = new Array(n);
+    const strings = new Array(n);
+    for (let i = 0; i < n; ++i) {
+        const object = objects[i];
+        if (result === undefined) {
+            status[i] =
+        }
+    }
+    const objects_ptr = Module['_malloc'](keys.length * HEAPU32.BYTES_PER_ELEMENT);
+    if (result === undefined) {
+        return 0;
+    }
+    if (typeof result !== "string") {
+        throw Error("Only tracked objects holding strings can be transferred");
+    }
+    HEAPU32.set([result.length], size / HEAPU32.BYTES_PER_ELEMENT);
+    return stringToNewUTF8(result);
+});
+// clang-format on
+
+static void do_get_tracked_object(Context *ctx, int32_t *keys, size_t len, int sync_caller_pid)
 {
     term reply = term_invalid_term();
-    char *serialized = (char *) EM_ASM_PTR({
-        const remoteObject = Module['remoteObjectsMap'].get($0);
-        if(remoteObject === undefined) {
-            return stringToNewUTF8("");
-        }
-        return stringToNewUTF8(remoteObject); }, key);
-    size_t size = strlen(serialized);
-    if (UNLIKELY(memory_ensure_free_opt(ctx, term_binary_heap_size(size) + TUPLE_SIZE(2), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        free(serialized);
+    uint32_t len;
+    uint32_t strings_size;
+    uint8_t status = malloc();
+
+    uint8_t char **serialized = js_get_tracked_object(keys, &len, &strings_size);
+
+    if (UNLIKELY(memory_ensure_free_opt(ctx, term_binary_heap_size(strings_size) + LIST_SIZE(len, BINARY_HEADER_SIZE), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         reply = ERROR_ATOM;
         goto send_signal;
     }
-
+    // TODO: handle when some keys are missing, create list of keys
     reply = term_alloc_tuple(2, &ctx->heap);
-    if (UNLIKELY(size == 0)) {
-        free(serialized);
+    if (IS_NULL_PTR(serialized)) {
         term_put_tuple_element(reply, 0, ERROR_ATOM);
         term_put_tuple_element(reply, 1, BADKEY_ATOM);
         goto send_signal;
@@ -246,6 +312,9 @@ static void do_get_remote_object(Context *ctx, atomic_size_t key, int sync_calle
     term_put_tuple_element(reply, 1, serialized_term);
     Context *target = NULL;
 send_signal:
+    free(serialized);
+    free(keys);
+
     target = globalcontext_get_process_lock(ctx->global, sync_caller_pid);
     if (target) {
         mailbox_send_term_signal(target, TrapAnswerSignal, reply);
@@ -253,29 +322,58 @@ send_signal:
     } // else: sender died
 }
 
-static term nif_emscripten_from_remote_object(Context *ctx, int argc, term argv[])
+static term nif_emscripten_from_tracked_objects(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
+    term refs = argv[0];
+    term type = argv[1];
+    VALIDATE_VALUE(refs, term_is_list);
+    if (UNLIKELY(type != KEY_ATOM || type != VALUE_ATOM)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    int proper;
+    size_t len = term_list_length(refs, &proper);
+    if (UNLIKELY(!proper)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    int32_t *keys = malloc(sizeof(int32_t) * len);
+    if (IS_NULL_PTR(keys)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
 
     struct EmscriptenPlatformData *platform = ctx->global->platform_data;
-
     ErlNifEnv *env = erl_nif_env_from_context(ctx);
-    void *obj;
-    if (UNLIKELY(!enif_get_resource(env, argv[0], platform->remote_object_resource_type, &obj))) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
-    struct RemoteObjectResource *remote_object_rsrc = (struct RemoteObjectResource *) obj;
 
-    if (argv[1] == KEY_ATOM) {
-        return term_from_int64(remote_object_rsrc->key);
-    } else if (argv[1] == VALUE_ATOM) {
-        // Trap caller waiting for completion
-        context_update_flags(ctx, ~NoFlags, Trap);
-        emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIII, do_get_remote_object, NULL, ctx, remote_object_rsrc->key, ctx->process_id);
-        return term_invalid_term();
-    } else {
-        RAISE_ERROR(BADARG_ATOM);
+    size_t i = 0;
+    while (!term_is_nil(refs)) {
+        term ref = term_get_list_head(refs);
+        struct TrackedObjectResource *tracked_object_rsrc;
+        bool ok = enif_get_resource(env, ref, platform->tracked_object_resource_type, (void **) &tracked_object_rsrc);
+        if (UNLIKELY(!ok)) {
+            free(keys);
+            RAISE_ERROR(BADARG_ATOM);
+        }
+
+        keys[i++] = tracked_object_rsrc->key;
+        refs = term_get_list_tail(refs);
     }
+
+    if (type == KEY_ATOM) {
+        if (UNLIKELY(memory_ensure_free_opt(ctx, LIST_SIZE(len, 1), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+        term key_list = term_nil();
+        for (long i = len - 1; i >= 0; --i) {
+            key_list = term_list_prepend(term_from_int64(keys[i]), key_list, &ctx->heap);
+        }
+        free(keys);
+        return key_list;
+    }
+
+    // Trap caller waiting for completion
+    context_update_flags(ctx, ~NoFlags, Trap);
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIIII, do_get_tracked_object, NULL, ctx, keys, len, ctx->process_id);
+    return term_invalid_term();
 }
 
 static term nif_emscripten_promise_resolve_reject(Context *ctx, int argc, term argv[], em_promise_result_t result)
@@ -327,13 +425,13 @@ static const struct Nif emscripten_run_script_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_emscripten_run_script
 };
-static const struct Nif emscripten_run_remote_object_script_fn = {
+static const struct Nif emscripten_run_tracked_js = {
     .base.type = NIFFunctionType,
-    .nif_ptr = nif_emscripten_run_remote_object_script_fn
+    .nif_ptr = nif_emscripten_run_tracked_js
 };
-static const struct Nif emscripten_from_remote_object = {
+static const struct Nif emscripten_from_tracked_objects = {
     .base.type = NIFFunctionType,
-    .nif_ptr = nif_emscripten_from_remote_object,
+    .nif_ptr = nif_emscripten_from_tracked_objects,
 };
 static const struct Nif emscripten_promise_resolve_nif = {
     .base.type = NIFFunctionType,
@@ -949,14 +1047,11 @@ const struct Nif *platform_nifs_get_nif(const char *nifname)
     if (strcmp("run_script/2", nifname) == 0) {
         return &emscripten_run_script_nif;
     }
-    if (strcmp("run_remote_object_fn_script/1", nifname) == 0) {
-        return &emscripten_run_remote_object_script_fn;
+    if (strcmp("run_tracked_js/2", nifname) == 0) {
+        return &emscripten_run_tracked_js;
     }
-    if (strcmp("run_remote_object_fn_script/2", nifname) == 0) {
-        return &emscripten_run_remote_object_script_fn;
-    }
-    if (strcmp("from_remote_object/2", nifname) == 0) {
-        return &emscripten_from_remote_object;
+    if (strcmp("from_tracked_objects/2", nifname) == 0) {
+        return &emscripten_from_tracked_objects;
     }
     if (strcmp("promise_resolve/1", nifname) == 0) {
         return &emscripten_promise_resolve_nif;

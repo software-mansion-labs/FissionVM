@@ -98,20 +98,16 @@ static void promise_dtor(ErlNifEnv *caller_env, void *obj)
     }
 }
 
-static void do_remove_remote_object(atomic_size_t key)
-{
-    EM_ASM({
-        Module['onRemoteObjectDelete']($0);
-        Module['remoteObjectsMap'].delete($0);
-    }, key);
-}
+EM_JS(void, js_do_remove_remote_object, (atomic_size_t key), {
+    Module['onTrackedObjectDelete'](key);
+});
 
 static void remote_object_dtor(ErlNifEnv *caller_env, void *obj)
 {
     UNUSED(caller_env);
 
-    struct RemoteObjectResource *remote_object_rsrc = (struct RemoteObjectResource *) obj;
-    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VI, do_remove_remote_object, NULL, remote_object_rsrc->key);
+    struct TrackedObjectResource *remote_object_rsrc = (struct TrackedObjectResource *) obj;
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VI, js_do_remove_remote_object, NULL, remote_object_rsrc->key);
 }
 
 static void htmlevent_user_data_dtor(ErlNifEnv *caller_env, void *obj)
