@@ -238,6 +238,7 @@ typedef struct PACKED TrackedObjectArray
     uint32_t *sizes;
     char **objects;
     uint8_t *status;
+    uint8_t has_errors;
 } TrackedObjectArray;
 
 enum TrackedObjectStatus
@@ -249,30 +250,59 @@ enum TrackedObjectStatus
 
 // clang-format off
 EM_JS(char **, js_get_tracked_object, (uint32_t* keys, uint32_t len, uint32_t objects_len, uint32_t *object_sizes, uint8_t* object_status), {
+
+    const OK = 0;
+    const BAD_KEY = 1;
+    const NOT_STRING = 2;
+
+    const objects = Module['getTrackedObjects'](keys);
+    const n = objects.length;
+
+    let total_byte_size = 0;
+    let count = 0;
+    const status = new Array(n);
+    const sizes = new Array(n);
+    const maybe_strings = new Array(n);
+    const string_ptrs = new Array(n);
+    for (let i = 0; i < n; ++i) {
+        const object = objects[i];
+        if (result === undefined) {
+            status[i] = BAD_KEY;
+            sizes[i] = 0;
+            maybe_strings[i] = null;
+        } else if (typeof result !== "string") {
+            status[i] = NOT_STRING;
+            sizes[i] = 0;
+            maybe_strings[i] = null;
+        } else {
+            const byte_size = Module['lengthBytesUTF8'](object) + 1;
+            total_byte_size += byte_size;
+            count += 1;
+            status[i] = OK;
+            sizes[i] = byte_size;
+            maybe_strings[i] = object;
+        }
+    }
+
+    const base = Module['_malloc'](total_byte_size);
+    for (let i = 0; i < n; ++i) {
+        const maybe_string = maybe_strings[i];
+        if (maybe_string !== null) {
+            stringToUTF8(str, ret, size);
+        } else {
+            string_ptrs[i] = 0;
+        }
+    }
+
+
     var stringToNewUTF8 = (str) => {
         var size = lengthBytesUTF8(str) + 1;
         var ret = _malloc(size);
         if (ret) stringToUTF8(str, ret, size);
         return ret;
     };
-    const OK = 0;
-    const BAD_KEY = 1;
-    const NOT_STRING = 2;
 
 
-    const objects = Module['getTrackedObjects'](keys);
-    const n = objects.length;
-
-    let total_size = 0;
-    const status = new Array(n);
-    const sizes = new Array(n);
-    const strings = new Array(n);
-    for (let i = 0; i < n; ++i) {
-        const object = objects[i];
-        if (result === undefined) {
-            status[i] =
-        }
-    }
     const objects_ptr = Module['_malloc'](keys.length * HEAPU32.BYTES_PER_ELEMENT);
     if (result === undefined) {
         return 0;
