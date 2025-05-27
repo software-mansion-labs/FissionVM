@@ -48,13 +48,12 @@ jobs:
       #     tests/test-enif
       #     tests/test-mailbox
       #     tests/test-structs
-      - name: Build Popcorn
+      - name: Build FissionLib
         run: |
-          git clone git@github.com:software-mansion/popcorn.git
-          cd popcorn
-          echo "import Config; config :popcorn, target: :unix, runtime_source: {:path, \"..\"}" > config/config.secret.exs
+          git clone git@github.com:software-mansion-labs/elixir-wasm.git
+          cd elixir-wasm/fission_lib
+          echo "import Config; config :fission_lib, atomvm_path: \"../../build/src/AtomVM\"" > config/config.secret.exs
           mix deps.get
-          export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3
-          MIX_ENV=test mix popcorn.build_runtime --target unix
-      - name: Test Popcorn
-        run: cd popcorn && mix test
+          MIX_ENV=test mix compile
+      - name: Test FissionLib
+        run: cd elixir-wasm/fission_lib && mix test
