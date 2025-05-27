@@ -5775,13 +5775,16 @@ static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
     term module_atom = argv[0];
     VALIDATE_VALUE(module_atom, term_is_atom);
     AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);
+    if (IS_NULL_PTR(module_name)) {
+        return ERROR_ATOM;
+    }
     Module *module = globalcontext_get_module(ctx->global, module_name);
     if (IS_NULL_PTR(module)) {
         return ERROR_ATOM;
     }
     assert(module->num_filenames >= 1);
     struct ModuleFilename filename = module->filenames[0];
-    size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size) + filename.len * CONS_SIZE;
+    size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size) + LIST_SIZE(filename.len, 1);
     if (UNLIKELY(memory_ensure_free(ctx, result_size) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }

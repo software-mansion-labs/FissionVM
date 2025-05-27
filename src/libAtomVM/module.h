@@ -118,7 +118,7 @@ struct Module
     void *str_table;
     size_t str_table_len;
     uint8_t *binary;
-    unsigned long binary_size;
+    size_t binary_size;
 
     struct LineRef *line_refs;
     struct ModuleFilename *filenames;
