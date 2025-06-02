@@ -30,6 +30,7 @@
     load_abs/1,
     load_binary/3,
     ensure_loaded/1,
+    get_object_code/1,
     which/1
 ]).
 
@@ -98,6 +99,18 @@ load_binary(_Module, _Filename, _Binary) ->
 -spec ensure_loaded(Module) -> {module, Module} | {error, embedded | any()} when
     Module :: atom().
 ensure_loaded(_Module) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @param   Module      module to get object code from
+%% @returns Tuple `{Module, Binary, Filename}' if successful, otherwise 'error'.
+%% @doc     Return module binary of a given module, third term of tuple is 
+%% currently unspecified.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec get_object_code(Module) -> {Module, Binary, Filename} when
+    Module :: atom(), Binary :: binary(), Filename :: string().
+get_object_code(_Module) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
