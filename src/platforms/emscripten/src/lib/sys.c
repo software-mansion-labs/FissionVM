@@ -87,6 +87,13 @@ size_t sys_get_next_remote_object_key(GlobalContext *glb)
     return platform->next_remote_object_index++;
 }
 
+size_t sys_get_next_tracked_object_key(GlobalContext *glb)
+{
+    struct EmscriptenPlatformData *platform = glb->platform_data;
+    return platform->next_tracked_object_index++;
+}
+
+
 static void promise_dtor(ErlNifEnv *caller_env, void *obj)
 {
     UNUSED(caller_env);

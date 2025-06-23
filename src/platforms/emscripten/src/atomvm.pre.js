@@ -30,7 +30,10 @@ Module["call"] = async function (name, message) {
   return promiseMap.get(promiseId).promise;
 };
 Module["nextRemoteObjectKey"] = function () {
-  ccall("next_remote_object_key", "integer", [], []);
+  return ccall("next_remote_object_key", "integer", [], []);
+};
+Module["nextTrackedObjectKey"] = function () {
+  return ccall("next_tracked_object_key", "integer", [], []);
 };
 Module["remoteObjectsMap"] = new Map();
 Module["onRemoteObjectDelete"] = (_key) => {};

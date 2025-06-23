@@ -278,6 +278,41 @@ static term nif_emscripten_from_remote_object(Context *ctx, int argc, term argv[
     }
 }
 
+static term nif_emscripten_run_script_tracked(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    UNUSED(argv);
+    if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2) + CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term values = term_nil();
+    values = term_list_prepend(term_from_int(1), values, &ctx->heap);
+
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(result_tuple, 0, OK_ATOM);
+    term_put_tuple_element(result_tuple, 1, values);
+    return result_tuple;
+}
+
+static term nif_emscripten_get_tracked(Context *ctx, int argc, term argv[])
+{
+    UNUSED(ctx);
+    UNUSED(argc);
+    UNUSED(argv);
+
+    if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2) + CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    term values = term_nil();
+    values = term_list_prepend(term_from_int(1), values, &ctx->heap);
+
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(result_tuple, 0, OK_ATOM);
+    term_put_tuple_element(result_tuple, 1, values);
+    return result_tuple;
+}
+
 static term nif_emscripten_promise_resolve_reject(Context *ctx, int argc, term argv[], em_promise_result_t result)
 {
     struct EmscriptenPlatformData *platform = ctx->global->platform_data;
@@ -334,6 +369,14 @@ static const struct Nif emscripten_run_remote_object_script_fn = {
 static const struct Nif emscripten_from_remote_object = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_emscripten_from_remote_object,
+};
+static const struct Nif emscripten_run_script_tracked = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_emscripten_run_script_tracked
+};
+static const struct Nif emscripten_get_tracked = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_emscripten_get_tracked,
 };
 static const struct Nif emscripten_promise_resolve_nif = {
     .base.type = NIFFunctionType,
@@ -957,6 +1000,12 @@ const struct Nif *platform_nifs_get_nif(const char *nifname)
     }
     if (strcmp("from_remote_object/2", nifname) == 0) {
         return &emscripten_from_remote_object;
+    }
+    if (strcmp("run_script_tracked/1", nifname) == 0) {
+        return &emscripten_run_script_tracked;
+    }
+    if (strcmp("get_tracked/2", nifname) == 0) {
+        return &emscripten_get_tracked;
     }
     if (strcmp("promise_resolve/1", nifname) == 0) {
         return &emscripten_promise_resolve_nif;
