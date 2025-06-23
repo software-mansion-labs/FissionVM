@@ -278,20 +278,93 @@ static term nif_emscripten_from_remote_object(Context *ctx, int argc, term argv[
     }
 }
 
+// clang-format off
+EM_JS(uint32_t *, js_tracked_eval, (const char *code, uint32_t *size, bool debug), {
+    const keys = Module['onRunTrackedJs'](UTF8ToString(code), debug);
+    if (debug) {
+        if (!Array.isArray(keys)) {
+            throw new Error("onRunTrackedJs() returned non-array");
+        }
+        const isIndex = k => typeof(k) === "number";
+        if (!keys.every(isIndex)) {
+            throw new Error("onRunTrackedJs() non-numeric array");
+        }
+    }
+    // emscripten's malloc impl crashes wasm module on failed alloc so no checking for that
+    const ptr = Module['_malloc'](keys.length * HEAPU32.BYTES_PER_ELEMENT);
+    HEAPU32.set([keys.length], size / HEAPU32.BYTES_PER_ELEMENT);
+    HEAPU32.set(keys, ptr / HEAPU32.BYTES_PER_ELEMENT);
+    return ptr;
+});
+
+static void do_run_script_tracked(const char *script, int32_t sync_caller_pid, GlobalContext *global)
+{
+#ifdef NDEBUG
+    bool debug = false;
+#else
+    bool debug = true;
+#endif
+    uint32_t keys_n;
+    uint32_t *keys = js_tracked_eval(script, &keys_n, debug);
+    Context *target_ctx = globalcontext_get_process_lock(global, sync_caller_pid);
+    if (target_ctx) {
+        term result = term_invalid_term();
+        term refs = term_nil();
+        term *remote_objects = NULL;
+        if (keys_n == 0) {
+            goto create_tuple;
+        }
+
+        remote_objects = malloc(keys_n * sizeof(term));
+        if (IS_NULL_PTR(remote_objects)) {
+            result = OUT_OF_MEMORY_ATOM;
+            goto cleanup;
+        }
+        if (UNLIKELY(memory_ensure_free_opt(target_ctx, TUPLE_SIZE(2) + LIST_SIZE(keys_n, 1), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            result = OUT_OF_MEMORY_ATOM;
+            goto cleanup;
+        }
+
+        for (size_t i = 0; i < keys_n; ++i) {
+            remote_objects[i] = term_remote_object_from_key(target_ctx, keys[i]);
+            // we can't easily recover from OOM here
+            assert(!term_is_invalid_term(remote_objects[i]));
+        }
+
+        for (long i = keys_n - 1; i >= 0; --i) {
+            refs = term_list_prepend(remote_objects[i], refs, &target_ctx->heap);
+        }
+
+    create_tuple:
+        result = term_alloc_tuple(2, &target_ctx->heap);
+        term_put_tuple_element(result, 0, OK_ATOM);
+        term_put_tuple_element(result, 1, refs);
+
+    cleanup:
+        free(remote_objects);
+        printf("%d: %ld\n", keys_n, result);
+        term_display(stdout, result, target_ctx);
+        mailbox_send_term_signal(target_ctx, TrapAnswerSignal, result);
+        globalcontext_get_process_unlock(global, target_ctx);
+    } // else: sender died
+}
+
 static term nif_emscripten_run_script_tracked(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
     UNUSED(argv);
-    if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2) + CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-    }
-    term values = term_nil();
-    values = term_list_prepend(term_from_int(1), values, &ctx->heap);
+    term script_term = argv[0];
 
-    term result_tuple = term_alloc_tuple(2, &ctx->heap);
-    term_put_tuple_element(result_tuple, 0, OK_ATOM);
-    term_put_tuple_element(result_tuple, 1, values);
-    return result_tuple;
+    int ok;
+    char *script = interop_term_to_string(script_term, &ok);
+    if (UNLIKELY(!ok)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    // Trap caller waiting for completion
+    context_update_flags(ctx, ~NoFlags, Trap);
+    // script will be freed as it's passed as satellite
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIII, do_run_script_tracked, script, script, ctx->process_id, ctx->global);
+    return term_invalid_term();
 }
 
 static term nif_emscripten_get_tracked(Context *ctx, int argc, term argv[])

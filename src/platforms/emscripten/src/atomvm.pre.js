@@ -37,3 +37,22 @@ Module["nextTrackedObjectKey"] = function () {
 };
 Module["remoteObjectsMap"] = new Map();
 Module["onRemoteObjectDelete"] = (_key) => {};
+Module["onRunTrackedJs"] = (scriptString, isDebug) => {
+  const indirectEval = eval;
+  const result = indirectEval(scriptString);
+  if (isDebug) {
+    if (!Array.isArray(result) && result !== undefined) {
+      throw new Error(
+        "Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined",
+      );
+    }
+  }
+
+  return (
+    result?.map((value) => {
+      const key = Module["nextRemoteObjectKey"]();
+      Module["remoteObjectsMap"].set(key, value);
+      return key;
+    }) ?? []
+  );
+};
