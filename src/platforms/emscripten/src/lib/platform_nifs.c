@@ -296,6 +296,7 @@ EM_JS(uint32_t *, js_tracked_eval, (const char *code, uint32_t *size, bool debug
     HEAPU32.set(keys, ptr / HEAPU32.BYTES_PER_ELEMENT);
     return ptr;
 });
+// clang-format on
 
 static void do_run_script_tracked(const char *script, int32_t sync_caller_pid, GlobalContext *global)
 {
@@ -318,11 +319,11 @@ static void do_run_script_tracked(const char *script, int32_t sync_caller_pid, G
         remote_objects = malloc(keys_n * sizeof(term));
         if (IS_NULL_PTR(remote_objects)) {
             result = OUT_OF_MEMORY_ATOM;
-            goto cleanup;
+            goto send_result;
         }
         if (UNLIKELY(memory_ensure_free_opt(target_ctx, TUPLE_SIZE(2) + LIST_SIZE(keys_n, 1), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             result = OUT_OF_MEMORY_ATOM;
-            goto cleanup;
+            goto send_result;
         }
 
         for (size_t i = 0; i < keys_n; ++i) {
@@ -340,10 +341,8 @@ static void do_run_script_tracked(const char *script, int32_t sync_caller_pid, G
         term_put_tuple_element(result, 0, OK_ATOM);
         term_put_tuple_element(result, 1, refs);
 
-    cleanup:
+    send_result:
         free(remote_objects);
-        printf("%d: %ld\n", keys_n, result);
-        term_display(stdout, result, target_ctx);
         mailbox_send_term_signal(target_ctx, TrapAnswerSignal, result);
         globalcontext_get_process_unlock(global, target_ctx);
     } // else: sender died
@@ -352,7 +351,6 @@ static void do_run_script_tracked(const char *script, int32_t sync_caller_pid, G
 static term nif_emscripten_run_script_tracked(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
-    UNUSED(argv);
     term script_term = argv[0];
 
     int ok;
@@ -367,23 +365,83 @@ static term nif_emscripten_run_script_tracked(Context *ctx, int argc, term argv[
     return term_invalid_term();
 }
 
+static void do_get_tracked_object(int32_t *ref_keys, size_t n, int32_t sync_caller_pid, GlobalContext *global)
+{
+    Context *target_ctx = globalcontext_get_process_lock(global, sync_caller_pid);
+    if (target_ctx) {
+        term result = term_invalid_term();
+        if (UNLIKELY(memory_ensure_free_opt(target_ctx, TUPLE_SIZE(3), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            result = OUT_OF_MEMORY_ATOM;
+            goto send_result;
+        }
+        result = term_alloc_tuple(3, &target_ctx->heap);
+        term_put_tuple_element(result, 0, OK_ATOM);
+        term_put_tuple_element(result, 1, term_nil());
+        term_put_tuple_element(result, 2, term_nil());
+    send_result:
+        mailbox_send_term_signal(target_ctx, TrapAnswerSignal, result);
+        globalcontext_get_process_unlock(global, target_ctx);
+    } // else: sender died
+}
+
 static term nif_emscripten_get_tracked(Context *ctx, int argc, term argv[])
 {
-    UNUSED(ctx);
     UNUSED(argc);
-    UNUSED(argv);
+    term refs = argv[0];
+    term type = argv[1];
+    struct EmscriptenPlatformData *platform = ctx->global->platform_data;
+    ErlNifEnv *env = erl_nif_env_from_context(ctx);
 
-    if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2) + CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    VALIDATE_VALUE(refs, term_is_list);
+    if (UNLIKELY(type != KEY_ATOM && type != VALUE_ATOM)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    int proper;
+    size_t n = term_list_length(refs, &proper);
+    if (UNLIKELY(!proper)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    if (n == 0) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    int32_t *ref_keys = malloc(n * sizeof(int32_t));
+    if (IS_NULL_PTR(ref_keys)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    term values = term_nil();
-    values = term_list_prepend(term_from_int(1), values, &ctx->heap);
+    for (size_t i = 0; i < n; ++i) {
+        term ref = term_get_list_head(refs);
+        void *obj;
+        if (UNLIKELY(!enif_get_resource(env, ref, platform->remote_object_resource_type, &obj))) {
+            free(ref_keys);
+            RAISE_ERROR(BADARG_ATOM);
+        }
+        struct RemoteObjectResource *remote_object_rsrc = (struct RemoteObjectResource *) obj;
+        ref_keys[i] = remote_object_rsrc->key;
+        refs = term_get_list_tail(refs);
+    }
 
-    term result_tuple = term_alloc_tuple(2, &ctx->heap);
-    term_put_tuple_element(result_tuple, 0, OK_ATOM);
-    term_put_tuple_element(result_tuple, 1, values);
-    return result_tuple;
+    if (type == KEY_ATOM) {
+        if (UNLIKELY(memory_ensure_free_opt(ctx, LIST_SIZE(n, 1) + TUPLE_SIZE(3), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+
+        term keys = term_nil();
+        for (long i = n - 1; i >= 0; --i) {
+            keys = term_list_prepend(term_from_int32(ref_keys[i]), keys, &ctx->heap);
+        }
+        term tuple = term_alloc_tuple(2, &ctx->heap);
+        term_put_tuple_element(tuple, 0, OK_ATOM);
+        term_put_tuple_element(tuple, 1, keys);
+        return tuple;
+    }
+    assert(type == VALUE_ATOM);
+    // Trap caller waiting for completion
+    context_update_flags(ctx, ~NoFlags, Trap);
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIIII, do_get_tracked_object, NULL, ref_keys, n, ctx->process_id, ctx->global);
+    return term_invalid_term();
 }
 
 static term nif_emscripten_promise_resolve_reject(Context *ctx, int argc, term argv[], em_promise_result_t result)
