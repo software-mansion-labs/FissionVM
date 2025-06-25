@@ -36,7 +36,13 @@ Module["nextTrackedObjectKey"] = function () {
   return ccall("next_tracked_object_key", "integer", [], []);
 };
 Module["remoteObjectsMap"] = new Map();
-Module["onRemoteObjectDelete"] = (_key) => {};
+Module["onRemoteObjectDelete"] = (key) => {
+  Module["remoteObjectsMap"].delete(key);
+};
+Module["onGetTrackedObjects"] = (keys) => {
+  const getRemoteObject = (key) => Module["remoteObjectsMap"].get(key);
+  return keys.map(getRemoteObject);
+};
 Module["onRunTrackedJs"] = (scriptString, isDebug) => {
   const indirectEval = eval;
   const result = indirectEval(scriptString);

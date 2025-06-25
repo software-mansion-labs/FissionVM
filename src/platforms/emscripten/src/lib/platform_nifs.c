@@ -27,6 +27,7 @@
 #include <nifs.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <string.h>
 #include <term.h>
 #include <term_typedef.h>
 
@@ -290,7 +291,7 @@ EM_JS(uint32_t *, js_tracked_eval, (const char *code, uint32_t *size, bool debug
             throw new Error("onRunTrackedJs() non-numeric array");
         }
     }
-    // emscripten's malloc impl crashes wasm module on failed alloc so no checking for that
+    // emscripten's malloc impl crashes wasm module on failed alloc so no point checking for that
     const ptr = Module['_malloc'](keys.length * HEAPU32.BYTES_PER_ELEMENT);
     HEAPU32.set([keys.length], size / HEAPU32.BYTES_PER_ELEMENT);
     HEAPU32.set(keys, ptr / HEAPU32.BYTES_PER_ELEMENT);
@@ -365,19 +366,128 @@ static term nif_emscripten_run_script_tracked(Context *ctx, int argc, term argv[
     return term_invalid_term();
 }
 
-static void do_get_tracked_object(int32_t *ref_keys, size_t n, int32_t sync_caller_pid, GlobalContext *global)
+// clang-format off
+EM_JS(char *, js_get_tracked_object, (uint32_t *keys_ptr, uint32_t keys_n, uint32_t **sizes, uint8_t **statuses, uint32_t *objects_n, uint32_t *strings_n, uint32_t *all_byte_size), {
+    const OK = 0;
+    const BAD_KEY = 1;
+    const NOT_STRING = 2;
+
+    const keysOffset = keys_ptr / HEAPU32.BYTES_PER_ELEMENT;
+    const keys = [...HEAPU32.subarray(keysOffset, keysOffset + keys_n)];
+
+    const objects = Module['onGetTrackedObjects'](keys);
+        if (!Array.isArray(objects)) {
+        return 0;
+    }
+    const n = objects.length;
+
+    if (n === 0) {
+        return 0;
+    }
+
+    const sizesPtr = Module['_malloc'](n * HEAPU32.BYTES_PER_ELEMENT);
+    const statusPtr = Module['_malloc'](n * HEAPU8.BYTES_PER_ELEMENT);
+    let allByteSize = 0;
+    let stringsN = 0;
+
+    for (let i = 0; i < n; ++i) {
+        let status = OK;
+        let byteSize = 0;
+        const object = objects[i];
+                if (object === undefined) {
+            status = BAD_KEY;
+        } else if (typeof object !== "string") {
+            status = NOT_STRING;
+        } else {
+            byteSize = lengthBytesUTF8(object);
+            stringsN += 1;
+        }
+        HEAPU8[statusPtr / HEAPU8.BYTES_PER_ELEMENT + i] = status;
+        HEAPU32[sizesPtr / HEAPU32.BYTES_PER_ELEMENT + i] = byteSize;
+        allByteSize += byteSize;
+    }
+
+    const stringsPtr = Module['_malloc'](allByteSize * HEAPU8.BYTES_PER_ELEMENT);
+    let currentStringsPtr = stringsPtr;
+    for (let i = 0; i < n; ++i) {
+        const status = HEAPU8[statusPtr / HEAPU8.BYTES_PER_ELEMENT + i];
+        if (status !== OK) {
+            continue;
+        }
+        const string = objects[i];
+        const size = HEAPU32[sizesPtr / HEAPU32.BYTES_PER_ELEMENT + i];
+        // stringToUTF8 includes null byte which we don't need
+        stringToUTF8(string, currentStringsPtr, size+1);
+        currentStringsPtr += size;
+    }
+
+    HEAPU32[statuses / HEAPU32.BYTES_PER_ELEMENT] = statusPtr;
+    HEAPU32[sizes / HEAPU32.BYTES_PER_ELEMENT] = sizesPtr;
+    HEAPU32[objects_n / HEAPU32.BYTES_PER_ELEMENT] = n;
+    HEAPU32[strings_n / HEAPU32.BYTES_PER_ELEMENT] = stringsN;
+    HEAPU32[all_byte_size / HEAPU32.BYTES_PER_ELEMENT] = allByteSize;
+
+    return stringsPtr;
+});
+// clang-format on
+
+typedef enum
 {
+    TO_OK = 0,
+    TO_BAD_KEY = 1,
+    TO_NOT_STRING = 2,
+} TrackedObjectStatus;
+
+static void do_get_tracked_object(uint32_t *ref_keys, size_t keys_n, int32_t sync_caller_pid, GlobalContext *global)
+{
+    uint32_t objects_n;
+    uint32_t strings_n;
+    uint32_t all_byte_size;
+    uint32_t *sizes;
+    uint8_t *statuses;
+
+    const char *strings = js_get_tracked_object(ref_keys, keys_n, &sizes, &statuses, &objects_n, &strings_n, &all_byte_size);
+    assert(strings_n <= objects_n);
     Context *target_ctx = globalcontext_get_process_lock(global, sync_caller_pid);
     if (target_ctx) {
         term result = term_invalid_term();
-        if (UNLIKELY(memory_ensure_free_opt(target_ctx, TUPLE_SIZE(3), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        if (IS_NULL_PTR(strings)) {
+            result = BADVALUE_ATOM;
+            goto send_result;
+        }
+        size_t size = LIST_SIZE(objects_n, TUPLE_SIZE(2)) + LIST_SIZE(strings_n, BINARY_HEADER_SIZE) + term_binary_data_size_in_terms(all_byte_size);
+        if (UNLIKELY(memory_ensure_free_opt(target_ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             result = OUT_OF_MEMORY_ATOM;
             goto send_result;
         }
-        result = term_alloc_tuple(3, &target_ctx->heap);
-        term_put_tuple_element(result, 0, OK_ATOM);
-        term_put_tuple_element(result, 1, term_nil());
-        term_put_tuple_element(result, 2, term_nil());
+
+        // move pointer to one byte past buffer
+        const char *current_string = strings + all_byte_size;
+        result = term_nil();
+        for (long i = objects_n - 1; i >= 0; --i) {
+            TrackedObjectStatus status = statuses[i];
+
+            term tuple = term_alloc_tuple(2, &target_ctx->heap);
+            if (status == TO_OK) {
+                size_t size = sizes[i];
+                current_string -= size;
+
+                term binary = term_create_uninitialized_binary(size, &target_ctx->heap, global);
+                char *data = (char *) term_binary_data(binary);
+                memcpy(data, current_string, size);
+
+                term_put_tuple_element(tuple, 0, OK_ATOM);
+                term_put_tuple_element(tuple, 1, binary);
+            } else if (status == TO_NOT_STRING) {
+                term_put_tuple_element(tuple, 0, ERROR_ATOM);
+                term_put_tuple_element(tuple, 1, BADVALUE_ATOM);
+            } else /* TO_BAD_KEY */ {
+                term_put_tuple_element(tuple, 0, ERROR_ATOM);
+                term_put_tuple_element(tuple, 1, BADKEY_ATOM);
+            }
+            result = term_list_prepend(tuple, result, &target_ctx->heap);
+        }
+
     send_result:
         mailbox_send_term_signal(target_ctx, TrapAnswerSignal, result);
         globalcontext_get_process_unlock(global, target_ctx);
@@ -424,7 +534,7 @@ static term nif_emscripten_get_tracked(Context *ctx, int argc, term argv[])
     }
 
     if (type == KEY_ATOM) {
-        if (UNLIKELY(memory_ensure_free_opt(ctx, LIST_SIZE(n, 1) + TUPLE_SIZE(3), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        if (UNLIKELY(memory_ensure_free_opt(ctx, LIST_SIZE(n, 1), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
 
@@ -432,10 +542,7 @@ static term nif_emscripten_get_tracked(Context *ctx, int argc, term argv[])
         for (long i = n - 1; i >= 0; --i) {
             keys = term_list_prepend(term_from_int32(ref_keys[i]), keys, &ctx->heap);
         }
-        term tuple = term_alloc_tuple(2, &ctx->heap);
-        term_put_tuple_element(tuple, 0, OK_ATOM);
-        term_put_tuple_element(tuple, 1, keys);
-        return tuple;
+        return keys;
     }
     assert(type == VALUE_ATOM);
     // Trap caller waiting for completion
