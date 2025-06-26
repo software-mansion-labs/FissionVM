@@ -44,21 +44,33 @@ Module["onGetTrackedObjects"] = (keys) => {
   return keys.map(getRemoteObject);
 };
 Module["onRunTrackedJs"] = (scriptString, isDebug) => {
-  const indirectEval = eval;
-  const result = indirectEval(scriptString);
-  if (isDebug) {
-    if (!Array.isArray(result) && result !== undefined) {
-      throw new Error(
-        "Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined",
-      );
-    }
+  const trackValue = (value) => {
+    const key = Module["nextRemoteObjectKey"]();
+    Module["remoteObjectsMap"].set(key, value);
+    return key;
+  };
+
+  let result;
+  try {
+    const indirectEval = eval;
+    result = indirectEval(scriptString);
+  } catch (_e) {
+    return null;
+  }
+  isDebug && ensureValidResult(result);
+  return result?.map(trackValue) ?? [];
+};
+function ensureValidResult(result) {
+  const isIndex = (k) => typeof k === "number";
+
+  if (result === null) {
+    return;
+  }
+  if (Array.isArray(result) && keys.every(isIndex)) {
+    return;
   }
 
-  return (
-    result?.map((value) => {
-      const key = Module["nextRemoteObjectKey"]();
-      Module["remoteObjectsMap"].set(key, value);
-      return key;
-    }) ?? []
-  );
-};
+  const message =
+    "Evaluated script returned invalid value. Expected number array or null";
+  throw new Error(message);
+}

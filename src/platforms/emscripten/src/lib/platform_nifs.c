@@ -282,18 +282,14 @@ static term nif_emscripten_from_remote_object(Context *ctx, int argc, term argv[
 // clang-format off
 EM_JS(uint32_t *, js_tracked_eval, (const char *code, uint32_t *size, bool debug), {
     const keys = Module['onRunTrackedJs'](UTF8ToString(code), debug);
-    if (debug) {
-        if (!Array.isArray(keys)) {
-            throw new Error("onRunTrackedJs() returned non-array");
-        }
-        const isIndex = k => typeof(k) === "number";
-        if (!keys.every(isIndex)) {
-            throw new Error("onRunTrackedJs() non-numeric array");
-        }
+    const error = keys === null;
+    if (error) {
+        HEAPU32[size / HEAPU32.BYTES_PER_ELEMENT] = 0;
+        return 0;
     }
-    // emscripten's malloc impl crashes wasm module on failed alloc so no point checking for that
+
     const ptr = Module['_malloc'](keys.length * HEAPU32.BYTES_PER_ELEMENT);
-    HEAPU32.set([keys.length], size / HEAPU32.BYTES_PER_ELEMENT);
+    HEAPU32[size / HEAPU32.BYTES_PER_ELEMENT] = keys.length;
     HEAPU32.set(keys, ptr / HEAPU32.BYTES_PER_ELEMENT);
     return ptr;
 });
@@ -312,38 +308,36 @@ static void do_run_script_tracked(const char *script, int32_t sync_caller_pid, G
     if (target_ctx) {
         term result = term_invalid_term();
         term refs = term_nil();
-        term *remote_objects = NULL;
+        if (UNLIKELY(memory_ensure_free_opt(target_ctx, TUPLE_SIZE(2) + LIST_SIZE(keys_n, TERM_BOXED_REFC_BINARY_SIZE), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            // TODO: how to raise?
+            result = OUT_OF_MEMORY_ATOM;
+            goto send_result;
+        }
+        result = term_alloc_tuple(2, &target_ctx->heap);
+
+        if (IS_NULL_PTR(keys)) {
+            term_put_tuple_element(result, 0, ERROR_ATOM);
+            term_put_tuple_element(result, 1, BADARG_ATOM);
+            goto send_result;
+        }
+
         if (keys_n == 0) {
-            goto create_tuple;
-        }
-
-        remote_objects = malloc(keys_n * sizeof(term));
-        if (IS_NULL_PTR(remote_objects)) {
-            result = OUT_OF_MEMORY_ATOM;
+            term_put_tuple_element(result, 0, OK_ATOM);
+            term_put_tuple_element(result, 1, term_nil());
             goto send_result;
-        }
-        if (UNLIKELY(memory_ensure_free_opt(target_ctx, TUPLE_SIZE(2) + LIST_SIZE(keys_n, 1), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-            result = OUT_OF_MEMORY_ATOM;
-            goto send_result;
-        }
-
-        for (size_t i = 0; i < keys_n; ++i) {
-            remote_objects[i] = term_remote_object_from_key(target_ctx, keys[i]);
-            // we can't easily recover from OOM here
-            assert(!term_is_invalid_term(remote_objects[i]));
         }
 
         for (long i = keys_n - 1; i >= 0; --i) {
-            refs = term_list_prepend(remote_objects[i], refs, &target_ctx->heap);
+            term remote_object = term_remote_object_from_key(target_ctx, keys[i]);
+            // we can't easily recover from OOM here
+            assert(!term_is_invalid_term(remote_object));
+            refs = term_list_prepend(remote_object, refs, &target_ctx->heap);
         }
-
-    create_tuple:
-        result = term_alloc_tuple(2, &target_ctx->heap);
         term_put_tuple_element(result, 0, OK_ATOM);
         term_put_tuple_element(result, 1, refs);
 
     send_result:
-        free(remote_objects);
+        free(keys);
         mailbox_send_term_signal(target_ctx, TrapAnswerSignal, result);
         globalcontext_get_process_unlock(global, target_ctx);
     } // else: sender died
@@ -367,7 +361,7 @@ static term nif_emscripten_run_script_tracked(Context *ctx, int argc, term argv[
 }
 
 // clang-format off
-EM_JS(char *, js_get_tracked_object, (uint32_t *keys_ptr, uint32_t keys_n, uint32_t **sizes, uint8_t **statuses, uint32_t *objects_n, uint32_t *strings_n, uint32_t *all_byte_size), {
+EM_JS(char *, js_get_tracked_objects, (uint32_t *keys_ptr, uint32_t keys_n, uint32_t **sizes, uint8_t **statuses, uint32_t *objects_n, uint32_t *strings_n, uint32_t *all_byte_size), {
     const OK = 0;
     const BAD_KEY = 1;
     const NOT_STRING = 2;
@@ -431,22 +425,20 @@ EM_JS(char *, js_get_tracked_object, (uint32_t *keys_ptr, uint32_t keys_n, uint3
 });
 // clang-format on
 
-typedef enum
+static void do_get_tracked_objects(uint32_t *ref_keys, size_t keys_n, int32_t sync_caller_pid, GlobalContext *global)
 {
-    TO_OK = 0,
-    TO_BAD_KEY = 1,
-    TO_NOT_STRING = 2,
-} TrackedObjectStatus;
+    static const uint8_t OK = 0;
+    static const uint8_t BAD_KEY = 1;
+    static const uint8_t NOT_STRING = 2;
+    UNUSED(BAD_KEY);
 
-static void do_get_tracked_object(uint32_t *ref_keys, size_t keys_n, int32_t sync_caller_pid, GlobalContext *global)
-{
-    uint32_t objects_n;
-    uint32_t strings_n;
-    uint32_t all_byte_size;
-    uint32_t *sizes;
-    uint8_t *statuses;
+    uint32_t objects_n = 0;
+    uint32_t strings_n = 0;
+    uint32_t all_byte_size = 0;
+    uint32_t *sizes = NULL;
+    uint8_t *statuses = NULL;
 
-    const char *strings = js_get_tracked_object(ref_keys, keys_n, &sizes, &statuses, &objects_n, &strings_n, &all_byte_size);
+    char *strings = js_get_tracked_objects(ref_keys, keys_n, &sizes, &statuses, &objects_n, &strings_n, &all_byte_size);
     assert(strings_n <= objects_n);
     Context *target_ctx = globalcontext_get_process_lock(global, sync_caller_pid);
     if (target_ctx) {
@@ -465,10 +457,10 @@ static void do_get_tracked_object(uint32_t *ref_keys, size_t keys_n, int32_t syn
         const char *current_string = strings + all_byte_size;
         result = term_nil();
         for (long i = objects_n - 1; i >= 0; --i) {
-            TrackedObjectStatus status = statuses[i];
+            uint8_t status = statuses[i];
 
             term tuple = term_alloc_tuple(2, &target_ctx->heap);
-            if (status == TO_OK) {
+            if (status == OK) {
                 size_t size = sizes[i];
                 current_string -= size;
 
@@ -478,10 +470,10 @@ static void do_get_tracked_object(uint32_t *ref_keys, size_t keys_n, int32_t syn
 
                 term_put_tuple_element(tuple, 0, OK_ATOM);
                 term_put_tuple_element(tuple, 1, binary);
-            } else if (status == TO_NOT_STRING) {
+            } else if (status == NOT_STRING) {
                 term_put_tuple_element(tuple, 0, ERROR_ATOM);
                 term_put_tuple_element(tuple, 1, BADVALUE_ATOM);
-            } else /* TO_BAD_KEY */ {
+            } else /* BAD_KEY */ {
                 term_put_tuple_element(tuple, 0, ERROR_ATOM);
                 term_put_tuple_element(tuple, 1, BADKEY_ATOM);
             }
@@ -489,6 +481,9 @@ static void do_get_tracked_object(uint32_t *ref_keys, size_t keys_n, int32_t syn
         }
 
     send_result:
+        free(sizes);
+        free(statuses);
+        free(strings);
         mailbox_send_term_signal(target_ctx, TrapAnswerSignal, result);
         globalcontext_get_process_unlock(global, target_ctx);
     } // else: sender died
@@ -547,7 +542,7 @@ static term nif_emscripten_get_tracked(Context *ctx, int argc, term argv[])
     assert(type == VALUE_ATOM);
     // Trap caller waiting for completion
     context_update_flags(ctx, ~NoFlags, Trap);
-    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIIII, do_get_tracked_object, NULL, ref_keys, n, ctx->process_id, ctx->global);
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VIIII, do_get_tracked_objects, NULL, ref_keys, n, ctx->process_id, ctx->global);
     return term_invalid_term();
 }
 
