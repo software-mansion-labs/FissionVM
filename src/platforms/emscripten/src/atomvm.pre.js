@@ -29,24 +29,21 @@ Module["call"] = async function (name, message) {
   );
   return promiseMap.get(promiseId).promise;
 };
-Module["nextRemoteObjectKey"] = function () {
-  return ccall("next_remote_object_key", "integer", [], []);
-};
 Module["nextTrackedObjectKey"] = function () {
   return ccall("next_tracked_object_key", "integer", [], []);
 };
-Module["remoteObjectsMap"] = new Map();
-Module["onRemoteObjectDelete"] = (key) => {
-  Module["remoteObjectsMap"].delete(key);
+Module["trackedObjectsMap"] = new Map();
+Module["onTrackedObjectDelete"] = (key) => {
+  Module["trackedObjectsMap"].delete(key);
 };
 Module["onGetTrackedObjects"] = (keys) => {
-  const getRemoteObject = (key) => Module["remoteObjectsMap"].get(key);
-  return keys.map(getRemoteObject);
+  const getTrackedObject = (key) => Module["trackedObjectsMap"].get(key);
+  return keys.map(getTrackedObject);
 };
 Module["onRunTrackedJs"] = (scriptString, isDebug) => {
   const trackValue = (value) => {
-    const key = Module["nextRemoteObjectKey"]();
-    Module["remoteObjectsMap"].set(key, value);
+    const key = Module["nextTrackedObjectKey"]();
+    Module["trackedObjectsMap"].set(key, value);
     return key;
   };
 
