@@ -5688,8 +5688,6 @@ static term nif_code_load_binary(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    term file_name = argv[1];
-
     term binary = argv[2];
     if (UNLIKELY(!term_is_binary(binary))) {
         RAISE_ERROR(BADARG_ATOM);

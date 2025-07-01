@@ -97,6 +97,7 @@ set(SOURCE_FILES
     nifs.c
     port.c
     posix_nifs.c
+    process_crash_report.c
     refc_binary.c
     resources.c
     scheduler.c
@@ -136,6 +137,10 @@ if (ADVANCED_TRACING)
     if (ADVANCED_TRACING_STDERR)
         target_compile_definitions(libAtomVM PUBLIC ADVANCED_TRACING_STDERR)
     endif()
+endif()
+
+if (GENERATE_PROCESS_CRASH_REPORTS)
+    target_compile_definitions(libAtomVM PUBLIC AVM_PROCESS_CRASH_REPORTS)
 endif()
 
 if(SANITIZER STREQUAL "address")
