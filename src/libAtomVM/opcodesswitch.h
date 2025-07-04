@@ -234,10 +234,14 @@ typedef dreg_t dreg_gc_safe_t;
                 case COMPACT_NBITS_VALUE:{                                              \
                     int sz = (first_byte >> 5) + 2;                                     \
                     if (UNLIKELY(sz > 8)) {                                             \
-                        /* TODO: when first_byte >> 5 is 7, a different encoding is used */ \
-                        fprintf(stderr, "Unexpected nbits value @ %" PRIuPTR "\n", (uintptr_t) ((decode_pc) - 1)); \
-                        AVM_ABORT();                                                    \
-                        break;                                                          \
+                      sz = *(decode_pc) + 9;                                            \
+                      (decode_pc)++;                                                    \
+                      /* Integer larger than 60-bits but no bigger than 64-bits */      \
+                      /* will become boxed term taking 9 bytes (1 byte box + 64 bits)*/ \
+                      /* AtomVM can handle 64 bit int, but not larger ones until BigNum support is ready*/ \
+                      if (sz > 9 && (first_byte & 0xF) == COMPACT_LARGE_INTEGER) {      \
+                        fprintf(stderr, "WARNING: Loading integer possibly longer than 64 bits"); \
+                      }                                                                 \
                     }                                                                   \
                     (decode_pc) += sz;                                                  \
                     break;                                                              \
