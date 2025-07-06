@@ -197,7 +197,10 @@ static void do_run_script_tracked(const char *script, int32_t sync_caller_pid, G
         free(keys);
         mailbox_send_term_signal(target_ctx, TrapAnswerSignal, result);
         globalcontext_get_process_unlock(global, target_ctx);
-    } // else: sender died
+    } else {
+        // sender died
+        free(keys);
+    }
 }
 
 static term nif_emscripten_run_script_tracked(Context *ctx, int argc, term argv[])
