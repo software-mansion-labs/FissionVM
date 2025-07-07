@@ -147,9 +147,9 @@ em_promise_t call(const char *name, const char *message)
 }
 
 EMSCRIPTEN_KEEPALIVE
-size_t next_remote_object_key()
+size_t next_tracked_object_key()
 {
-    return sys_get_next_remote_object_key(global);
+    return sys_get_next_tracked_object_key(global);
 }
 
 /**

@@ -24,7 +24,9 @@
 #include "defaultatoms.h"
 
 #define EMSCRIPTEN_ATOM_INDEX (PLATFORM_ATOMS_BASE_INDEX + 0)
+#define BADVALUE_ATOM_INDEX (PLATFORM_ATOMS_BASE_INDEX + 1)
 
 #define EMSCRIPTEN_ATOM term_from_atom_index(EMSCRIPTEN_ATOM_INDEX)
+#define BADVALUE_ATOM term_from_atom_index(BADVALUE_ATOM_INDEX)
 
 #endif

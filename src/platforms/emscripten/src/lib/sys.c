@@ -81,10 +81,10 @@ void sys_promise_resolve_str_and_destroy(em_promise_t promise, em_promise_result
     emscripten_promise_destroy(promise);
 }
 
-size_t sys_get_next_remote_object_key(GlobalContext *glb)
+size_t sys_get_next_tracked_object_key(GlobalContext *glb)
 {
     struct EmscriptenPlatformData *platform = glb->platform_data;
-    return platform->next_remote_object_index++;
+    return platform->next_tracked_object_index++;
 }
 
 static void promise_dtor(ErlNifEnv *caller_env, void *obj)
@@ -98,20 +98,17 @@ static void promise_dtor(ErlNifEnv *caller_env, void *obj)
     }
 }
 
-static void do_remove_remote_object(atomic_size_t key)
+static void do_remove_tracked_object(atomic_size_t key)
 {
-    EM_ASM({
-        Module['onRemoteObjectDelete']($0);
-        Module['remoteObjectsMap'].delete($0);
-    }, key);
+    EM_ASM({ Module['onTrackedObjectDelete']($0); }, key);
 }
 
-static void remote_object_dtor(ErlNifEnv *caller_env, void *obj)
+static void tracked_object_dtor(ErlNifEnv *caller_env, void *obj)
 {
     UNUSED(caller_env);
 
-    struct RemoteObjectResource *remote_object_rsrc = (struct RemoteObjectResource *) obj;
-    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VI, do_remove_remote_object, NULL, remote_object_rsrc->key);
+    struct TrackedObjectResource *tracked_object_rsrc = (struct TrackedObjectResource *) obj;
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VI, do_remove_tracked_object, NULL, tracked_object_rsrc->key);
 }
 
 static void htmlevent_user_data_dtor(ErlNifEnv *caller_env, void *obj)
@@ -151,9 +148,9 @@ static const ErlNifResourceTypeInit htmlevent_user_data_resource_type_init = {
     .down = htmlevent_user_data_down,
 };
 
-static const ErlNifResourceTypeInit remote_object_resource_type_init = {
+static const ErlNifResourceTypeInit tracked_object_resource_type_init = {
     .members = 1,
-    .dtor = remote_object_dtor,
+    .dtor = tracked_object_dtor,
 };
 
 void sys_init_platform(GlobalContext *glb)
@@ -172,7 +169,6 @@ void sys_init_platform(GlobalContext *glb)
         AVM_ABORT();
     }
     list_init(&platform->messages);
-    platform->next_remote_object_index = 0;
     ErlNifEnv env;
     erl_nif_env_partial_init_from_globalcontext(&env, glb);
     platform->promise_resource_type = enif_init_resource_type(&env, "promise", &promise_resource_type_init, ERL_NIF_RT_CREATE, NULL);
@@ -185,9 +181,9 @@ void sys_init_platform(GlobalContext *glb)
         fprintf(stderr, "Cannot initialize htmlevent_user_data_resource_type");
         AVM_ABORT();
     }
-    platform->remote_object_resource_type = enif_init_resource_type(&env, "remote_object", &remote_object_resource_type_init, ERL_NIF_RT_CREATE, NULL);
-    if (IS_NULL_PTR(platform->remote_object_resource_type)) {
-        fprintf(stderr, "Cannot initialize remote_object_resource_type");
+    platform->tracked_object_resource_type = enif_init_resource_type(&env, "tracked_object", &tracked_object_resource_type_init, ERL_NIF_RT_CREATE, NULL);
+    if (IS_NULL_PTR(platform->tracked_object_resource_type)) {
+        fprintf(stderr, "Cannot initialize tracked_object_resource_type");
         AVM_ABORT();
     }
     glb->platform_data = platform;

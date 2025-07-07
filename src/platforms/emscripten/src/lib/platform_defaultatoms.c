@@ -21,12 +21,14 @@
 #include "platform_defaultatoms.h"
 
 static const char *const emscripten_atom = ATOM_STR("\xA", "emscripten");
+static const char *const bad_value = ATOM_STR("\x8", "badvalue");
 
 void platform_defaultatoms_init(GlobalContext *glb)
 {
     int ok = 1;
 
     ok &= globalcontext_insert_atom(glb, emscripten_atom) == EMSCRIPTEN_ATOM_INDEX;
+    ok &= globalcontext_insert_atom(glb, bad_value) == BADVALUE_ATOM_INDEX;
 
     if (!ok) {
         AVM_ABORT();

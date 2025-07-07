@@ -29,8 +29,45 @@ Module["call"] = async function (name, message) {
   );
   return promiseMap.get(promiseId).promise;
 };
-Module["nextRemoteObjectKey"] = function () {
-  ccall("next_remote_object_key", "integer", [], []);
+Module["nextTrackedObjectKey"] = function () {
+  return ccall("next_tracked_object_key", "integer", [], []);
 };
-Module["remoteObjectsMap"] = new Map();
-Module["onRemoteObjectDelete"] = (_key) => {};
+Module["trackedObjectsMap"] = new Map();
+Module["onTrackedObjectDelete"] = (key) => {
+  Module["trackedObjectsMap"].delete(key);
+};
+Module["onGetTrackedObjects"] = (keys) => {
+  const getTrackedObject = (key) => Module["trackedObjectsMap"].get(key);
+  return keys.map(getTrackedObject);
+};
+Module["onRunTrackedJs"] = (scriptString, isDebug) => {
+  const trackValue = (value) => {
+    const key = Module["nextTrackedObjectKey"]();
+    Module["trackedObjectsMap"].set(key, value);
+    return key;
+  };
+
+  let result;
+  try {
+    const indirectEval = eval;
+    result = indirectEval(scriptString);
+  } catch (_e) {
+    return null;
+  }
+  isDebug && ensureValidResult(result);
+  return result?.map(trackValue) ?? [];
+};
+function ensureValidResult(result) {
+  const isIndex = (k) => typeof k === "number";
+
+  if (result === null) {
+    return;
+  }
+  if (Array.isArray(result) && keys.every(isIndex)) {
+    return;
+  }
+
+  const message =
+    "Evaluated script returned invalid value. Expected number array or null";
+  throw new Error(message);
+}
