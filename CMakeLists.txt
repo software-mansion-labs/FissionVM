@@ -38,6 +38,7 @@ option(COVERAGE "Build for code coverage" OFF)
 set(SANITIZER "address" CACHE STRING "Enable Address Sanitizer") # Include address, memory, or undefined sanitizer
 option(DEBUG_ASSERTIONS ON)
 option(DEBUG_GC "Sets Heap Growth strategy to MinimumHeapGrowth, triggers GC whenever possible" OFF)
+option(GENERATE_PROCESS_CRASH_REPORTS "Print crash reports when processes die with non-standard reasons" OFF)
 
 if((${CMAKE_SYSTEM_NAME} STREQUAL "Darwin") OR
    (${CMAKE_SYSTEM_NAME} STREQUAL "Linux") OR
