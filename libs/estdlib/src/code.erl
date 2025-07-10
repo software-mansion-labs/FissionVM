@@ -103,7 +103,7 @@ ensure_loaded(_Module) ->
 
 %%-----------------------------------------------------------------------------
 %% @param   Module      module to get object code from
-%% @returns Tuple `{Module, Binary, Filename}' if successful, otherwise 'error'.
+%% @returns Tuple `{Module, Binary, Filename}' if successful, otherwise `error'.
 %% @doc     Return module binary of a given module, third term of tuple is 
 %% currently unspecified.
 %% @end
