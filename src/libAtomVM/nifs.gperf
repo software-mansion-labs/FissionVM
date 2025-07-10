@@ -200,6 +200,7 @@ unicode:characters_to_list/2, &unicode_characters_to_list_nif
 unicode:characters_to_binary/1, &unicode_characters_to_binary_nif
 unicode:characters_to_binary/2, &unicode_characters_to_binary_nif
 unicode:characters_to_binary/3, &unicode_characters_to_binary_nif
+avm_rand:splitmix64_next/1, &rand_splitmix64_next_nif
 math:acos/1, &math_acos_nif
 math:acosh/1, &math_acosh_nif
 math:asin/1, &math_asin_nif

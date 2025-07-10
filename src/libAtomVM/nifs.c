@@ -20,6 +20,7 @@
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#include <stdint.h>
 #endif
 
 #include "nifs.h"
@@ -228,6 +229,7 @@ static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[]);
 static term nif_zlib_compress_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_nif_error_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[]);
+static term nif_rand_splitmix64_next(Context *ctx, int argc, term argv[]);
 
 #define DECLARE_MATH_NIF_FUN(moniker) \
     static term nif_math_##moniker(Context *ctx, int argc, term argv[]);
@@ -972,6 +974,11 @@ static const struct Nif erlang_bump_reductions_nif = {
     .nif_ptr = nif_erlang_bump_reductions_1
 };
 
+static const struct Nif rand_splitmix64_next_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_rand_splitmix64_next
+};
+
 #define DEFINE_MATH_NIF(moniker)                    \
     static const struct Nif math_##moniker##_nif =  \
     {                                               \
@@ -1079,7 +1086,7 @@ static inline term make_maybe_boxed_int64(Context *ctx, avm_int64_t value)
     #endif
 
     if ((value < MIN_NOT_BOXED_INT) || (value > MAX_NOT_BOXED_INT)) {
-        if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT64_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
         return term_make_boxed_int(value, &ctx->heap);
@@ -5688,8 +5695,6 @@ static term nif_code_load_binary(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    term file_name = argv[1];
-
     term binary = argv[2];
     if (UNLIKELY(!term_is_binary(binary))) {
         RAISE_ERROR(BADARG_ATOM);
@@ -6450,6 +6455,25 @@ static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[])
     return TRUE_ATOM;
 }
 
+static term nif_rand_splitmix64_next(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    VALIDATE_VALUE(argv[0], term_is_any_integer);
+    uint64_t x = term_maybe_unbox_int64(argv[0]);
+    // implementation based on https://github.com/erlang/otp/blob/d051172925a5c84b2f21850a188a533f885f201c/lib/stdlib/src/rand.erl#L1629
+    uint64_t z = (x += 0x9e3779b97f4a7c15);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+    z = z ^ (z >> 31);
+    // assume pessimisticly both ints will be boxed
+    if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2) + 2 * BOXED_INT64_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+      RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term result = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(result, 0, term_make_maybe_boxed_int64(z, &ctx->heap));
+    term_put_tuple_element(result, 1, term_make_maybe_boxed_int64(x, &ctx->heap));
+    return result;
+}
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math
 // error handling is designed to be thread-safe, as errors are specified
