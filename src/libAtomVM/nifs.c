@@ -5785,7 +5785,7 @@ static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
     assert(module->num_filenames >= 1);
     struct ModuleFilename filename = module->filenames[0];
     size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size) + LIST_SIZE(filename.len, 1);
-    if (UNLIKELY(memory_ensure_free(ctx, result_size) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, result_size, 1, &module_atom, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     // Note: this assumes constness of module->binary and could be use-after-free if we allowed changing module bitcode at runtime.
