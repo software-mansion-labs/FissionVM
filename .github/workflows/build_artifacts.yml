@@ -34,21 +34,15 @@ jobs:
       - name: Vars setup
         id: setup
         run: |
-          set -euo pipefail
-          VERSION=$([[ $GITHUB_REF_TYPE = "tag" ]] && echo $GITHUB_REF_NAME || echo ${GITHUB_SHA::8})
-          echo "fissionvm_js=FissionVM-web-${VERSION}.mjs" >> $GITHUB_OUTPUT
-          echo "fissionvm_wasm=FissionVM-web-${VERSION}.wasm" >> $GITHUB_OUTPUT
           echo "artifacts_dir=src/platforms/emscripten/build/src" >> $GITHUB_OUTPUT
 
       - name: "Rename artifacts"
         working-directory: ${{ steps.setup.outputs.artifacts_dir }}
         run: |
-          mv AtomVM.mjs "${{ steps.setup.outputs.fissionvm_js }}"
-          gzip -k "${{ steps.setup.outputs.fissionvm_js }}"
-          sha256sum "${{ steps.setup.outputs.fissionvm_js }}" > "${{ steps.setup.outputs.fissionvm_js }}.sha256"
-          mv AtomVM.wasm "${{ steps.setup.outputs.fissionvm_wasm }}"
-          gzip -k  "${{ steps.setup.outputs.fissionvm_wasm }}"
-          sha256sum "${{ steps.setup.outputs.fissionvm_wasm }}" > "${{ steps.setup.outputs.fissionvm_wasm }}.sha256"
+          gzip -k "AtomVM.mjs"
+          sha256sum "AtomVM.mjs" > "AtomVM.mjs.sha256"
+          gzip -k  "AtomVM.wasm"
+          sha256sum "AtomVM.wasm" > "AtomVM.wasm.sha256"
 
       - name: "Release (web)"
         uses: softprops/action-gh-release@v2
@@ -57,9 +51,9 @@ jobs:
           prerelease: ${{ contains( github.ref_name, '-dev') || contains( github.ref_name, '-rc') }}
           fail_on_unmatched_files: true
           files: |
-            ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_js }}
-            ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_js }}.gz
-            ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_js }}.sha256
-            ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_wasm }}
-            ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_wasm }}.gz
-            ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_wasm }}.sha256
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.mjs
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.mjs.gz
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.mjs.sha256
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.wasm
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.wasm.gz
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.wasm.sha256
