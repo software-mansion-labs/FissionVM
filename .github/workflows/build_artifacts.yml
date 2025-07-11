@@ -54,6 +54,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: ${{ startsWith( github.ref_name, 'test-') }}
+          prerelease: ${{ contains( github.ref_name, '-dev') || contains( github.ref_name, '-rc') }}
           fail_on_unmatched_files: true
           files: |
             ${{ steps.setup.outputs.artifacts_dir }}/${{ steps.setup.outputs.fissionvm_js }}
