@@ -26,6 +26,7 @@ set(ERLANG_MODULES
     ahttp_client
     atomvm
     avm_pubsub
+    avm_rand
     console
     emscripten
     esp
