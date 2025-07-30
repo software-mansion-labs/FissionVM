@@ -194,3 +194,14 @@ X(PRIVATE_ATOM, "\x7", "private")
 X(PUBLIC_ATOM, "\x6", "public")
 X(DUPLICATE_BAG_ATOM, "\xd", "duplicate_bag")
 X(SET_ATOM, "\x3", "set")
+
+
+X(OS_TYPE_ATOM, "\x7", "os_type")
+
+X(TRIM_ATOM, "\x4", "trim")
+X(TRIM_ALL_ATOM, "\x8", "trim_all")
+
+X(NON_EXISTING_ATOM, "\xC", "non_existing")
+
+X(KEY_ATOM, "\x3", "key")
+X(VALUE_ATOM, "\x5", "value")

@@ -25,4 +25,9 @@
 #define ATOMVM_VERSION_MINOR 6
 #define ATOMVM_VERSION_PATCH 999
 
+#define SYSTEM_NAME "Darwin"
+#define SYSTEM_VERSION "24.5.0"
+#define SYSTEM_ARCHITECTURE "arm64"
+#define ATOMVM_VERSION "0.7.0-dev+git.7793679f"
+
 #endif

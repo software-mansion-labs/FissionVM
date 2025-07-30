@@ -45,6 +45,7 @@ set(HEADER_FILES
     list.h
     listeners.h
     mailbox.h
+    md5.h
     memory.h
     module.h
     opcodes.h
@@ -90,6 +91,7 @@ set(SOURCE_FILES
     iff.c
     interop.c
     mailbox.c
+    md5.c
     memory.c
     module.c
     nifs.c

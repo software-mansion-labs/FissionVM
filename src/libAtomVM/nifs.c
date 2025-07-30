@@ -20,20 +20,24 @@
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#include <stdint.h>
 #endif
 
 #include "nifs.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <fenv.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "atom_table.h"
-#include "avm_version.h"
+#include "atomvm_version.h"
 #include "avmpack.h"
 #include "bif.h"
 #include "bitstring.h"
@@ -47,6 +51,7 @@
 #include "globalcontext.h"
 #include "interop.h"
 #include "mailbox.h"
+#include "md5.h"
 #include "memory.h"
 #include "module.h"
 #include "platform_nifs.h"
@@ -66,23 +71,35 @@
 
 #define FLOAT_BUF_SIZE 64
 
-#define RAISE(a, b)  \
-    ctx->x[0] = (a); \
-    ctx->x[1] = (b); \
+#define RAISE(a, b)         \
+    ctx->x[0] = (a);        \
+    ctx->x[1] = (b);        \
+    ctx->x[2] = term_nil(); \
     return term_invalid_term();
 
 #ifndef MAX
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #endif
 
+#ifndef MIN
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#endif
+
 #define NOT_FOUND (0xFF)
 
+#define INVALID_INDEX (SIZE_MAX)
+
 #ifdef ENABLE_ADVANCED_TRACE
-static const char *const trace_calls_atom = "\xB" "trace_calls";
-static const char *const trace_call_args_atom = "\xF" "trace_call_args";
-static const char *const trace_returns_atom = "\xD" "trace_returns";
-static const char *const trace_send_atom = "\xA" "trace_send";
-static const char *const trace_receive_atom = "\xD" "trace_receive";
+static const char *const trace_calls_atom = "\xB"
+                                            "trace_calls";
+static const char *const trace_call_args_atom = "\xF"
+                                                "trace_call_args";
+static const char *const trace_returns_atom = "\xD"
+                                              "trace_returns";
+static const char *const trace_send_atom = "\xA"
+                                           "trace_send";
+static const char *const trace_receive_atom = "\xD"
+                                              "trace_receive";
 #endif
 
 static NativeHandlerResult process_echo_mailbox(Context *ctx);
@@ -98,8 +115,11 @@ static term nif_binary_last_1(Context *ctx, int argc, term argv[]);
 static term nif_binary_part_3(Context *ctx, int argc, term argv[]);
 static term nif_binary_split(Context *ctx, int argc, term argv[]);
 static term nif_binary_replace(Context *ctx, int argc, term argv[]);
+static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[]);
+static term nif_file_native_name_encoding(Context *ctx, int argc, term argv[]);
 static term nif_binary_match(Context *ctx, int argc, term argv[]);
 static term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term argv[]);
+static term nif_os_getenv_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_delete_element_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_atom_to_binary(Context *ctx, int argc, term argv[]);
 static term nif_erlang_atom_to_list_1(Context *ctx, int argc, term argv[]);
@@ -125,6 +145,7 @@ static term nif_erlang_link(Context *ctx, int argc, term argv[]);
 static term nif_erlang_float_to_binary(Context *ctx, int argc, term argv[]);
 static term nif_erlang_float_to_list(Context *ctx, int argc, term argv[]);
 static term nif_erlang_list_to_binary_1(Context *ctx, int argc, term argv[]);
+static term nif_erlang_list_to_bitstring_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_list_to_integer(Context *ctx, int argc, term argv[]);
 static term nif_erlang_list_to_float_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_monotonic_time_1(Context *ctx, int argc, term argv[]);
@@ -135,7 +156,6 @@ static term nif_erlang_register_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_unregister_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_send_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_setelement_3(Context *ctx, int argc, term argv[]);
-// static term nif_erlang_spawn_opt(Context *ctx, int argc, term argv[]);
 static term nif_erlang_spawn_fun_opt(Context *ctx, int argc, term argv[]);
 static term nif_erlang_whereis_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_system_time_1(Context *ctx, int argc, term argv[]);
@@ -177,6 +197,7 @@ static term nif_erlang_memory(Context *ctx, int argc, term argv[]);
 static term nif_erlang_monitor(Context *ctx, int argc, term argv[]);
 static term nif_erlang_demonitor(Context *ctx, int argc, term argv[]);
 static term nif_erlang_unlink(Context *ctx, int argc, term argv[]);
+static term nif_erlang_md5(Context *ctx, int argc, term argv[]);
 static term nif_atomvm_add_avm_pack_binary(Context *ctx, int argc, term argv[]);
 static term nif_atomvm_add_avm_pack_file(Context *ctx, int argc, term argv[]);
 static term nif_atomvm_close_avm_pack(Context *ctx, int argc, term argv[]);
@@ -193,14 +214,23 @@ static term nif_code_all_loaded(Context *ctx, int argc, term argv[]);
 static term nif_code_load_abs(Context *ctx, int argc, term argv[]);
 static term nif_code_load_binary(Context *ctx, int argc, term argv[]);
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[]);
+// static term nif_code_get_object_code(Context *ctx, int argc, term argv[]);
+// static term nif_code_which(Context *ctx, int argc, term argv[]);
 static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[]);
 static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
+static term nif_lists_member(Context *ctx, int argc, term argv[]);
+static term nif_lists_keymember(Context *ctx, int argc, term argv[]);
+static term nif_lists_keyfind(Context *ctx, int argc, term argv[]);
+static term nif_lists_keysearch(Context *ctx, int argc, term argv[]);
 static term nif_maps_from_keys(Context *ctx, int argc, term argv[]);
 static term nif_maps_next(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_list(Context *ctx, int argc, term argv[]);
 static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]);
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[]);
 static term nif_zlib_compress_1(Context *ctx, int argc, term argv[]);
+static term nif_erlang_nif_error_1(Context *ctx, int argc, term argv[]);
+static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[]);
+static term nif_rand_splitmix64_next(Context *ctx, int argc, term argv[]);
 
 #define DECLARE_MATH_NIF_FUN(moniker) \
     static term nif_math_##moniker(Context *ctx, int argc, term argv[]);
@@ -228,651 +258,605 @@ DECLARE_MATH_NIF_FUN(sqrt)
 DECLARE_MATH_NIF_FUN(tan)
 DECLARE_MATH_NIF_FUN(tanh)
 
-static const struct Nif binary_at_nif =
-{
+static const struct Nif binary_at_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_at_2
 };
 
-static const struct Nif binary_copy_nif =
-{
+static const struct Nif binary_copy_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_copy
 };
 
-static const struct Nif binary_first_nif =
-{
+static const struct Nif binary_first_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_first_1
 };
 
-static const struct Nif binary_last_nif =
-{
+static const struct Nif binary_last_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_last_1
 };
 
-static const struct Nif binary_part_nif =
-{
+static const struct Nif binary_part_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_part_3
 };
 
-static const struct Nif binary_split_nif =
-{
+static const struct Nif binary_split_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_split
 };
 
-static const struct Nif binary_replace_nif =
-{
+static const struct Nif binary_replace_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_replace
 };
 
-static const struct Nif binary_match_nif =
-{
+static const struct Nif prim_file_get_cwd_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_prim_file_get_cwd_0
+};
+
+static const struct Nif file_native_name_encoding_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_file_native_name_encoding
+};
+
+static const struct Nif binary_match_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_binary_match
 };
 
-static const struct Nif make_ref_nif =
-{
+static const struct Nif make_ref_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_make_ref_0
 };
 
-static const struct Nif atom_to_binary_nif =
-{
+static const struct Nif atom_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_atom_to_binary
 };
 
-static const struct Nif atom_to_list_nif =
-{
+static const struct Nif atom_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_atom_to_list_1
 };
 
-static const struct Nif binary_to_atom_1_nif =
-{
+static const struct Nif binary_to_atom_1_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_atom_1
 };
 
-static const struct Nif binary_to_float_nif =
-{
+static const struct Nif binary_to_float_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_float_1
 };
 
-static const struct Nif binary_to_integer_nif =
-{
+static const struct Nif binary_to_integer_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_integer
 };
 
-static const struct Nif binary_to_list_nif =
-{
+static const struct Nif binary_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_list_1
 };
 
-static const struct Nif binary_to_existing_atom_1_nif =
-{
+static const struct Nif binary_to_existing_atom_1_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_existing_atom_1
 };
 
-static const struct Nif delete_element_nif =
-{
+static const struct Nif delete_element_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_delete_element_2
 };
 
-static const struct Nif display_nif =
-{
+static const struct Nif display_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_display_1
 };
 
-static const struct Nif erase_0_nif =
-{
+static const struct Nif erase_0_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_erase_0
 };
 
-static const struct Nif erase_1_nif =
-{
+static const struct Nif erase_1_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_erase_1
 };
 
-static const struct Nif error_nif =
-{
+static const struct Nif error_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_error
 };
 
-static const struct Nif exit_nif =
-{
+static const struct Nif exit_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_exit
 };
 
-static const struct Nif insert_element_nif =
-{
+static const struct Nif insert_element_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_insert_element_3
 };
 
-static const struct Nif integer_to_binary_nif =
-{
+static const struct Nif integer_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_integer_to_binary_2
 };
 
-static const struct Nif integer_to_list_nif =
-{
+static const struct Nif integer_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_integer_to_list_2
 };
 
-static const struct Nif float_to_binary_nif =
-{
+static const struct Nif float_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_float_to_binary
 };
 
-static const struct Nif float_to_list_nif =
-{
+static const struct Nif float_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_float_to_list
 };
 
-static const struct Nif fun_info_nif =
-{
+static const struct Nif fun_info_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_fun_info_2
 };
 
-static const struct Nif is_process_alive_nif =
-{
+static const struct Nif is_process_alive_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_is_process_alive_1
 };
 
-static const struct Nif list_to_binary_nif =
-{
+static const struct Nif list_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_binary_1
 };
 
-static const struct Nif list_to_integer_nif =
-{
+static const struct Nif list_to_bitstring_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_list_to_bitstring_1
+};
+
+static const struct Nif list_to_integer_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_integer
 };
 
-static const struct Nif list_to_float_nif =
-{
+static const struct Nif list_to_float_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_float_1
 };
 
-static const struct Nif list_to_tuple_nif =
-{
+static const struct Nif list_to_tuple_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_list_to_tuple_1
 };
 
-static const struct Nif iolist_size_nif =
-{
+static const struct Nif iolist_size_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_iolist_size_1
 };
 
-static const struct Nif iolist_to_binary_nif =
-{
+static const struct Nif iolist_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_iolist_to_binary_1
 };
 
-static const struct Nif open_port_nif =
-{
+static const struct Nif open_port_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_open_port_2
 };
 
-static const struct Nif make_tuple_nif =
-{
+static const struct Nif make_tuple_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_make_tuple_2
 };
 
-static const struct Nif register_nif =
-{
+static const struct Nif register_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_register_2
 };
 
-static const struct Nif unregister_nif =
-{
+static const struct Nif unregister_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_unregister_1
 };
 
-static const struct Nif spawn_opt_nif =
-{
+static const struct Nif spawn_opt_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_spawn_opt
 };
 
-static const struct Nif spawn_fun_opt_nif =
-{
+static const struct Nif spawn_fun_opt_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_spawn_fun_opt
 };
 
-static const struct Nif send_nif =
-{
+static const struct Nif send_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_send_2
 };
 
-static const struct Nif setelement_nif =
-{
+static const struct Nif setelement_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_setelement_3
 };
 
-static const struct Nif whereis_nif =
-{
+static const struct Nif whereis_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_whereis_1
 };
 
-static const struct Nif concat_nif =
-{
+static const struct Nif concat_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_concat_2
 };
 
-static const struct Nif monotonic_time_nif =
-{
+static const struct Nif monotonic_time_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_monotonic_time_1
 };
 
-static const struct Nif system_time_nif =
-{
+static const struct Nif system_time_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_system_time_1
 };
 
-static const struct Nif universaltime_nif =
-{
+static const struct Nif universaltime_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_universaltime_0
 };
 
-static const struct Nif localtime_nif =
-{
+static const struct Nif localtime_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_localtime
 };
 
-static const struct Nif timestamp_nif =
-{
+static const struct Nif timestamp_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_timestamp_0
 };
 
-static const struct Nif system_time_to_universal_time_nif =
-{
+static const struct Nif system_time_to_universal_time_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_calendar_system_time_to_universal_time_2
 };
 
-static const struct Nif tuple_to_list_nif =
-{
+const struct Nif os_getenv_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_os_getenv_1
+};
+
+static const struct Nif tuple_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_tuple_to_list_1
 };
 
-static const struct Nif flat_size_nif =
-{
+static const struct Nif flat_size_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erts_debug_flat_size
 };
 
-static const struct Nif process_flag_nif =
-{
+static const struct Nif process_flag_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_process_flag
 };
 
-static const struct Nif processes_nif =
-{
+static const struct Nif processes_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_processes
 };
 
-static const struct Nif process_info_nif =
-{
+static const struct Nif process_info_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_process_info
 };
 
-static const struct Nif get_0_nif =
-{
+static const struct Nif get_0_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_get_0
 };
 
-static const struct Nif put_nif =
-{
+static const struct Nif put_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_put_2
 };
 
-static const struct Nif system_info_nif =
-{
+static const struct Nif system_info_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_system_info
 };
 
-static const struct Nif system_flag_nif =
-{
+static const struct Nif system_flag_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_system_flag
 };
 
-static const struct Nif binary_to_term_nif =
-{
+static const struct Nif binary_to_term_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_binary_to_term
 };
 
-static const struct Nif term_to_binary_nif =
-{
+static const struct Nif term_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_term_to_binary
 };
 
-static const struct Nif split_binary_nif =
-{
+static const struct Nif split_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_split_binary
 };
 
-static const struct Nif throw_nif =
-{
+static const struct Nif throw_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_throw
 };
 
-static const struct Nif pid_to_list_nif =
-{
+static const struct Nif pid_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_pid_to_list
 };
 
-static const struct Nif port_to_list_nif =
-{
+static const struct Nif port_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_port_to_list
 };
 
-static const struct Nif ref_to_list_nif =
-{
+static const struct Nif ref_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_ref_to_list
 };
 
-static const struct Nif fun_to_list_nif =
-{
+static const struct Nif fun_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_fun_to_list
 };
 
-static const struct Nif function_exported_nif =
-{
+static const struct Nif function_exported_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_function_exported
 };
 
-static const struct Nif garbage_collect_nif =
-{
+static const struct Nif garbage_collect_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_garbage_collect
 };
 
-static const struct Nif make_fun_nif =
-{
+static const struct Nif make_fun_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_make_fun_3
 };
 
-static const struct Nif memory_nif =
-{
+static const struct Nif memory_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_memory
 };
 
-static const struct Nif monitor_nif =
-{
+static const struct Nif monitor_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_monitor
 };
 
-static const struct Nif demonitor_nif =
-{
+static const struct Nif demonitor_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_demonitor
 };
 
-static const struct Nif link_nif =
-{
+static const struct Nif link_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_link
 };
 
-static const struct Nif unlink_nif =
-{
+static const struct Nif unlink_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_unlink
 };
 
-static const struct Nif group_leader_nif =
-{
+static const struct Nif group_leader_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_group_leader
 };
 
-static const struct Nif get_module_info_nif =
-{
+static const struct Nif get_module_info_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_get_module_info
 };
 
-static const struct Nif setnode_2_nif =
-{
+static const struct Nif setnode_2_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_setnode_2
 };
 
-static const struct Nif raise_nif =
-{
+static const struct Nif raise_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_raise
 };
 
-static const struct Nif ets_new_nif =
-{
+static const struct Nif md5_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_md5
+};
+
+static const struct Nif ets_new_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_new
 };
 
-static const struct Nif ets_insert_nif =
-{
+static const struct Nif ets_insert_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_insert
 };
 
-static const struct Nif ets_lookup_nif =
-{
-    .base.type = NIFFunctionType,
-    .nif_ptr = nif_ets_lookup
-};
-
-static const struct Nif ets_lookup_element_nif =
-{
-    .base.type = NIFFunctionType,
-    .nif_ptr = nif_ets_lookup_element
-};
-
-static const struct Nif ets_delete_nif =
-{
-    .base.type = NIFFunctionType,
-    .nif_ptr = nif_ets_delete
-};
-
-static const struct Nif ets_update_counter_nif =
-{
+static const struct Nif ets_update_counter_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_ets_update_counter
 };
 
-static const struct Nif atomvm_add_avm_pack_binary_nif =
-{
+static const struct Nif ets_lookup_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_lookup
+};
+
+static const struct Nif ets_lookup_element_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_lookup_element
+};
+
+static const struct Nif ets_delete_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_delete
+};
+
+static const struct Nif atomvm_add_avm_pack_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_add_avm_pack_binary
 };
-static const struct Nif atomvm_add_avm_pack_file_nif =
-{
+static const struct Nif atomvm_add_avm_pack_file_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_add_avm_pack_file
 };
-static const struct Nif atomvm_close_avm_pack_nif =
-{
+static const struct Nif atomvm_close_avm_pack_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_close_avm_pack
 };
-static const struct Nif atomvm_get_start_beam_nif =
-{
+static const struct Nif atomvm_get_start_beam_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_get_start_beam
 };
-static const struct Nif atomvm_read_priv_nif =
-{
+static const struct Nif atomvm_read_priv_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_read_priv
 };
-static const struct Nif atomvm_get_creation_nif =
-{
+static const struct Nif atomvm_get_creation_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_atomvm_get_creation
 };
-static const struct Nif console_print_nif =
-{
+static const struct Nif console_print_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_console_print
 };
-static const struct Nif base64_encode_nif =
-{
+static const struct Nif base64_encode_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_base64_encode
 };
-static const struct Nif base64_decode_nif =
-{
+static const struct Nif base64_decode_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_base64_decode
 };
-static const struct Nif base64_encode_to_string_nif =
-{
+static const struct Nif base64_encode_to_string_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_base64_encode_to_string
 };
-static const struct Nif base64_decode_to_string_nif =
-{
+static const struct Nif base64_decode_to_string_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_base64_decode_to_string
 };
-static const struct Nif code_all_available_nif =
-{
+static const struct Nif code_all_available_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_all_available
 };
-static const struct Nif code_all_loaded_nif =
-{
+static const struct Nif code_all_loaded_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_all_loaded
 };
-static const struct Nif code_load_abs_nif =
-{
+static const struct Nif code_load_abs_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_load_abs
 };
-static const struct Nif code_load_binary_nif =
-{
+static const struct Nif code_load_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_load_binary
 };
-static const struct Nif code_ensure_loaded_nif =
-{
+static const struct Nif code_ensure_loaded_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_code_ensure_loaded
 };
 
-static const struct Nif module_loaded_nif =
-{
+// static const struct Nif code_get_object_code_nif = {
+//     .base.type = NIFFunctionType,
+//     .nif_ptr = nif_code_get_object_code
+// };
+
+// static const struct Nif code_which_nif = {
+//     .base.type = NIFFunctionType,
+//     .nif_ptr = nif_code_which
+// };
+
+static const struct Nif module_loaded_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_module_loaded
 };
 
-static const struct Nif lists_reverse_nif =
-{
+static const struct Nif lists_reverse_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_lists_reverse
 };
-static const struct Nif maps_from_keys_nif =
-{
+static const struct Nif lists_member_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_lists_member
+};
+static const struct Nif lists_keymember_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_lists_keymember
+};
+static const struct Nif lists_keyfind_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_lists_keyfind
+};
+static const struct Nif lists_keysearch_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_lists_keysearch
+};
+static const struct Nif maps_from_keys_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_maps_from_keys
 };
-static const struct Nif maps_next_nif =
-{
+static const struct Nif maps_next_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_maps_next
 };
-static const struct Nif unicode_characters_to_list_nif =
-{
+static const struct Nif unicode_characters_to_list_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_list
 };
-static const struct Nif unicode_characters_to_binary_nif =
-{
+static const struct Nif unicode_characters_to_binary_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_unicode_characters_to_binary
 };
-static const struct Nif erlang_lists_subtract_nif =
-{
+static const struct Nif erlang_lists_subtract_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_lists_subtract
 };
-static const struct Nif zlib_compress_nif =
-{
+static const struct Nif zlib_compress_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_zlib_compress_1
 };
 
+static const struct Nif erlang_nif_error_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_nif_error_1
+};
 
-#define DEFINE_MATH_NIF(moniker)                    \
-    static const struct Nif math_##moniker##_nif =  \
-    {                                               \
-        .base.type = NIFFunctionType,               \
-        .nif_ptr = nif_math_##moniker               \
+static const struct Nif erlang_bump_reductions_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_bump_reductions_1
+};
+
+static const struct Nif rand_splitmix64_next_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_rand_splitmix64_next
+};
+
+#define DEFINE_MATH_NIF(moniker)                     \
+    static const struct Nif math_##moniker##_nif = { \
+        .base.type = NIFFunctionType,                \
+        .nif_ptr = nif_math_##moniker                \
     };
 
 DEFINE_MATH_NIF(cos)
@@ -898,7 +882,7 @@ DEFINE_MATH_NIF(sqrt)
 DEFINE_MATH_NIF(tan)
 DEFINE_MATH_NIF(tanh)
 
-//Handle optional nifs
+// Handle optional nifs
 #if HAVE_OPEN && HAVE_CLOSE
 #define IF_HAVE_OPEN_CLOSE(expr) (expr)
 #if HAVE_EXECVE
@@ -933,7 +917,7 @@ DEFINE_MATH_NIF(tanh)
 #define IF_HAVE_OPENDIR_READDIR_CLOSEDIR(expr) NULL
 #endif
 
-//Ignore warning caused by gperf generated code
+// Ignore warning caused by gperf generated code
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -952,17 +936,17 @@ const struct Nif *nifs_get(const char *mfa)
 
 static inline term make_maybe_boxed_int64(Context *ctx, avm_int64_t value)
 {
-    #if BOXED_TERMS_REQUIRED_FOR_INT64 == 2
-        if ((value < AVM_INT_MIN) || (value > AVM_INT_MAX)) {
-            if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT64_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-                RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-            }
-            return term_make_boxed_int64(value, &ctx->heap);
+#if BOXED_TERMS_REQUIRED_FOR_INT64 == 2
+    if ((value < AVM_INT_MIN) || (value > AVM_INT_MAX)) {
+        if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT64_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
-    #endif
+        return term_make_boxed_int64(value, &ctx->heap);
+    }
+#endif
 
     if ((value < MIN_NOT_BOXED_INT) || (value > MAX_NOT_BOXED_INT)) {
-        if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        if (UNLIKELY(memory_ensure_free_opt(ctx, BOXED_INT64_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
         return term_make_boxed_int(value, &ctx->heap);
@@ -998,6 +982,12 @@ static term nif_erlang_iolist_to_binary_1(Context *ctx, int argc, term argv[])
     return nif_erlang_list_to_binary_1(ctx, argc, argv);
 }
 
+static term nif_erlang_list_to_bitstring_1(Context *ctx, int argc, term argv[])
+{
+    //  TODO: implement proper list_to_bitstring function when the bitstrings are supported
+    return nif_erlang_list_to_binary_1(ctx, argc, argv);
+}
+
 static term nif_erlang_open_port_2(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
@@ -1014,11 +1004,11 @@ static term nif_erlang_open_port_2(Context *ctx, int argc, term argv[])
     }
 
     term t = term_get_tuple_element(port_name_tuple, 1);
-    //TODO: validate port name
+    // TODO: validate port name
     int ok;
     char *driver_name = interop_term_to_string(t, &ok);
     if (UNLIKELY(!ok)) {
-        //TODO: handle atoms here
+        // TODO: handle atoms here
         RAISE_ERROR(BADARG_ATOM);
     }
 
@@ -1059,9 +1049,7 @@ static term nif_erlang_register_2(Context *ctx, int argc, term argv[])
     int32_t pid = term_to_local_process_id(pid_or_port_term);
 
     // pid must be existing, not already registered, and not the atom undefined.
-    if (UNLIKELY(!globalcontext_process_exists(ctx->global, pid)) ||
-        globalcontext_get_registered_process(ctx->global, atom_index) != UNDEFINED_ATOM ||
-        reg_name_term == UNDEFINED_ATOM){
+    if (UNLIKELY(!globalcontext_process_exists(ctx->global, pid)) || globalcontext_get_registered_process(ctx->global, atom_index) != UNDEFINED_ATOM || reg_name_term == UNDEFINED_ATOM) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
@@ -1214,7 +1202,8 @@ static NativeHandlerResult process_console_mailbox(Context *ctx)
     NativeHandlerResult result = NativeContinue;
     while (result == NativeContinue) {
         Message *message = mailbox_first(&ctx->mailbox);
-        if (message == NULL) break;
+        if (message == NULL)
+            break;
         term msg = message->message;
 
         result = process_console_message(ctx, msg);
@@ -1233,6 +1222,9 @@ static term do_spawn(Context *ctx, Context *new_ctx, size_t arity, size_t n_free
     term max_heap_size_term = interop_proplist_get_value(opts_term, MAX_HEAP_SIZE_ATOM);
     term link_term = interop_proplist_get_value(opts_term, LINK_ATOM);
     term monitor_term = interop_proplist_get_value(opts_term, MONITOR_ATOM);
+#ifdef AVM_DEBUG_GC
+    term heap_growth_strategy = MINIMUM_ATOM;
+#else
     term heap_growth_strategy = interop_proplist_get_value_default(opts_term, ATOMVM_HEAP_GROWTH_ATOM, BOUNDED_FREE_ATOM);
     term request_term = interop_proplist_get_value_default(opts_term, REQUEST_ATOM, UNDEFINED_ATOM);
     term group_leader;
@@ -1247,6 +1239,7 @@ static term do_spawn(Context *ctx, Context *new_ctx, size_t arity, size_t n_free
         context_destroy(new_ctx);
         RAISE_ERROR(BADARG_ATOM);
     }
+#endif
 
     if (min_heap_size_term != term_nil()) {
         if (UNLIKELY(!term_is_integer(min_heap_size_term))) {
@@ -1279,7 +1272,7 @@ static term do_spawn(Context *ctx, Context *new_ctx, size_t arity, size_t n_free
     }
     size += memory_estimate_usage(group_leader);
     if (UNLIKELY(memory_ensure_free_opt(new_ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        //TODO: new process should be terminated, however a new pid is returned anyway
+        // TODO: new process should be terminated, however a new pid is returned anyway
         fprintf(stderr, "Unable to allocate sufficient memory to spawn process.\n");
         AVM_ABORT();
     }
@@ -1302,6 +1295,7 @@ static term do_spawn(Context *ctx, Context *new_ctx, size_t arity, size_t n_free
             context_destroy(new_ctx);
             RAISE_ERROR(BADARG_ATOM);
     }
+
     uint64_t ref_ticks = 0;
     term new_pid = term_from_local_process_id(new_ctx->process_id);
 
@@ -1447,24 +1441,27 @@ term nif_erlang_spawn_opt(Context *ctx, int argc, term argv[])
 
     Module *found_module = globalcontext_get_module(ctx->global, term_to_atom_index(module_term));
     if (UNLIKELY(!found_module)) {
+        context_destroy(new_ctx);
         return UNDEFINED_ATOM;
     }
 
     int proper;
     int args_len = term_list_length(argv[2], &proper);
     if (UNLIKELY(!proper)) {
+        context_destroy(new_ctx);
         RAISE_ERROR(BADARG_ATOM);
     }
     int label = module_search_exported_function(found_module, term_to_atom_index(argv[1]), args_len);
-    //TODO: fail here if no function has been found
+    // TODO: fail here if no function has been found
     if (UNLIKELY(label == 0)) {
+        context_destroy(new_ctx);
         AVM_ABORT();
     }
     new_ctx->saved_module = found_module;
     new_ctx->saved_ip = found_module->labels[label];
     new_ctx->cp = module_address(found_module->module_index, found_module->end_instruction_ii);
 
-    //TODO: check available registers count
+    // TODO: check available registers count
     int reg_index = 0;
 
     size_t min_heap_size = 0;
@@ -1794,6 +1791,33 @@ term nif_calendar_system_time_to_universal_time_2(Context *ctx, int argc, term a
     return build_datetime_from_tm(ctx, gmtime_r(&ts.tv_sec, &broken_down_time));
 }
 
+static term nif_os_getenv_1(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term env_var_list = argv[0];
+    VALIDATE_VALUE(env_var_list, term_is_list);
+
+    int ok;
+    const char *env_var = interop_list_to_utf8_string(env_var_list, &ok);
+    if (UNLIKELY(!ok)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    const char *env_var_value = getenv(env_var);
+    free((void *) env_var);
+    if (IS_NULL_PTR(env_var_value)) {
+        return FALSE_ATOM;
+    }
+
+    size_t len = strlen(env_var_value);
+    if (UNLIKELY(memory_ensure_free_opt(ctx, LIST_SIZE(len, 1), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    return interop_bytes_to_list(env_var_value, len, &ctx->heap);
+}
+
 static term nif_erlang_make_tuple_2(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
@@ -2014,8 +2038,8 @@ static term nif_erlang_binary_to_integer(Context *ctx, int argc, term argv[])
     memcpy(null_terminated_buf, bin_data, bin_data_size);
     null_terminated_buf[bin_data_size] = '\0';
 
-    //TODO: handle errors
-    //TODO: do not copy buffer, implement a custom strotoll
+    // TODO: handle errors
+    // TODO: do not copy buffer, implement a custom strotoll
     char *endptr;
     uint64_t value = strtoll(null_terminated_buf, &endptr, base);
     if (*endptr != '\0') {
@@ -2121,23 +2145,14 @@ static term nif_erlang_list_to_float_1(Context *ctx, int argc, term argv[])
 static term nif_erlang_binary_to_list_1(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
-
-    term value = argv[0];
-    VALIDATE_VALUE(value, term_is_binary);
-
-    int bin_size = term_binary_size(value);
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, bin_size * 2, 1, &value, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    term binary = argv[0];
+    VALIDATE_VALUE(binary, term_is_binary);
+    int size = term_binary_size(binary);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, LIST_SIZE(size, 1), 1, &binary, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-
-    const uint8_t *bin_data = (const uint8_t *) term_binary_data(value);
-
-    term prev = term_nil();
-    for (int i = bin_size - 1; i >= 0; i--) {
-        prev = term_list_prepend(term_from_int11(bin_data[i]), prev, &ctx->heap);
-    }
-
-    return prev;
+    const uint8_t *data = (const uint8_t *) term_binary_data(binary);
+    return interop_bytes_to_list(data, size, &ctx->heap);
 }
 
 static term nif_erlang_binary_to_existing_atom_1(Context *ctx, int argc, term argv[])
@@ -2954,6 +2969,59 @@ static term nif_erlang_system_info(Context *ctx, int argc, term argv[])
         return term_from_int32(1);
 #endif
     }
+    if (key == OS_TYPE_ATOM) {
+        RAISE_ERROR(BADARG_ATOM);
+        //     size_t atom_string_len = strlen(SYSTEM_NAME);
+
+        //     if (UNLIKELY(atom_string_len > 255)) {
+        //         RAISE_ERROR(SYSTEM_LIMIT_ATOM);
+        //     }
+
+        //     AtomString name_atom = malloc(atom_string_len + 1);
+
+        //     if (IS_NULL_PTR(name_atom)) {
+        //         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        //     }
+
+        //     ((uint8_t *) name_atom)[0] = atom_string_len;
+
+        //     char atom_string[] = SYSTEM_NAME;
+
+        //     atom_string[0] = tolower(atom_string[0]);
+
+        //     memcpy(((char *) name_atom) + 1, atom_string, atom_string_len);
+        //     long global_atom_index = atom_table_ensure_atom(ctx->global->atom_table, name_atom, AtomTableCopyAtom);
+
+        //     free((void *) name_atom);
+
+        //     if (UNLIKELY(global_atom_index == ATOM_TABLE_NOT_FOUND)) {
+        //         RAISE_ERROR(BADARG_ATOM);
+        //     }
+
+        //     if (UNLIKELY(global_atom_index == ATOM_TABLE_ALLOC_FAIL)) {
+        //         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        //     }
+
+        //     if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        //         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        //     }
+
+        //     term result_tuple = term_alloc_tuple(2, &ctx->heap);
+
+        //     term unix_atom = globalcontext_make_atom(ctx->global, ATOM_STR("\x4", "unix"));
+        //     term_put_tuple_element(result_tuple, 0, unix_atom);
+
+        //     term name_atom_term = term_from_atom_index(global_atom_index);
+        //     term_put_tuple_element(result_tuple, 1, name_atom_term);
+
+        //     return result_tuple;
+    }
+    if (key == OTP_RELEASE_ATOM) {
+        if (memory_ensure_free_opt(ctx, TERM_STRING_SIZE(strlen("26")), MEMORY_CAN_SHRINK) != MEMORY_GC_OK) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+        return term_from_string((const uint8_t *) "26", sizeof("26") - 1, &ctx->heap);
+    }
     return sys_get_info(ctx, key);
 }
 
@@ -2974,11 +3042,10 @@ static term nif_erlang_system_flag(Context *ctx, int argc, term argv[])
         int new_value = term_to_int(value);
         int nb_processors = smp_get_online_processors();
         if (UNLIKELY(new_value < 1) || UNLIKELY(new_value > nb_processors)) {
-            argv[0] = ERROR_ATOM;
-            argv[1] = BADARG_ATOM;
-            return term_invalid_term();
+            RAISE_ERROR(BADARG_ATOM);
         }
-        while (!ATOMIC_COMPARE_EXCHANGE_WEAK_INT(&ctx->global->online_schedulers, &old_value, new_value)) {};
+        while (!ATOMIC_COMPARE_EXCHANGE_WEAK_INT(&ctx->global->online_schedulers, &old_value, new_value)) {
+        };
         return term_from_int32(old_value);
     }
 #else
@@ -3170,57 +3237,176 @@ static term nif_binary_part_3(Context *ctx, int argc, term argv[])
     return term_maybe_create_sub_binary(pattern_term, slice.pos, slice.len, &ctx->heap, ctx->global);
 }
 
+static const char *find_pattern(const char *bin, size_t bin_size, const char **patterns, const size_t *pattern_sizes, size_t patterns_len, int *matched_pattern_index)
+{
+    for (size_t i = 0; i < bin_size; i++) {
+        for (size_t pattern_i = 0; pattern_i < patterns_len; pattern_i++) {
+            if (pattern_sizes[pattern_i] <= bin_size - i) {
+                if (memcmp(bin + i, patterns[pattern_i], pattern_sizes[pattern_i]) == 0) {
+                    *matched_pattern_index = pattern_i;
+                    return bin + i;
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
+term trim_list(Context *ctx, term list, size_t heap_size, bool trim, bool trim_all)
+{
+    int proper;
+    size_t length = term_list_length(list, &proper);
+    UNUSED(proper);
+    term *cons = malloc(length * sizeof(term));
+    if (IS_NULL_PTR(cons)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, 1, &list, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        free(cons);
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    term iter = list;
+
+    for (size_t i = 0; i < length; ++i) {
+        cons[i] = iter;
+        iter = term_get_list_tail(iter);
+    }
+
+    bool found_non_empty = false;
+    term trimmed = term_nil();
+    for (long long i = length - 1; i >= 0; --i) {
+        term head = term_get_list_head(cons[i]);
+
+        bool is_empty = term_binary_size(head) == 0;
+        if (is_empty) {
+            bool trim_tail = trim && !found_non_empty;
+            if (!trim_tail && !trim_all) {
+                trimmed = term_list_prepend(head, trimmed, &ctx->heap);
+            }
+        } else {
+            trimmed = term_list_prepend(head, trimmed, &ctx->heap);
+            found_non_empty = true;
+        }
+    }
+
+    free(cons);
+    return trimmed;
+}
+
+static void get_pattern_data_with_sizes(term pattern_term, const char **pattern_data, size_t *sizes, size_t *shortest_pattern_length)
+{
+    if (term_is_binary(pattern_term)) {
+        pattern_data[0] = term_binary_data(pattern_term);
+        sizes[0] = term_binary_size(pattern_term);
+        *shortest_pattern_length = sizes[0];
+    }
+
+    for (size_t i = 0; term_is_nonempty_list(pattern_term); ++i) {
+        term head = term_get_list_head(pattern_term);
+        pattern_data[i] = term_binary_data(head);
+        sizes[i] = term_binary_size(head);
+        if (i == 0 || sizes[i] < *shortest_pattern_length) {
+            *shortest_pattern_length = sizes[i];
+        }
+        pattern_term = term_get_list_tail(pattern_term);
+    }
+}
+
 static term nif_binary_split(Context *ctx, int argc, term argv[])
 {
     term bin_term = argv[0];
     term pattern_term = argv[1];
 
     VALIDATE_VALUE(bin_term, term_is_binary);
-    VALIDATE_VALUE(pattern_term, term_is_binary);
-
+    if (!term_is_binary(pattern_term) && !term_is_nonempty_list(pattern_term)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
     bool global = false;
+    bool trim = false;
+    bool trim_all = false;
+
     if (argc == 3) {
         term options = argv[2];
         if (UNLIKELY(!term_is_list(options))) {
             RAISE_ERROR(BADARG_ATOM);
         }
-        if (term_is_nonempty_list(options)) {
-            term head = term_get_list_head(options);
-            term tail = term_get_list_tail(options);
-            if (UNLIKELY(head != GLOBAL_ATOM)) {
+        term head;
+        term tail = options;
+        while (term_is_nonempty_list(tail)) {
+            head = term_get_list_head(tail);
+            tail = term_get_list_tail(tail);
+            switch (head) {
+                case GLOBAL_ATOM:
+                    global = true;
+                    break;
+                case TRIM_ATOM:
+                    trim = true;
+                    break;
+                case TRIM_ALL_ATOM:
+                    trim_all = true;
+                    break;
+                default:
+                    RAISE_ERROR(BADARG_ATOM);
+            }
+        }
+    }
+    size_t pattern_list_size = 1;
+    if (term_is_list(pattern_term)) {
+        int proper;
+        pattern_list_size = term_list_length(pattern_term, &proper);
+        if (UNLIKELY(!proper)) {
+            RAISE_ERROR(BADARG_ATOM);
+        }
+        term iter = pattern_term;
+        while (term_is_nonempty_list(iter)) {
+            term head = term_get_list_head(iter);
+            if (UNLIKELY(term_binary_size(head) == 0)) {
                 RAISE_ERROR(BADARG_ATOM);
             }
-            if (UNLIKELY(!term_is_nil(tail))) {
-                RAISE_ERROR(BADARG_ATOM);
-            }
-            global = true;
+            iter = term_get_list_tail(iter);
+        }
+    } else if (term_is_binary(pattern_term)) {
+        size_t pattern_size = term_binary_size(pattern_term);
+        if (UNLIKELY(pattern_size == 0)) {
+            RAISE_ERROR(BADARG_ATOM);
         }
     }
 
     int bin_size = term_binary_size(bin_term);
-    int pattern_size = term_binary_size(pattern_term);
-
-    if (UNLIKELY(pattern_size == 0)) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
 
     const char *bin_data = term_binary_data(bin_term);
-    const char *pattern_data = term_binary_data(pattern_term);
+    const char **pattern_data = malloc(sizeof(char *) * pattern_list_size);
+    if (IS_NULL_PTR(pattern_data)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+
+    size_t *sizes = malloc(sizeof(size_t) * pattern_list_size);
+    if (IS_NULL_PTR(sizes)) {
+        free(pattern_data);
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    size_t shortest_pattern_length;
+
+    get_pattern_data_with_sizes(pattern_term, pattern_data, sizes, &shortest_pattern_length);
 
     // Count segments first to allocate memory once.
     size_t num_segments = 1;
     const char *temp_bin_data = bin_data;
-    int temp_bin_size = bin_size;
+    size_t temp_bin_size = bin_size;
     size_t heap_size = 0;
     do {
-        const char *found = (const char *) memmem(temp_bin_data, temp_bin_size, pattern_data, pattern_size);
-        if (!found) break;
+        int matched_pattern_index;
+        const char *found = find_pattern(temp_bin_data, temp_bin_size, pattern_data, sizes, pattern_list_size, &matched_pattern_index);
+        if (!found)
+            break;
         num_segments++;
         heap_size += CONS_SIZE + term_sub_binary_heap_size(argv[0], found - temp_bin_data);
-        int next_search_offset = found - temp_bin_data + pattern_size;
+        int next_search_offset = found - temp_bin_data + sizes[matched_pattern_index];
         temp_bin_data += next_search_offset;
         temp_bin_size -= next_search_offset;
-    } while (global && temp_bin_size >= pattern_size);
+    } while (global && temp_bin_size >= shortest_pattern_length);
 
     heap_size += CONS_SIZE + term_sub_binary_heap_size(argv[0], temp_bin_size);
 
@@ -3229,6 +3415,8 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
     if (num_segments == 1) {
         // not found
         if (UNLIKELY(memory_ensure_free_with_roots(ctx, LIST_SIZE(1, 0), 1, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            free(pattern_data);
+            free(sizes);
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         }
 
@@ -3237,6 +3425,8 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     // binary:split/2,3 always return sub binaries, except when copied binaries are as small as sub-binaries.
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_size, 2, argv, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        free(pattern_data);
+        free(sizes);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
@@ -3247,14 +3437,17 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
 
     // Reset pointers after allocation
     bin_data = term_binary_data(argv[0]);
-    pattern_data = term_binary_data(argv[1]);
+
+    pattern_term = argv[1];
+    get_pattern_data_with_sizes(pattern_term, pattern_data, sizes, &shortest_pattern_length);
 
     term list_cursor = result_list;
     temp_bin_data = bin_data;
     temp_bin_size = bin_size;
     term *list_ptr = term_get_list_ptr(list_cursor);
     do {
-        const char *found = (const char *) memmem(temp_bin_data, temp_bin_size, pattern_data, pattern_size);
+        int matched_pattern_index;
+        const char *found = find_pattern(temp_bin_data, temp_bin_size, pattern_data, sizes, pattern_list_size, &matched_pattern_index);
 
         if (found) {
             term tok = term_maybe_create_sub_binary(argv[0], temp_bin_data - bin_data, found - temp_bin_data, &ctx->heap, ctx->global);
@@ -3263,7 +3456,7 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
             list_cursor = list_ptr[LIST_TAIL_INDEX];
             list_ptr = term_get_list_ptr(list_cursor);
 
-            int next_search_offset = found - temp_bin_data + pattern_size;
+            int next_search_offset = found - temp_bin_data + sizes[matched_pattern_index];
             temp_bin_data += next_search_offset;
             temp_bin_size -= next_search_offset;
         }
@@ -3274,6 +3467,13 @@ static term nif_binary_split(Context *ctx, int argc, term argv[])
             break;
         }
     } while (!term_is_nil(list_cursor));
+
+    free(pattern_data);
+    free(sizes);
+
+    if (trim || trim_all) {
+        result_list = trim_list(ctx, result_list, heap_size, trim, trim_all);
+    }
 
     return result_list;
 }
@@ -3522,6 +3722,7 @@ static term nif_erlang_throw(Context *ctx, int argc, term argv[])
 
     ctx->x[0] = THROW_ATOM;
     ctx->x[1] = t;
+    ctx->x[2] = term_nil();
     return term_invalid_term();
 }
 
@@ -3535,7 +3736,7 @@ static term nif_erlang_raise(Context *ctx, int argc, term argv[])
     }
     ctx->x[0] = ex_class;
     ctx->x[1] = argv[1];
-    ctx->x[2] = term_nil();
+    ctx->x[2] = argv[2];
     return term_invalid_term();
 }
 
@@ -4015,7 +4216,7 @@ static term nif_erlang_exit(Context *ctx, int argc, term argv[])
                 } else if (ctx == target) {
                     mailbox_send_term_signal(target, KillSignal, reason);
                     self_is_signaled = target == ctx;
-                } else if (reason != NORMAL_ATOM){
+                } else if (reason != NORMAL_ATOM) {
                     mailbox_send_term_signal(target, KillSignal, reason);
                     self_is_signaled = target == ctx;
                 } // else there is no effect
@@ -4534,6 +4735,61 @@ static term nif_erlang_setnode_2(Context *ctx, int argc, term argv[])
     return TRUE_ATOM;
 }
 
+static InteropFunctionResult md5_hash_vendored_fold_fun(term t, void *accum)
+{
+    MD5Context *ctx = (MD5Context *) accum;
+    if (term_is_integer(t)) {
+        avm_int64_t tmp = term_maybe_unbox_int64(t);
+        if (tmp < 0 || tmp > 255) {
+            return InteropBadArg;
+        }
+        uint8_t val = (uint8_t) tmp;
+        md5Update(ctx, &val, 1);
+    } else /* term_is_binary(t) */ {
+        md5Update(ctx, (uint8_t *) term_binary_data(t), term_binary_size(t));
+    }
+    return InteropOk;
+}
+
+static bool do_md5_hash_vendored(term data, unsigned char *dst)
+{
+    MD5Context ctx;
+    md5Init(&ctx);
+
+    InteropFunctionResult result = interop_chardata_fold(data, md5_hash_vendored_fold_fun, NULL, (void *) &ctx);
+    if (UNLIKELY(result != InteropOk)) {
+        return false;
+    }
+
+    md5Finalize(&ctx);
+    memcpy(dst, ctx.digest, 16);
+
+    return true;
+}
+
+#define MAX_MD_SIZE 64
+static term nif_erlang_md5(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    term data = argv[0];
+
+    if (!(term_is_binary(data) || term_is_list(data))) {
+        RAISE_ERROR(BADARG_ATOM)
+    }
+
+    unsigned char digest[MAX_MD_SIZE];
+    size_t digest_len = 16;
+
+    if (UNLIKELY(!do_md5_hash_vendored(data, digest))) {
+        RAISE_ERROR(BADARG_ATOM)
+    }
+
+    if (UNLIKELY(memory_ensure_free(ctx, term_binary_heap_size(digest_len)) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    return term_from_literal_binary(digest, digest_len, &ctx->heap, ctx->global);
+}
+
 struct RefcBinaryAVMPack
 {
     struct AVMPackData base;
@@ -4911,13 +5167,13 @@ static term nif_console_print(Context *ctx, int argc, term argv[])
     return OK_ATOM;
 }
 
-static char b64_table[64] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-                             'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-                             'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
-                             'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-                             'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-                             'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
-                             '8', '9', '+', '/'};
+static char b64_table[64] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+    'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+    'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+    'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
+    'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', '+', '/' };
 
 // per https://tools.ietf.org/rfc/rfc4648.txt
 
@@ -4985,9 +5241,8 @@ static term base64_encode(Context *ctx, int argc, term argv[], bool return_binar
             break;
     }
     size_t dst_size_with_pad = dst_size + pad;
-    size_t heap_free = return_binary ?
-        term_binary_heap_size(dst_size_with_pad)
-        : 2*dst_size_with_pad;
+    size_t heap_free = return_binary ? term_binary_heap_size(dst_size_with_pad)
+                                     : 2 * dst_size_with_pad;
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_free, 1, &src, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
@@ -5133,9 +5388,8 @@ static term base64_decode(Context *ctx, int argc, term argv[], bool return_binar
         }
     }
     dst_size -= pad;
-    size_t heap_free = return_binary ?
-        term_binary_heap_size(dst_size)
-        : 2*dst_size;
+    size_t heap_free = return_binary ? term_binary_heap_size(dst_size)
+                                     : 2 * dst_size;
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, heap_free, 1, &src, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
@@ -5237,7 +5491,8 @@ static term nif_code_all_loaded(Context *ctx, int argc, term argv[])
     return result;
 }
 
-struct CodeAllAvailableAcc {
+struct CodeAllAvailableAcc
+{
     Context *ctx;
     struct AVMPackData *avmpack_data;
     term result;
@@ -5389,9 +5644,6 @@ static term nif_code_load_binary(Context *ctx, int argc, term argv[])
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    term file_name = argv[1];
-    UNUSED(file_name);
-
     term binary = argv[2];
     if (UNLIKELY(!term_is_binary(binary))) {
         RAISE_ERROR(BADARG_ATOM);
@@ -5435,7 +5687,8 @@ static term nif_code_load_binary(Context *ctx, int argc, term argv[])
     return result;
 }
 
-static const char *const embedded_atom = "\x8" "embedded";
+static const char *const embedded_atom = "\x8"
+                                         "embedded";
 
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
 {
@@ -5464,6 +5717,57 @@ static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
 
     return result;
 }
+
+// static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
+// {
+//     UNUSED(argc);
+
+//     term module_atom = argv[0];
+//     VALIDATE_VALUE(module_atom, term_is_atom);
+//     AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);
+//     if (IS_NULL_PTR(module_name)) {
+//         return ERROR_ATOM;
+//     }
+//     Module *module = globalcontext_get_module(ctx->global, module_name);
+//     if (IS_NULL_PTR(module)) {
+//         return ERROR_ATOM;
+//     }
+//     assert(module->num_filenames >= 1);
+//     struct ModuleFilename filename = module->filenames[0];
+//     size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size) + LIST_SIZE(filename.len, 1);
+//     if (UNLIKELY(memory_ensure_free_with_roots(ctx, result_size, 1, &module_atom, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+//         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+//     }
+//     // Note: this assumes constness of module->binary and could be use-after-free if we allowed changing module bitcode at runtime.
+//     term binary = term_from_literal_binary((void *) module->binary, module->binary_size, &ctx->heap, ctx->global);
+//     term filename_term = term_from_string(filename.data, filename.len, &ctx->heap);
+//     term result = term_alloc_tuple(3, &ctx->heap);
+
+//     term_put_tuple_element(result, 0, module_atom);
+//     term_put_tuple_element(result, 1, binary);
+//     term_put_tuple_element(result, 2, filename_term);
+
+//     return result;
+// }
+
+// static term nif_code_which(Context *ctx, int argc, term argv[])
+// {
+//     UNUSED(argc);
+
+//     term module_atom = argv[0];
+//     VALIDATE_VALUE(module_atom, term_is_atom);
+//     AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);
+//     Module *module = globalcontext_get_module(ctx->global, module_name);
+//     if (IS_NULL_PTR(module)) {
+//         return NON_EXISTING_ATOM;
+//     }
+//     struct ModuleFilename filename = module->filenames[0];
+//     if (UNLIKELY(memory_ensure_free(ctx, filename.len) != MEMORY_GC_OK)) {
+//         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+//     }
+//     term filename_term = term_from_string(filename.data, filename.len, &ctx->heap);
+//     return filename_term;
+// }
 
 static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[])
 {
@@ -5506,6 +5810,44 @@ static term nif_lists_reverse(Context *ctx, int argc, term argv[])
     return result;
 }
 
+static term nif_lists_member(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    term elem = argv[0];
+    term list = argv[1];
+    VALIDATE_VALUE(list, term_is_list);
+
+    int proper;
+    term_list_length(list, &proper);
+    if (UNLIKELY(!proper)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    while (!term_is_nil(list)) {
+        term head = term_get_list_head(list);
+
+        TermCompareResult cmp_result = term_compare(head, elem, TermCompareExact, ctx->global);
+
+        if (cmp_result == TermEquals) {
+            return TRUE_ATOM;
+        }
+
+        if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+
+        list = term_get_list_tail(list);
+    }
+
+    return FALSE_ATOM;
+}
+
+static term nif_lists_keymember(Context *ctx, int argc, term argv[])
+{
+    term result = nif_lists_keyfind(ctx, argc, argv);
+    return result == FALSE_ATOM ? FALSE_ATOM : TRUE_ATOM;
+}
+
 // assumption: size is at least 1
 static int sort_keys_uniq(term *keys, int size, GlobalContext *global)
 {
@@ -5543,6 +5885,61 @@ static int sort_keys_uniq(term *keys, int size, GlobalContext *global)
     }
 
     return j;
+}
+
+static term nif_lists_keyfind(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    term key = argv[0];
+    term n = argv[1];
+    term tuple_list = argv[2];
+
+    if (!term_is_integer(n) || !term_is_list(tuple_list)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    int n_pos = term_to_int(n);
+
+    if (n_pos <= 0) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    int proper;
+    term_list_length(tuple_list, &proper);
+    if (UNLIKELY(!proper)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    while (!term_is_nil(tuple_list)) {
+        term tuple = term_get_list_head(tuple_list);
+
+        if (!term_is_tuple(tuple)) {
+            tuple_list = term_get_list_tail(tuple_list);
+            continue;
+        }
+
+        int tuple_size = term_get_tuple_arity(tuple);
+
+        if (n_pos > tuple_size) {
+            tuple_list = term_get_list_tail(tuple_list);
+            continue;
+        }
+
+        term nth_element = term_get_tuple_element(tuple, n_pos - 1);
+
+        TermCompareResult cmp_result = term_compare(nth_element, key, TermCompareExact, ctx->global);
+
+        if (cmp_result == TermEquals) {
+            return tuple;
+        }
+        if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+
+        tuple_list = term_get_list_tail(tuple_list);
+    }
+
+    return FALSE_ATOM;
 }
 
 static term nif_maps_from_keys(Context *ctx, int argc, term argv[])
@@ -5596,6 +5993,18 @@ static term nif_maps_from_keys(Context *ctx, int argc, term argv[])
     }
 
     return map;
+}
+
+static term nif_lists_keysearch(Context *ctx, int argc, term argv[])
+{
+    term found_value = nif_lists_keyfind(ctx, argc, argv);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 1, &found_value, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(result_tuple, 0, VALUE_ATOM);
+    term_put_tuple_element(result_tuple, 1, found_value);
+    return found_value == FALSE_ATOM ? FALSE_ATOM : result_tuple;
 }
 
 static term nif_maps_next(Context *ctx, int argc, term argv[])
@@ -5788,100 +6197,177 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
     return result_tuple;
 }
 
+static size_t invalidate_first_matching(term *cons_arr, size_t n, term pattern, Context *ctx)
+{
+    for (size_t i = 0; i < n; ++i) {
+        term cons_pair = cons_arr[i];
+        if (term_is_invalid_term(cons_pair)) {
+            continue;
+        }
+
+        term item = term_get_list_head(cons_pair);
+        TermCompareResult cmp_result = term_compare(item, pattern, TermCompareExact, ctx->global);
+        if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
+            return INVALID_INDEX;
+        }
+
+        if (cmp_result == TermEquals) {
+            cons_arr[i] = term_invalid_term();
+            return i;
+        }
+    }
+    return INVALID_INDEX;
+}
+
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc)
 
-    term list1 = argv[0];
-    term list2 = argv[1];
+    term list = argv[0];
+    term patterns = argv[1];
 
-    VALIDATE_VALUE(list1, term_is_list);
-    VALIDATE_VALUE(list2, term_is_list);
+    VALIDATE_VALUE(list, term_is_list);
+    VALIDATE_VALUE(patterns, term_is_list);
 
     int proper;
-    int len = term_list_length(list1, &proper);
+    const size_t length = term_list_length(list, &proper);
     if (UNLIKELY(!proper)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
     int proper2;
-    term_list_length(list2, &proper2);
+    term_list_length(patterns, &proper2);
     if (UNLIKELY(!proper2)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
-    if (term_is_nil(list1)) {
+    if (term_is_nil(list)) {
         return term_nil();
     }
 
-    if (term_is_nil(list2)) {
-        return list1;
+    if (term_is_nil(patterns)) {
+        return list;
     }
 
-    term *cons = malloc(len * sizeof(term));
+    TERM_DEBUG_ASSERT(length > 0);
+    term *cons = malloc(length * sizeof(term));
     if (IS_NULL_PTR(cons)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
-    int i = 0;
-    term list = list1;
 
-    while (!term_is_nil(list)) {
-        cons[i] = list;
-        list = term_get_list_tail(list);
-        i++;
+    term iter = list;
+    for (size_t i = 0; i < length; ++i) {
+        cons[i] = iter;
+        iter = term_get_list_tail(iter);
     }
 
-    int last_filtered_idx = -1;
+    size_t last_filtered_index = INVALID_INDEX;
+    while (!term_is_nil(patterns)) {
+        term pattern = term_get_list_head(patterns);
+        size_t filtered_index = invalidate_first_matching(cons, length, pattern, ctx);
 
-    while (!term_is_nil(list2)) {
-        term to_nullify = term_get_list_head(list2);
-
-        for (int i = 0; i < len; i++) {
-            if (term_is_invalid_term(cons[i])) {
-                continue;
-            }
-            term item = term_get_list_head(cons[i]);
-            TermCompareResult cmp_result = term_compare(to_nullify, item, TermCompareExact, ctx->global);
-
-            if (UNLIKELY(cmp_result == TermCompareMemoryAllocFail)) {
-                free(cons);
-                RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-            }
-            if (cmp_result == TermEquals) {
-                if (last_filtered_idx < i) {
-                    last_filtered_idx = i;
-                }
-                cons[i] = term_invalid_term();
-                break;
-            }
+        bool not_initialized = last_filtered_index == INVALID_INDEX;
+        bool is_further = filtered_index != INVALID_INDEX && last_filtered_index < filtered_index;
+        if (not_initialized || is_further) {
+            last_filtered_index = filtered_index;
         }
-        list2 = term_get_list_tail(list2);
+        patterns = term_get_list_tail(patterns);
     }
 
-    if (last_filtered_idx == -1) {
+    bool unfiltered = last_filtered_index == INVALID_INDEX;
+    if (unfiltered) {
         free(cons);
-        return list1;
+        return list;
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, (last_filtered_idx + 1) * CONS_SIZE, last_filtered_idx + 1, cons, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    // include element after last filtered
+    size_t copied_n = MIN(last_filtered_index + 2, length);
+    TERM_DEBUG_ASSERT(copied_n <= length);
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, copied_n * CONS_SIZE, copied_n, cons, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(cons);
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
 
-    term result = term_nil();
-    if (last_filtered_idx < len - 1) {
-        result = cons[last_filtered_idx + 1];
-    }
+    TERM_DEBUG_ASSERT(copied_n >= 1);
+    size_t copied_tail_i = copied_n - 1;
+    term result = copied_tail_i == last_filtered_index ? term_nil() : cons[copied_tail_i];
 
-    for (int i = last_filtered_idx - 1; i >= 0; i--) {
-        if (!term_is_invalid_term(cons[i])) {
-            term item = term_get_list_head(cons[i]);
-            result = term_list_prepend(item, result, &ctx->heap);
+    for (long long i = copied_tail_i - 1; i >= 0; --i) {
+        term cons_pair = cons[i];
+        if (term_is_invalid_term(cons_pair)) {
+            continue;
         }
+
+        term item = term_get_list_head(cons_pair);
+        result = term_list_prepend(item, result, &ctx->heap);
     }
 
     free(cons);
     return result;
+}
+
+static term nif_prim_file_get_cwd_0(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    UNUSED(argv)
+
+    char cwd[PATH_MAX];
+    if (IS_NULL_PTR(getcwd(cwd, PATH_MAX))) {
+        if (UNLIKELY(memory_ensure_free(ctx, TUPLE_SIZE(2)) != MEMORY_GC_OK)) {
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+        term result_tuple = term_alloc_tuple(2, &ctx->heap);
+        term reason = UNDEFINED_ATOM;
+        switch (errno) {
+            case EACCES:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\x11", "permission_denied"));
+                break;
+            case EINVAL:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "negative_size"));
+                break;
+            case ERANGE:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\x10", "buffer_too_small"));
+                break;
+            default:
+                reason = globalcontext_make_atom(ctx->global, ATOM_STR("\xD", "unknown_error"));
+                break;
+        }
+        term_put_tuple_element(result_tuple, 0, ERROR_ATOM);
+        term_put_tuple_element(result_tuple, 1, reason);
+        return result_tuple;
+    }
+
+    size_t cwd_length = strlen(cwd);
+    if (UNLIKELY(memory_ensure_free(ctx, TUPLE_SIZE(2) + term_binary_heap_size(cwd_length)) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term result_tuple = term_alloc_tuple(2, &ctx->heap);
+    term cwd_binary = term_from_literal_binary(cwd, cwd_length, &ctx->heap, ctx->global);
+
+    term_put_tuple_element(result_tuple, 0, OK_ATOM);
+    term_put_tuple_element(result_tuple, 1, cwd_binary);
+    return result_tuple;
+}
+
+static bool has_env_value(const char *env_var, const char *value)
+{
+    // This doesn't work with concurrent threads setting the env
+    const char *env_value = getenv(env_var);
+    if (env_value == NULL) {
+        return false;
+    }
+    return strstr(env_value, value) != NULL;
+}
+
+static term nif_file_native_name_encoding(Context *ctx, int argc, term argv[])
+{
+    UNUSED(ctx)
+    UNUSED(argc)
+    UNUSED(argv)
+    if (has_env_value("LC_ALL", "UTF-8") || has_env_value("LC_CTYPE", "UTF-8") || has_env_value("LANG", "UTF-8")) {
+        return UTF8_ATOM;
+    }
+    return LATIN1_ATOM;
 }
 
 #ifdef WITH_ZLIB
@@ -5962,6 +6448,45 @@ static term nif_zlib_compress_1(Context *ctx, int argc, term argv[])
 }
 #endif
 
+static term nif_erlang_nif_error_1(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc)
+    UNUSED(argv)
+    UNUSED(ctx)
+
+    AVM_ABORT();
+}
+
+static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    UNUSED(ctx);
+    UNUSED(argv);
+    // VALIDATE_VALUE(argv[0], term_is_integer);
+    // int64_t reductions_to_bump = term_to_int(argv[0]) - 1;
+    // ctx->reductions += reductions_to_bump;
+    return TRUE_ATOM;
+}
+
+static term nif_rand_splitmix64_next(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    VALIDATE_VALUE(argv[0], term_is_any_integer);
+    uint64_t x = term_maybe_unbox_int64(argv[0]);
+    // implementation based on https://github.com/erlang/otp/blob/d051172925a5c84b2f21850a188a533f885f201c/lib/stdlib/src/rand.erl#L1629
+    uint64_t z = (x += 0x9e3779b97f4a7c15);
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+    z = z ^ (z >> 31);
+    // assume pessimisticly both ints will be boxed
+    if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2) + 2 * BOXED_INT64_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+    }
+    term result = term_alloc_tuple(2, &ctx->heap);
+    term_put_tuple_element(result, 0, term_make_maybe_boxed_int64(z, &ctx->heap));
+    term_put_tuple_element(result, 1, term_make_maybe_boxed_int64(x, &ctx->heap));
+    return result;
+}
 //
 // MAINTENANCE NOTE: Exception handling for fp operations using math
 // error handling is designed to be thread-safe, as errors are specified
@@ -5983,7 +6508,7 @@ static void maybe_clear_exceptions()
 static term get_exception(avm_float_t f)
 {
 #ifdef HAVE_PRAGMA_STDC_FENV_ACCESS
-    #pragma STDC FENV_ACCESS ON
+#pragma STDC FENV_ACCESS ON
     UNUSED(f)
     if (fetestexcept(FE_DIVBYZERO | FE_INVALID)) {
         return BADARITH_ATOM;
@@ -5998,7 +6523,7 @@ static term get_exception(avm_float_t f)
 static term math_unary_op(Context *ctx, term x_term, unary_math_f f)
 {
 #ifdef HAVE_PRAGMA_STDC_FENV_ACCESS
-    #pragma STDC FENV_ACCESS ON
+#pragma STDC FENV_ACCESS ON
 #endif
     avm_float_t x = term_conv_to_float(x_term);
     maybe_clear_exceptions();
@@ -6017,7 +6542,7 @@ static term math_unary_op(Context *ctx, term x_term, unary_math_f f)
 static term math_binary_op(Context *ctx, term x_term, term y_term, binary_math_f f)
 {
 #ifdef HAVE_PRAGMA_STDC_FENV_ACCESS
-    #pragma STDC FENV_ACCESS ON
+#pragma STDC FENV_ACCESS ON
 #endif
     avm_float_t x = term_conv_to_float(x_term);
     avm_float_t y = term_conv_to_float(y_term);

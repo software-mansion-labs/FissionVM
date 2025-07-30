@@ -210,3 +210,14 @@ math:sqrt/1, &math_sqrt_nif
 math:tan/1, &math_tan_nif
 math:tanh/1, &math_tanh_nif
 zlib:compress/1, &zlib_compress_nif
+prim_file:get_cwd/0, &prim_file_get_cwd_nif
+file:native_name_encoding/0, &file_native_name_encoding_nif
+erlang:list_to_bitstring/1, &list_to_bitstring_nif
+erlang:md5/1, &md5_nif
+lists:member/2, &lists_member_nif
+lists:keymember/3, &lists_keymember_nif
+lists:keyfind/3, &lists_keyfind_nif
+lists:keysearch/3, &lists_keysearch_nif
+erlang:nif_error/1, &erlang_nif_error_nif
+erlang:bump_reductions/1, &erlang_bump_reductions_nif
+avm_rand:splitmix64_next/1, &rand_splitmix64_next_nif
