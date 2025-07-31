@@ -592,6 +592,17 @@ struct Test tests[] = {
     TEST_CASE(test_ets),
     TEST_CASE(test_node),
 
+    TEST_CASE(test_prim_file_get_cwd),
+    TEST_CASE(test_file_native_name_encoding),
+    TEST_CASE(test_list_to_bitstring),
+    TEST_CASE(test_md5),
+    TEST_CASE(test_lists_member),
+    TEST_CASE(test_lists_keymember),
+    TEST_CASE(test_lists_keyfind),
+    TEST_CASE(test_lists_keysearch),
+    TEST_CASE(test_bump_reductions),
+    TEST_CASE(test_avm_rand_splitmix64_next),
+
     // TEST CRASHES HERE: TEST_CASE(memlimit),
 
     { NULL, 0, false, false }

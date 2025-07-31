@@ -535,6 +535,17 @@ compile_erlang(test_raw_raise)
 compile_erlang(test_ets)
 compile_erlang(test_node)
 
+compile_erlang(test_prim_file_get_cwd)
+compile_erlang(test_file_native_name_encoding)
+compile_erlang(test_list_to_bitstring)
+compile_erlang(test_md5)
+compile_erlang(test_lists_member)
+compile_erlang(test_lists_keymember)
+compile_erlang(test_lists_keyfind)
+compile_erlang(test_lists_keysearch)
+compile_erlang(test_bump_reductions)
+compile_erlang(test_avm_rand_splitmix64_next)
+
 add_custom_target(erlang_test_modules DEPENDS
     code_load_files
 
@@ -1034,4 +1045,15 @@ add_custom_target(erlang_test_modules DEPENDS
 
     test_ets.beam
     test_node.beam
+
+    test_prim_file_get_cwd.beam
+    test_file_native_name_encoding.beam
+    test_list_to_bitstring.beam
+    test_md5.beam
+    test_lists_member.beam
+    test_lists_keymember.beam
+    test_lists_keyfind.beam
+    test_lists_keysearch.beam
+    test_bump_reductions.beam
+    test_avm_rand_splitmix64_next.beam
 )
