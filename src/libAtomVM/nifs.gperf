@@ -219,5 +219,4 @@ lists:keymember/3, &lists_keymember_nif
 lists:keyfind/3, &lists_keyfind_nif
 lists:keysearch/3, &lists_keysearch_nif
 erlang:nif_error/1, &erlang_nif_error_nif
-erlang:bump_reductions/1, &erlang_bump_reductions_nif
 avm_rand:splitmix64_next/1, &rand_splitmix64_next_nif

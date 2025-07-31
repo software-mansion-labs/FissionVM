@@ -600,7 +600,6 @@ struct Test tests[] = {
     TEST_CASE(test_lists_keymember),
     TEST_CASE(test_lists_keyfind),
     TEST_CASE(test_lists_keysearch),
-    TEST_CASE(test_bump_reductions),
     TEST_CASE(test_avm_rand_splitmix64_next),
 
     // TEST CRASHES HERE: TEST_CASE(memlimit),

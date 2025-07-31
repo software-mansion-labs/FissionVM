@@ -543,7 +543,6 @@ compile_erlang(test_lists_member)
 compile_erlang(test_lists_keymember)
 compile_erlang(test_lists_keyfind)
 compile_erlang(test_lists_keysearch)
-compile_erlang(test_bump_reductions)
 compile_erlang(test_avm_rand_splitmix64_next)
 
 add_custom_target(erlang_test_modules DEPENDS
@@ -1054,6 +1053,5 @@ add_custom_target(erlang_test_modules DEPENDS
     test_lists_keymember.beam
     test_lists_keyfind.beam
     test_lists_keysearch.beam
-    test_bump_reductions.beam
     test_avm_rand_splitmix64_next.beam
 )

@@ -214,8 +214,6 @@ static term nif_code_all_loaded(Context *ctx, int argc, term argv[]);
 static term nif_code_load_abs(Context *ctx, int argc, term argv[]);
 static term nif_code_load_binary(Context *ctx, int argc, term argv[]);
 static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[]);
-// static term nif_code_get_object_code(Context *ctx, int argc, term argv[]);
-// static term nif_code_which(Context *ctx, int argc, term argv[]);
 static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[]);
 static term nif_lists_reverse(Context *ctx, int argc, term argv[]);
 static term nif_lists_member(Context *ctx, int argc, term argv[]);
@@ -229,7 +227,6 @@ static term nif_unicode_characters_to_binary(Context *ctx, int argc, term argv[]
 static term nif_erlang_lists_subtract(Context *ctx, int argc, term argv[]);
 static term nif_zlib_compress_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_nif_error_1(Context *ctx, int argc, term argv[]);
-static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[]);
 static term nif_rand_splitmix64_next(Context *ctx, int argc, term argv[]);
 
 #define DECLARE_MATH_NIF_FUN(moniker) \
@@ -778,16 +775,6 @@ static const struct Nif code_ensure_loaded_nif = {
     .nif_ptr = nif_code_ensure_loaded
 };
 
-// static const struct Nif code_get_object_code_nif = {
-//     .base.type = NIFFunctionType,
-//     .nif_ptr = nif_code_get_object_code
-// };
-
-// static const struct Nif code_which_nif = {
-//     .base.type = NIFFunctionType,
-//     .nif_ptr = nif_code_which
-// };
-
 static const struct Nif module_loaded_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_module_loaded
@@ -841,11 +828,6 @@ static const struct Nif zlib_compress_nif = {
 static const struct Nif erlang_nif_error_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_nif_error_1
-};
-
-static const struct Nif erlang_bump_reductions_nif = {
-    .base.type = NIFFunctionType,
-    .nif_ptr = nif_erlang_bump_reductions_1
 };
 
 static const struct Nif rand_splitmix64_next_nif = {
@@ -2968,59 +2950,6 @@ static term nif_erlang_system_info(Context *ctx, int argc, term argv[])
 #else
         return term_from_int32(1);
 #endif
-    }
-    if (key == OS_TYPE_ATOM) {
-        RAISE_ERROR(BADARG_ATOM);
-        //     size_t atom_string_len = strlen(SYSTEM_NAME);
-
-        //     if (UNLIKELY(atom_string_len > 255)) {
-        //         RAISE_ERROR(SYSTEM_LIMIT_ATOM);
-        //     }
-
-        //     AtomString name_atom = malloc(atom_string_len + 1);
-
-        //     if (IS_NULL_PTR(name_atom)) {
-        //         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-        //     }
-
-        //     ((uint8_t *) name_atom)[0] = atom_string_len;
-
-        //     char atom_string[] = SYSTEM_NAME;
-
-        //     atom_string[0] = tolower(atom_string[0]);
-
-        //     memcpy(((char *) name_atom) + 1, atom_string, atom_string_len);
-        //     long global_atom_index = atom_table_ensure_atom(ctx->global->atom_table, name_atom, AtomTableCopyAtom);
-
-        //     free((void *) name_atom);
-
-        //     if (UNLIKELY(global_atom_index == ATOM_TABLE_NOT_FOUND)) {
-        //         RAISE_ERROR(BADARG_ATOM);
-        //     }
-
-        //     if (UNLIKELY(global_atom_index == ATOM_TABLE_ALLOC_FAIL)) {
-        //         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-        //     }
-
-        //     if (UNLIKELY(memory_ensure_free_opt(ctx, TUPLE_SIZE(2), MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-        //         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-        //     }
-
-        //     term result_tuple = term_alloc_tuple(2, &ctx->heap);
-
-        //     term unix_atom = globalcontext_make_atom(ctx->global, ATOM_STR("\x4", "unix"));
-        //     term_put_tuple_element(result_tuple, 0, unix_atom);
-
-        //     term name_atom_term = term_from_atom_index(global_atom_index);
-        //     term_put_tuple_element(result_tuple, 1, name_atom_term);
-
-        //     return result_tuple;
-    }
-    if (key == OTP_RELEASE_ATOM) {
-        if (memory_ensure_free_opt(ctx, TERM_STRING_SIZE(strlen("26")), MEMORY_CAN_SHRINK) != MEMORY_GC_OK) {
-            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-        }
-        return term_from_string((const uint8_t *) "26", sizeof("26") - 1, &ctx->heap);
     }
     return sys_get_info(ctx, key);
 }
@@ -5718,57 +5647,6 @@ static term nif_code_ensure_loaded(Context *ctx, int argc, term argv[])
     return result;
 }
 
-// static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
-// {
-//     UNUSED(argc);
-
-//     term module_atom = argv[0];
-//     VALIDATE_VALUE(module_atom, term_is_atom);
-//     AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);
-//     if (IS_NULL_PTR(module_name)) {
-//         return ERROR_ATOM;
-//     }
-//     Module *module = globalcontext_get_module(ctx->global, module_name);
-//     if (IS_NULL_PTR(module)) {
-//         return ERROR_ATOM;
-//     }
-//     assert(module->num_filenames >= 1);
-//     struct ModuleFilename filename = module->filenames[0];
-//     size_t result_size = TUPLE_SIZE(3) + term_binary_heap_size(module->binary_size) + LIST_SIZE(filename.len, 1);
-//     if (UNLIKELY(memory_ensure_free_with_roots(ctx, result_size, 1, &module_atom, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-//         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-//     }
-//     // Note: this assumes constness of module->binary and could be use-after-free if we allowed changing module bitcode at runtime.
-//     term binary = term_from_literal_binary((void *) module->binary, module->binary_size, &ctx->heap, ctx->global);
-//     term filename_term = term_from_string(filename.data, filename.len, &ctx->heap);
-//     term result = term_alloc_tuple(3, &ctx->heap);
-
-//     term_put_tuple_element(result, 0, module_atom);
-//     term_put_tuple_element(result, 1, binary);
-//     term_put_tuple_element(result, 2, filename_term);
-
-//     return result;
-// }
-
-// static term nif_code_which(Context *ctx, int argc, term argv[])
-// {
-//     UNUSED(argc);
-
-//     term module_atom = argv[0];
-//     VALIDATE_VALUE(module_atom, term_is_atom);
-//     AtomString module_name = globalcontext_atomstring_from_term(ctx->global, module_atom);
-//     Module *module = globalcontext_get_module(ctx->global, module_name);
-//     if (IS_NULL_PTR(module)) {
-//         return NON_EXISTING_ATOM;
-//     }
-//     struct ModuleFilename filename = module->filenames[0];
-//     if (UNLIKELY(memory_ensure_free(ctx, filename.len) != MEMORY_GC_OK)) {
-//         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-//     }
-//     term filename_term = term_from_string(filename.data, filename.len, &ctx->heap);
-//     return filename_term;
-// }
-
 static term nif_erlang_module_loaded(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
@@ -6455,17 +6333,6 @@ static term nif_erlang_nif_error_1(Context *ctx, int argc, term argv[])
     UNUSED(ctx)
 
     AVM_ABORT();
-}
-
-static term nif_erlang_bump_reductions_1(Context *ctx, int argc, term argv[])
-{
-    UNUSED(argc);
-    UNUSED(ctx);
-    UNUSED(argv);
-    // VALIDATE_VALUE(argv[0], term_is_integer);
-    // int64_t reductions_to_bump = term_to_int(argv[0]) - 1;
-    // ctx->reductions += reductions_to_bump;
-    return TRUE_ATOM;
 }
 
 static term nif_rand_splitmix64_next(Context *ctx, int argc, term argv[])
