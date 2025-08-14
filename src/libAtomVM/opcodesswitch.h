@@ -1332,6 +1332,10 @@ static int get_catch_label_and_change_module(Context *ctx, Module **mod)
     return 0;
 }
 
+static bool is_exception_class(term t) {
+    return t == ERROR_ATOM || t == LOWERCASE_EXIT_ATOM || t == THROW_ATOM;
+}
+
 static term maybe_alloc_boxed_integer_fragment(Context *ctx, avm_int64_t value)
 {
 #if BOXED_TERMS_REQUIRED_FOR_INT64 > 1
@@ -3603,6 +3607,12 @@ wait_timeout_trap_handler:
                 #ifdef IMPL_EXECUTE_LOOP
                     TRACE("raise/2 stacktrace=0x%lx exc_value=0x%lx\n", stacktrace, exc_value);
                     if (stacktrace_is_built(stacktrace)) {
+                        //  FIXME: This is a temporary solution as in some niche cases of reraise the x_regs[0] is
+                        //  overwritten and it does not represent exception class
+                        if (!is_exception_class(x_regs[0])) {
+                            x_regs[0] = ERROR_ATOM;
+                        }
+                        x_regs[1] = exc_value;
                         x_regs[2] = stacktrace;
                     } else {
                         x_regs[0] = stacktrace_exception_class(stacktrace);
