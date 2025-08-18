@@ -52,7 +52,7 @@ jobs:
         run: |
           git clone git@github.com:software-mansion/popcorn.git
           cd popcorn
-          echo "import Config; config :popcorn, target: :unix, runtime_source: {:path, \"..\"}" > config/config.secret.exs
+          echo "import Config; config :popcorn, target: :unix, runtime: {:path, \"../build/src\"}" > config/config.secret.exs
           mix deps.get
           export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3
           MIX_ENV=test mix popcorn.build_runtime --target unix
