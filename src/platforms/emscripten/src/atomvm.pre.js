@@ -57,6 +57,16 @@ Module["onRunTrackedJs"] = (scriptString, isDebug) => {
   isDebug && ensureValidResult(result);
   return result?.map(trackValue) ?? [];
 };
+
+// This is a workaround for handling the ABORT signal. It effectively calls
+// Module["onWorkerError"] from the main JS thread. The onAbort callback is called
+// within the worker just before it's terminated. The worker doesn't have access to
+// window nor DOM, so we need to communicate with the main JS thread. It seems that
+// this is the only option.
+Module["onAbort"] = (error) => {
+  postMessage({ cmd: "callHandler", handler: "onWorkerError", args: [error] })
+};
+
 function ensureValidResult(result) {
   const isIndex = (k) => typeof k === "number";
 
