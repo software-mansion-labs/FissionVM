@@ -241,7 +241,7 @@ typedef dreg_t dreg_gc_safe_t;
                       /* will become boxed term taking 9 bytes (1 byte box + 64 bits)*/ \
                       /* AtomVM can handle 64 bit int, but not larger ones until BigNum support is ready*/ \
                       if (sz > 9 && (first_byte & 0xF) == COMPACT_LARGE_INTEGER) {      \
-                        fprintf(stderr, "WARNING: Loading integer possibly longer than 64 bits"); \
+                        fprintf(stderr, "WARNING: Loading integer longer than 64 bits (sz = %d)\n", sz); \
                       }                                                                 \
                     }                                                                   \
                     (decode_pc) += sz;                                                  \
