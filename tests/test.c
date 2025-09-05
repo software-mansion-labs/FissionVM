@@ -447,6 +447,7 @@ struct Test tests[] = {
     TEST_CASE_EXPECTED(float2list, 31),
     TEST_CASE_EXPECTED(float2bin2scientific, 31),
     TEST_CASE_EXPECTED(float2bin2decimals, 255),
+    TEST_CASE_EXPECTED(float2bin2short, 63),
     TEST_CASE_EXPECTED(float2bin2, 31),
     TEST_CASE_EXPECTED(float2list2scientific, 31),
     TEST_CASE(float_bif),
