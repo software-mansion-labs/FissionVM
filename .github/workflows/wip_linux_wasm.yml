@@ -1,0 +1,92 @@
+name: Build artifacts
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.17.3"
+          otp-version: "26.0.2"
+
+      - name: ⚙️ Install deps
+        run: sudo apt update -y && sudo apt install -y cmake gperf
+
+      - name: 🏗️ Build Linux binary
+        working-directory: ./src/platforms/emscripten/
+        run: |
+          set -euo pipefail
+          mkdir build
+          cd build
+          cmake .. -DAVM_EMSCRIPTEN_ENV=web
+          emmake make -j
+  wasm_build_web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    container: emscripten/emsdk
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Install deps
+        run: sudo apt update -y && sudo apt install -y cmake gperf
+
+      - name: 🏗️ Build WASM for web
+        working-directory: ./src/platforms/emscripten/
+        run: |
+          set -euo pipefail
+          mkdir build
+          cd build
+          emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
+          emmake make -j
+
+      - name: Setup name
+        id: setup
+        run: |
+          set -euo pipefail
+          VERSION=$([[ $GITHUB_REF_TYPE = "tag" ]] && echo $GITHUB_REF_NAME || echo ${GITHUB_SHA::8})
+          echo "fissionvm_js=FissionVM-web-${VERSION}.mjs" >> $GITHUB_OUTPUT
+          echo "fissionvm_wasm=FissionVM-web-${VERSION}.wasm" >> $GITHUB_OUTPUT
+
+      - name: "Rename artifacts"
+        working-directory: src/platforms/emscripten/build/src
+        run: |
+          mv AtomVM.mjs "${{ steps.setup.outputs.fissionvm_js }}"
+          sha256sum "${{ steps.setup.outputs.fissionvm_js }}" > "${{ steps.setup.outputs.fissionvm_js }}.sha256"
+          mv AtomVM.wasm "${{ steps.setup.outputs.fissionvm_wasm }}"
+          sha256sum "${{ steps.setup.outputs.fissionvm_wasm }}" > "${{ steps.setup.outputs.fissionvm_wasm }}.sha256"
+
+  release:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Release (web)"
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: ${{ github.ref_type == 'branch' }}
+          draft: ${{ github.ref_type != 'branch' }}
+          fail_on_unmatched_files: true
+          files: |
+            src/platforms/emscripten/build/src/${{ steps.setup.outputs.fissionvm_js }}
+            src/platforms/emscripten/build/src/${{ steps.setup.outputs.fissionvm_js }}.sha256
+            src/platforms/emscripten/build/src/${{ steps.setup.outputs.fissionvm_wasm }}
+            src/platforms/emscripten/build/src/${{ steps.setup.outputs.fissionvm_wasm }}.sha256
