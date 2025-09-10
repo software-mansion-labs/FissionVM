@@ -1,0 +1,20 @@
+%readonly-tables
+%define lookup-function-name popcorn_nif_in_word_set
+
+%{
+#include <string.h>
+typedef struct NifNameAndNifPtr NifNameAndNifPtr;
+%}
+struct NifNameAndNifPtr
+{
+  const char *name;
+  const struct Nif *nif;
+};
+%%
+# Waiting to be upstreamed
+binary:split/2, &binary_split_nif
+binary:split/3, &binary_split_nif
+erlang:display_string/2, &display_string_nif
+#
+# Upstreaming in progress - mock implementation
+code:get_object_code/1, &code_get_object_code_nif
