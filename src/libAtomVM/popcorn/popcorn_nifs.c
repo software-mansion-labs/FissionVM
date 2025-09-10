@@ -1,6 +1,7 @@
 // See popcorn_nifs.gperf for status of each NIF
 
 #include "popcorn_nifs.h"
+#include "popcorn_ets.h"
 #include "popcorn_md5.h"
 
 #include "nifs.h"
@@ -507,6 +508,383 @@ static term nif_erlang_display_string_2(Context *ctx, int argc, term argv[])
 static const struct Nif display_string_nif = {
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_display_string_2
+};
+
+// ETS
+
+static term nif_ets_new(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term name = argv[0];
+    VALIDATE_VALUE(name, term_is_atom);
+
+    term options = argv[1];
+    VALIDATE_VALUE(options, term_is_list);
+
+    term is_named = interop_kv_get_value_default(options, ATOM_STR("\xB", "named_table"), FALSE_ATOM, ctx->global);
+    term keypos = interop_kv_get_value_default(options, ATOM_STR("\x6", "keypos"), term_from_int(1), ctx->global);
+    avm_int_t index = term_to_int(keypos) - 1;
+
+    if (UNLIKELY(index < 0)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    term private = interop_kv_get_value(options, ATOM_STR("\x7", "private"), ctx->global);
+    term public = interop_kv_get_value(options, ATOM_STR("\x6", "public"), ctx->global);
+
+    PopcornEtsAccessType access = PopcornEtsAccessProtected;
+    if (!term_is_invalid_term(private)) {
+        access = PopcornEtsAccessPrivate;
+    } else if (!term_is_invalid_term(public)) {
+        access = PopcornEtsAccessPublic;
+    }
+
+    PopcornEtsTableType type = PopcornEtsTableSet;
+    term is_duplicate_bag = interop_kv_get_value_default(options, ATOM_STR("\xd", "duplicate_bag"), FALSE_ATOM, ctx->global) == TRUE_ATOM;
+    if (is_duplicate_bag) {
+        type = PopcornEtsTableDuplicateBag;
+    }
+
+    term table = term_invalid_term();
+    PopcornEtsErrorCode result = popcorn_ets_create_table(name, is_named == TRUE_ATOM, type, access, (size_t) index, &table, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return table;
+        case PopcornEtsTableNameInUse:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static inline bool is_popcorn_ets_table_id(term t)
+{
+    return term_is_reference(t) || term_is_atom(t);
+}
+
+static term nif_ets_insert(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+
+    term entry = argv[1];
+
+    PopcornEtsErrorCode result = popcorn_ets_insert(ref, entry, NULL, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return TRUE_ATOM;
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+    term to_insert = argv[1];
+    bool entry_inserted = false;
+
+    PopcornEtsErrorCode result = popcorn_ets_insert(ref, to_insert, &entry_inserted, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return entry_inserted ? TRUE_ATOM : FALSE_ATOM;
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_lookup(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+
+    term key = argv[1];
+
+    term ret = term_invalid_term();
+    PopcornEtsErrorCode result = popcorn_ets_lookup(ref, key, &ret, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return ret;
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadPosition:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_member(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+
+    term key = argv[1];
+
+    term ret = term_invalid_term();
+    PopcornEtsErrorCode result = popcorn_ets_lookup(ref, key, &ret, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return term_is_nil(ret) ? FALSE_ATOM : TRUE_ATOM;
+        case PopcornEtsBadAccess:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_take(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+
+    term key = argv[1];
+
+    term ret = term_invalid_term();
+    PopcornEtsErrorCode result = popcorn_ets_take(ref, key, &ret, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return ret;
+        case PopcornEtsBadAccess:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
+{
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+
+    term key = argv[1];
+    term operation = argv[2];
+    term default_value = term_invalid_term();
+    if (argc == 4) {
+        default_value = argv[3];
+        VALIDATE_VALUE(default_value, term_is_tuple);
+        term_put_tuple_element(default_value, 0, key);
+    }
+    term ret = term_invalid_term();
+    PopcornEtsErrorCode result = popcorn_ets_update_counter(ref, key, operation, default_value, &ret, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return ret;
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_update_element(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+
+    term key = argv[1];
+    term operation = argv[2];
+    VALIDATE_VALUE(operation, term_is_tuple);
+    if (term_get_tuple_arity(operation) != 2) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+    term pos = term_get_tuple_element(operation, 0);
+    VALIDATE_VALUE(pos, term_is_integer);
+    term value = term_get_tuple_element(operation, 1);
+
+    avm_int_t index = term_to_int(pos) - 1;
+    if (UNLIKELY(index < 0)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    term ret = term_invalid_term();
+    PopcornEtsErrorCode result = popcorn_ets_update_element(ref, key, value, (size_t) index, &ret, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return ret;
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
+{
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+
+    term key = argv[1];
+    term pos = argv[2];
+    VALIDATE_VALUE(pos, term_is_integer);
+    avm_int_t index = term_to_int(pos) - 1;
+    if (UNLIKELY(index < 0)) {
+        RAISE_ERROR(BADARG_ATOM);
+    }
+
+    term default_value = term_invalid_term();
+    if (argc == 4) {
+        default_value = argv[3];
+    }
+
+    term ret = term_invalid_term();
+    PopcornEtsErrorCode result = popcorn_ets_lookup_element(ref, key, (size_t) index, &ret, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return ret;
+        case PopcornEtsEntryNotFound:
+            if (!term_is_invalid_term(default_value)) {
+                return default_value;
+            }
+        case PopcornEtsBadPosition:
+        case PopcornEtsBadAccess:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_delete(Context *ctx, int argc, term argv[])
+{
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+    term ret = term_invalid_term();
+    PopcornEtsErrorCode result;
+    if (argc == 2) {
+        term key = argv[1];
+        result = popcorn_ets_delete(ref, key, &ret, ctx);
+    } else {
+        result = popcorn_ets_drop_table(ref, &ret, ctx);
+    }
+
+    switch (result) {
+        case PopcornEtsOk:
+            return ret;
+        case PopcornEtsBadAccess:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static term nif_ets_delete_object(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+
+    term ref = argv[0];
+    VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
+
+    term tuple = argv[1];
+    VALIDATE_VALUE(tuple, term_is_tuple);
+
+    term ret = term_invalid_term();
+    PopcornEtsErrorCode result = popcorn_ets_delete_object(ref, tuple, &ret, ctx);
+    switch (result) {
+        case PopcornEtsOk:
+            return ret;
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadPosition:
+            RAISE_ERROR(BADARG_ATOM);
+        case PopcornEtsAllocationFailure:
+            RAISE_ERROR(MEMORY_ATOM);
+        default:
+            AVM_ABORT();
+    }
+}
+
+static const struct Nif ets_new_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_new
+};
+
+static const struct Nif ets_insert_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_insert
+};
+
+static const struct Nif ets_insert_new_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_insert_new
+};
+
+static const struct Nif ets_update_counter_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_update_counter
+};
+
+static const struct Nif ets_update_element_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_update_element
+};
+
+static const struct Nif ets_lookup_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_lookup
+};
+
+static const struct Nif ets_member_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_member
+};
+
+static const struct Nif ets_take_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_take
+};
+
+static const struct Nif ets_lookup_element_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_lookup_element
+};
+
+static const struct Nif ets_delete_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_delete
+};
+
+static const struct Nif ets_delete_object_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_ets_delete_object
 };
 
 #pragma GCC diagnostic push
