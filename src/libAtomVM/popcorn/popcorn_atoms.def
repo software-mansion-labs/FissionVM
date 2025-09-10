@@ -1,0 +1,4 @@
+X(TRIM_ATOM, "\x4", "trim")
+X(TRIM_ALL_ATOM, "\x8", "trim_all")
+X(STDOUT_ATOM, "\x6", "stdout")
+X(STDERR_ATOM, "\x6", "stderr")
