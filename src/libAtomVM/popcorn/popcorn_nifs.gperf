@@ -18,3 +18,20 @@ erlang:display_string/2, &display_string_nif
 #
 # Upstreaming in progress - mock implementation
 code:get_object_code/1, &code_get_object_code_nif
+#
+# ETS
+#
+ets:new/2, &ets_new_nif
+ets:insert_new/2, &ets_insert_new_nif
+ets:update_counter/3, &ets_update_counter_nif
+ets:update_counter/4, &ets_update_counter_nif
+ets:update_element/3, &ets_update_element_nif
+ets:take/2, &ets_take_nif
+ets:member/2, &ets_member_nif
+ets:insert/2, &ets_insert_nif
+ets:lookup/2, &ets_lookup_nif
+ets:lookup_element/3, &ets_lookup_element_nif
+ets:lookup_element/4, &ets_lookup_element_nif
+ets:delete/2, &ets_delete_nif
+ets:delete/1, &ets_delete_nif
+ets:delete_object/2, &ets_delete_object_nif
