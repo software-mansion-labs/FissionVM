@@ -1,0 +1,15 @@
+%readonly-tables
+%define lookup-function-name popcorn_nif_in_word_set
+
+%{
+#include <string.h>
+typedef struct NifNameAndNifPtr NifNameAndNifPtr;
+%}
+struct NifNameAndNifPtr
+{
+  const char *name;
+  const struct Nif *nif;
+};
+%%
+#
+mock_popcorn_nif:mock_popcorn_nif/0, &mock_popcorn_nif
