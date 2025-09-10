@@ -24,6 +24,8 @@
 
 #include "nifs.h"
 
+#include "popcorn/popcorn_nifs.h"
+
 #include <errno.h>
 #include <fenv.h>
 #include <math.h>
@@ -924,6 +926,11 @@ DEFINE_MATH_NIF(tanh)
 
 const struct Nif *nifs_get(const char *mfa)
 {
+    const struct Nif *nif = popcorn_nifs_get_nif(mfa);
+    if (nif) {
+        return nif;
+    }
+
     const NifNameAndNifPtr *nameAndPtr = nif_in_word_set(mfa, strlen(mfa));
     if (!nameAndPtr) {
         return platform_nifs_get_nif(mfa);
@@ -5666,7 +5673,8 @@ static term nif_erlang_nif_error(Context *ctx, int argc, term argv[])
     UNUSED(argc);
     UNUSED(argv);
 
-    RAISE_ERROR(UNDEF_ATOM);
+    fprintf(stderr, "Nif not found, aborting\n");
+    AVM_ABORT();
 }
 
 #ifndef AVM_NO_JIT

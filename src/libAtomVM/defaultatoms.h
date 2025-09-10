@@ -35,6 +35,7 @@ extern "C" {
 enum
 {
 #include "defaultatoms.def"
+#include "popcorn/popcorn_atoms.def"
 
     // The first index for platform specific atoms, should always be last in the list
     PLATFORM_ATOMS_BASE_INDEX
@@ -51,6 +52,7 @@ _Static_assert(TRUE_ATOM_INDEX == 1, "true atom index must be 1");
 enum
 {
 #include "defaultatoms.def"
+#include "popcorn/popcorn_atoms.def"
 
     // dummy last item
     PLATFORM_ATOMS_BASE_DUMMY = TERM_FROM_ATOM_INDEX(PLATFORM_ATOMS_BASE_INDEX)

@@ -1,0 +1,29 @@
+%readonly-tables
+%define lookup-function-name popcorn_nif_in_word_set
+
+%{
+#include <string.h>
+typedef struct NifNameAndNifPtr NifNameAndNifPtr;
+%}
+struct NifNameAndNifPtr
+{
+  const char *name;
+  const struct Nif *nif;
+};
+%%
+# Waiting to be upstreamed
+binary:split/2, &binary_split_nif
+binary:split/3, &binary_split_nif
+erlang:display_string/2, &display_string_nif
+#
+# Upstreaming in progress - mock implementation
+code:get_object_code/1, &code_get_object_code_nif
+#
+# Not upstreamable 
+#
+# Hack; could be implemented in AtomVM's Erlang stdlib
+erlang:list_to_bitstring/1, &list_to_bitstring_nif
+#
+avm_rand:splitmix64_next/1, &rand_splitmix64_next_nif
+#
+erlang:md5/1, &md5_nif
