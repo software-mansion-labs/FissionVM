@@ -106,6 +106,11 @@ set(SOURCE_FILES
     valueshashtable.c
 )
 
+file(GLOB_RECURSE POPCORN_HEADER_FILES "popcorn/*.{h,def}")
+file(GLOB_RECURSE POPCORN_SOURCE_FILES "popcorn/*.c")
+set(HEADER_FILES ${HEADER_FILES} ${POPCORN_HEADER_FILES})
+set(SOURCE_FILES ${SOURCE_FILES} ${POPCORN_SOURCE_FILES})
+
 if(NOT AVM_DISABLE_JIT)
     set(HEADER_FILES ${HEADER_FILES}
         jit.h
@@ -141,6 +146,17 @@ endif()
 # AtomVM options used in libAtomVM
 if (ADVANCED_TRACING)
     target_compile_definitions(libAtomVM PUBLIC ENABLE_ADVANCED_TRACE)
+endif()
+
+if(SANITIZER STREQUAL "address")
+    target_compile_options(libAtomVM PUBLIC -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(libAtomVM PUBLIC -fsanitize=address)
+elseif(SANITIZER STREQUAL "memory")
+    target_compile_options(libAtomVM PUBLIC -fsanitize=memory -fno-omit-frame-pointer)
+    target_link_options(libAtomVM PUBLIC -fsanitize=memory)
+elseif(SANITIZER STREQUAL "undefined")
+    target_compile_options(libAtomVM PUBLIC -fsanitize=undefined)
+    target_link_options(libAtomVM PUBLIC -fsanitize=undefined)
 endif()
 
 target_link_libraries(libAtomVM PUBLIC m)
@@ -282,6 +298,9 @@ gperf_generate(${CMAKE_CURRENT_SOURCE_DIR}/nifs.gperf nifs_hash.h)
 add_custom_target(generated DEPENDS bifs_hash.h)
 add_custom_target(generated-nifs-hash DEPENDS nifs_hash.h)
 
+gperf_generate(${CMAKE_CURRENT_SOURCE_DIR}/popcorn/popcorn_nifs.gperf popcorn_nifs_hash.h)
+add_custom_target(generated-popcorn-nifs-hash DEPENDS popcorn_nifs_hash.h)
+
 include(../../version.cmake)
 
 if (ATOMVM_DEV)
@@ -311,6 +330,8 @@ if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Generic")
 endif()
 
 add_dependencies(libAtomVM generated generated-nifs-hash)
+
+add_dependencies(libAtomVM generated generated-popcorn-nifs-hash)
 
 if (COVERAGE)
     include(CodeCoverage)

@@ -33,6 +33,7 @@ void defaultatoms_init(GlobalContext *glb)
 
     static const char *const atoms[] = {
 #include "defaultatoms.def"
+#include "popcorn/popcorn_atoms.def"
 
         // dummy value
         NULL
