@@ -28,6 +28,8 @@ find_package(Erlang)
 find_package(Elixir)
 find_package(Gleam)
 
+set(SANITIZER "address" CACHE STRING "Enable Address Sanitizer") # Include address, memory, or undefined sanitizer
+
 option(AVM_ENABLE_OLD_OTP_VERSIONS "Enable OTP version < 26" ON)
 option(AVM_DISABLE_FP "Disable floating point support." OFF)
 option(AVM_DISABLE_SMP "Disable SMP." OFF)
