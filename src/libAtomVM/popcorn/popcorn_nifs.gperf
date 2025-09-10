@@ -40,3 +40,20 @@ erlang:list_to_bitstring/1, &list_to_bitstring_nif
 avm_rand:splitmix64_next/1, &rand_splitmix64_next_nif
 #
 erlang:md5/1, &md5_nif
+#
+# ETS
+#
+ets:new/2, &ets_new_nif
+ets:insert_new/2, &ets_insert_new_nif
+ets:update_counter/3, &ets_update_counter_nif
+ets:update_counter/4, &ets_update_counter_nif
+ets:update_element/3, &ets_update_element_nif
+ets:take/2, &ets_take_nif
+ets:member/2, &ets_member_nif
+ets:insert/2, &ets_insert_nif
+ets:lookup/2, &ets_lookup_nif
+ets:lookup_element/3, &ets_lookup_element_nif
+ets:lookup_element/4, &ets_lookup_element_nif
+ets:delete/2, &ets_delete_nif
+ets:delete/1, &ets_delete_nif
+ets:delete_object/2, &ets_delete_object_nif
