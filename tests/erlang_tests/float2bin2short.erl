@@ -21,43 +21,44 @@
 -module(float2bin2short).
 
 -export([start/0]).
+-export([id/1]).
+
+-define(ID(Arg), ?MODULE:id(Arg)).
 
 % FIXME: When short is properly implemented, add cases when the representation
 % becomes shorter using expotential notation, e.g.
 % 1/1_000_000 => "1.0e-6"
 start() ->
-  F1 = id(add(id(2.5), id(-1.0))),
-  Bin1 = id(erlang:float_to_binary(id(F1), [short])),
-  F2 = id(id(F1) + id(id(0.5) * id(-1.0))),
-  Bin2 = id(erlang:float_to_binary(id(F2), [short])),
-  F3 = id(id(F2) * id(-1.0)),
-  Bin3 = id(erlang:float_to_binary(id(F3), [short])),
-  F4 = id(add(id(F2), id(F3))),
-  Bin4 = id(erlang:float_to_binary(id(F4), [short])),
-  compare_bin(Bin1, id(<<"1.5">>))
-  + compare_bin(Bin2, id(<<"1.0">>)) * 2
-  + compare_bin(Bin3, id(<<"-1.0">>)) * 4
-  + compare_bin(Bin4, id(<<"0.0">>)) * 8
-  + float_to_bin_badarg({1}, [short]) * 16
-  + float_to_bin_badarg(F4, [{short, 1}]) * 32.
-
-add(A, B) when is_float(A) and is_float(B) ->
-  id(id(A) + id(B)).
-
-compare_bin(Bin1, Bin2) when byte_size(Bin1) == byte_size(Bin2) ->
-  compare_bin(Bin1, Bin2, byte_size(Bin1) - 1);
-compare_bin(_Bin1, _Bin2) ->
+  F1 = ?ID(2.5) + ?ID(-1.0),
+  Bin1 = erlang:float_to_binary(?ID(F1), [short]),
+  F2 = ?ID(F1) + ?ID(0.5) * ?ID(-1.0),
+  Bin2 = erlang:float_to_binary(?ID(F2), [short]),
+  F3 = ?ID(F2) * ?ID(-1.0),
+  Bin3 = id(erlang:float_to_binary(?ID(F3), [short])),
+  F4 = ?ID(F2) + ?ID(F3),
+  Bin4 = erlang:float_to_binary(?ID(F4), [short]),
+  true = assert_bin_equal(Bin1, ?ID(<<"1.5">>)),
+  true = assert_bin_equal(Bin2, ?ID(<<"1.0">>)),
+  true = assert_bin_equal(Bin3, ?ID(<<"-1.0">>)),
+  true = assert_bin_equal(Bin4, ?ID(<<"0.0">>)),
+  true = assert_float_to_bin_badarg({1}, [short]),
+  true = assert_float_to_bin_badarg(F4, [{short, 1}]),
   0.
 
+assert_bin_equal(Bin1, Bin2) when byte_size(Bin1) == byte_size(Bin2) ->
+  compare_bin(Bin1, Bin2, byte_size(Bin1) - 1);
+assert_bin_equal(_Bin1, _Bin2) ->
+  false.
+
 compare_bin(_Bin1, _Bin2, -1) ->
-  1;
+  true;
 compare_bin(Bin1, Bin2, Index) ->
   B1 = binary:at(Bin1, Index),
   case binary:at(Bin2, Index) of
     B1 ->
       compare_bin(Bin1, Bin2, Index - 1);
     _Any ->
-      0
+      false
   end.
 
 id(I) when is_float(I) ->
@@ -65,13 +66,13 @@ id(I) when is_float(I) ->
 id(I) when is_binary(I) ->
   I.
 
-float_to_bin_badarg(F, O) ->
+assert_float_to_bin_badarg(F, O) ->
   try erlang:float_to_binary(F, O) of
-    Res ->
-      Res
+    _Res ->
+      false
   catch
     error:badarg ->
-      1;
+      true;
     _:_ ->
-      -1
+      false
   end.
