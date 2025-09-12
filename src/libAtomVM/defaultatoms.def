@@ -55,6 +55,7 @@ X(REDUCTIONS_ATOM, "\xA", "reductions")
 X(DECIMALS_ATOM, "\x8", "decimals")
 X(SCIENTIFIC_ATOM, "\xA", "scientific")
 X(DEFAULTATOMS_COMPACT_ATOM, "\x7", "compact")
+X(SHORT_ATOM, "\x5", "short")
 
 X(BADMATCH_ATOM, "\x8", "badmatch")
 X(CASE_CLAUSE_ATOM, "\xB", "case_clause")

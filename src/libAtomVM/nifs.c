@@ -2628,7 +2628,13 @@ int get_float_format_opts(term opts, int *scientific, int *decimals, int *compac
     while (term_is_nonempty_list(t)) {
         term head = term_get_list_head(t);
 
-        if (term_is_tuple(head) && term_get_tuple_arity(head) == 2) {
+        if (head == SHORT_ATOM) {
+            // FIXME: OTP uses ryu algorithm for short format, vendored as a lib (https://github.com/erlang/otp/tree/master/erts/emulator/ryu)
+            // Workaround here uses default decimal precision with compacting
+            *scientific = 0;
+            *decimals = 10;
+            *compact = 1;
+        } else if (term_is_tuple(head) && term_get_tuple_arity(head) == 2) {
             term val_term = term_get_tuple_element(head, 1);
             if (!term_is_integer(val_term)) {
                 return 0;
