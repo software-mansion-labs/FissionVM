@@ -5433,7 +5433,6 @@ static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
     Module *module = globalcontext_load_module_from_avm(ctx->global, module_file_name);
 
     if (IS_NULL_PTR(module)) {
-        // Platform may implement sys_load_module_from_file
         module = sys_load_module_from_file(ctx->global, module_file_name);
     }
     if (UNLIKELY(!module)) {
@@ -5450,7 +5449,7 @@ static term nif_code_get_object_code(Context *ctx, int argc, term argv[])
     // TODO: update this code when module unloading will be supported.
     term binary = term_from_literal_binary((void *) module->binary, module->binary_size, &ctx->heap, ctx->global);
     // TODO: this code has to be changed to return the complete path
-    term filename_term = term_from_string(module_file_name, filename_len, &ctx->heap);
+    term filename_term = term_from_string((const uint8_t *) module_file_name, filename_len, &ctx->heap);
     term result = term_alloc_tuple(3, &ctx->heap);
 
     term_put_tuple_element(result, 0, module_atom);
