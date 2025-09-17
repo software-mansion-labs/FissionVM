@@ -3,13 +3,16 @@
 #
 #  SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 #
+
+on:
+  workflow_dispatch:
 # This is a workflow for atomvm/AtomVM to Publish API documentation and other content from the `doc` directory to
 # doc.atomvm.org hosted on GitHub Pages
 
 name: Publish Docs
 
 # Controls when the workflow will run
-on:
+disabled:
   # Triggers the workflow on pull request, tag events and pushes on main
   push:
     tags:
