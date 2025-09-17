@@ -4,9 +4,12 @@
 #  SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 #
 
+on:
+  workflow_dispatch:
+
 name: esp32-mkimage
 
-on:
+disabled:
   push:
     paths:
       - '.github/workflows/esp32-mkimage.yaml'
