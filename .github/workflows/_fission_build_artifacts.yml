@@ -1,0 +1,59 @@
+name: Build artifacts
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  wasm_build_web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    container: emscripten/emsdk
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Install deps
+        run: sudo apt update -y && sudo apt install -y cmake gperf
+
+      - name: 🏗️ Build WASM for web
+        working-directory: ./src/platforms/emscripten/
+        run: |
+          set -euo pipefail
+          mkdir build
+          cd build
+          emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
+          emmake make -j $(nproc)
+
+      - name: Vars setup
+        id: setup
+        run: |
+          echo "artifacts_dir=src/platforms/emscripten/build/src" >> $GITHUB_OUTPUT
+
+      - name: "Rename artifacts"
+        working-directory: ${{ steps.setup.outputs.artifacts_dir }}
+        run: |
+          gzip -k "AtomVM.mjs"
+          sha256sum "AtomVM.mjs" > "AtomVM.mjs.sha256"
+          gzip -k  "AtomVM.wasm"
+          sha256sum "AtomVM.wasm" > "AtomVM.wasm.sha256"
+
+      - name: "Release (web)"
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: ${{ startsWith( github.ref_name, 'test-') }}
+          prerelease: ${{ contains( github.ref_name, '-dev') || contains( github.ref_name, '-rc') }}
+          fail_on_unmatched_files: true
+          files: |
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.mjs
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.mjs.gz
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.mjs.sha256
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.wasm
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.wasm.gz
+            ${{ steps.setup.outputs.artifacts_dir }}/AtomVM.wasm.sha256
