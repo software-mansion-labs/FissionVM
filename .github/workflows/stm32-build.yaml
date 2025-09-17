@@ -4,9 +4,12 @@
 #  SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 #
 
+on:
+  workflow_dispatch:
+
 name: STM32 Build
 
-on:
+disabled:
   push:
     paths:
       - '.github/workflows/stm32-build.yaml'
