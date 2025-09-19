@@ -114,6 +114,9 @@ X(UTF16_ATOM, "\x5", "utf16")
 X(UTF32_ATOM, "\x5", "utf32")
 X(BADRECORD_ATOM, "\x9", "badrecord")
 
+X(STDOUT_ATOM, "\x6", "stdout")
+X(STDERR_ATOM, "\x6", "stderr")
+
 X(COPY_ATOM, "\x4", "copy")
 X(REUSE_ATOM, "\x5", "reuse")
 X(ENSURE_AT_LEAST_ATOM, "\xF", "ensure_at_least")

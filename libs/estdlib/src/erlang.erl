@@ -51,6 +51,8 @@
     erase/1,
     function_exported/3,
     display/1,
+    display_string/1,
+    display_string/2,
     list_to_atom/1,
     list_to_existing_atom/1,
     list_to_binary/1,
@@ -597,6 +599,32 @@ function_exported(_Module, _Function, _Arity) ->
 %%-----------------------------------------------------------------------------
 -spec display(Term :: any()) -> true.
 display(_Term) ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @hidden
+%% @param   String  string or binary to print
+%% @returns `true'
+%% @doc     Prints a string to stderr. Hidden by OTP, meant for debugging.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec display_string(P1) -> true when
+      P1 :: string() | binary().
+display_string(String) ->
+    erlang:display_string(stderr, String).
+
+%%-----------------------------------------------------------------------------
+%% @hidden
+%% @param   Device  stdout or stderr. Doesn't support stdin compared to OTP
+%% @param   String  string or binary to print
+%% @returns `true'
+%% @doc     Prints a string to specified device. Hidden by OTP, meant for debugging.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec display_string(Device, P1) -> true when
+      Device :: stdout | stderr,
+      P1 :: string() | binary().
+display_string(_Stream,_P1) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------

@@ -126,6 +126,7 @@ static term nif_erlang_binary_to_list_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_binary_to_existing_atom_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_concat_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_display_1(Context *ctx, int argc, term argv[]);
+static term nif_erlang_display_string_2(Context *ctx, int argc, term argv[]);
 static term nif_erlang_erase_0(Context *ctx, int argc, term argv[]);
 static term nif_erlang_erase_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_error(Context *ctx, int argc, term argv[]);
@@ -377,6 +378,13 @@ static const struct Nif display_nif =
     .base.type = NIFFunctionType,
     .nif_ptr = nif_erlang_display_1
 };
+
+static const struct Nif display_string_nif =
+{
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erlang_display_string_2
+};
+
 
 static const struct Nif erase_0_nif = {
     .base.type = NIFFunctionType,
@@ -2884,6 +2892,39 @@ static term nif_erlang_display_1(Context *ctx, int argc, term argv[])
 
     term_display(stdout, argv[0], ctx);
     printf("\n");
+
+    return TRUE_ATOM;
+}
+
+static term nif_erlang_display_string_2(Context *ctx, int argc, term argv[])
+{
+    UNUSED(ctx);
+    UNUSED(argc);
+
+    FILE *fd;
+    if (argv[0] == STDOUT_ATOM) {
+        fd = stdout;
+    } else if (argv[0] == STDERR_ATOM) {
+        fd = stderr;
+    } else {
+        return RAISE_ERROR(BADARG_ATOM);
+    }
+
+    term t = argv[1];
+    if (term_is_nonempty_list(t)) {
+        int ok;
+        char * printable = interop_list_to_string(t, &ok);
+        if (LIKELY(ok)) {
+            fputs(printable, fd);
+            free(printable);
+        } else {
+            return RAISE_ERROR(BADARG_ATOM);
+        }
+    } else if (term_is_binary(t)) {
+        int len = term_binary_size(t);
+        const char *binary_data =  term_binary_data(t);
+        fwrite(binary_data, sizeof(*binary_data), len, fd);
+    }
 
     return TRUE_ATOM;
 }
