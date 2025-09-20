@@ -31,10 +31,9 @@
 #include <module.h>
 #include <sys.h>
 
+#include "lib/emscripten_sys.h"
 #include <emscripten.h>
 #include <emscripten/promise.h>
-
-#include "emscripten_sys.h"
 
 static GlobalContext *global = NULL;
 static Module *main_module = NULL;
