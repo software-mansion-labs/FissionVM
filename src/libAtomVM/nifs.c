@@ -2907,23 +2907,27 @@ static term nif_erlang_display_string_2(Context *ctx, int argc, term argv[])
     } else if (argv[0] == STDERR_ATOM) {
         fd = stderr;
     } else {
-        return RAISE_ERROR(BADARG_ATOM);
+        RAISE_ERROR(BADARG_ATOM);
     }
 
     term t = argv[1];
     if (term_is_nonempty_list(t)) {
         int ok;
         char * printable = interop_list_to_string(t, &ok);
-        if (LIKELY(ok)) {
-            fputs(printable, fd);
-            free(printable);
-        } else {
-            return RAISE_ERROR(BADARG_ATOM);
+        if (UNLIKELY(!ok)) {
+            RAISE_ERROR(BADARG_ATOM);
         }
+
+        fputs(printable, fd);
+        free(printable);
     } else if (term_is_binary(t)) {
-        int len = term_binary_size(t);
-        const char *binary_data =  term_binary_data(t);
+        size_t len = term_binary_size(t);
+        const char *binary_data = term_binary_data(t);
         fwrite(binary_data, sizeof(*binary_data), len, fd);
+    } else if (term_is_nil(t)) {
+        return TRUE_ATOM;
+    } else {
+        RAISE_ERROR(BADARG_ATOM);
     }
 
     return TRUE_ATOM;
