@@ -139,6 +139,7 @@ compile_erlang(test_binary_to_atom)
 compile_erlang(test_binary_to_existing_atom)
 compile_erlang(test_atom_to_list)
 compile_erlang(test_display)
+compile_erlang(nif_erlang_display_string)
 compile_erlang(test_integer_to_list)
 compile_erlang(test_list_to_integer)
 compile_erlang(test_abs)
@@ -632,6 +633,7 @@ add_custom_target(erlang_test_modules DEPENDS
     test_binary_to_existing_atom.beam
     test_atom_to_list.beam
     test_display.beam
+    nif_erlang_display_string.beam
     test_integer_to_list.beam
     test_list_to_integer.beam
     test_abs.beam
