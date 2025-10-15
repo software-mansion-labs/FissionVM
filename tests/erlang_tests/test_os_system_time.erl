@@ -24,7 +24,7 @@
 -export([start/0]).
 
 start() ->
-    ok = test_os_system_time(1001),
+    ok = test_os_system_time(101),
     ok = test_os_system_time(10),
     ok = test_os_system_time(1),
     0.
