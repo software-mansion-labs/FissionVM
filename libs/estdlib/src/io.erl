@@ -27,7 +27,7 @@
 %%-----------------------------------------------------------------------------
 -module(io).
 
--export([format/1, format/2, get_line/1, put_chars/1, put_chars/2, fwrite/2, system_time/0]).
+-export([format/1, format/2, get_line/1, put_chars/1, put_chars/2, fwrite/2]).
 
 %%-----------------------------------------------------------------------------
 %% @doc     Equivalent to format(Format, []).
@@ -111,12 +111,3 @@ put_chars(standard_error, Chars) ->
     put_chars(Chars);
 put_chars(standard_output, Chars) ->
     put_chars(Chars).
-
-%%-----------------------------------------------------------------------------
-%% @returns An integer representing system time.
-%% @doc     Returns the current OS system time in native time unit.
-%% @end
-%%-----------------------------------------------------------------------------
--spec system_time() -> integer().
-system_time() ->
-    erlang:nif_error(undefined).
