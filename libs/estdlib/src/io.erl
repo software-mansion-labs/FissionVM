@@ -27,7 +27,16 @@
 %%-----------------------------------------------------------------------------
 -module(io).
 
--export([format/1, format/2, get_line/1, put_chars/1, put_chars/2, fwrite/2]).
+-export([format/1, format/2, get_line/1, put_chars/1, put_chars/2, fwrite/2, printable_range/0]).
+
+%%-----------------------------------------------------------------------------
+%% @doc Returns the user-requested range of printable Unicode characters.
+%% Currently always returns `unicode'
+%% @end
+%%-----------------------------------------------------------------------------
+-spec printable_range() -> unicode | latin1.
+printable_range() ->
+    unicode.
 
 %%-----------------------------------------------------------------------------
 %% @doc     Equivalent to format(Format, []).

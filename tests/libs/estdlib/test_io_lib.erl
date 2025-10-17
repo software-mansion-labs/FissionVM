@@ -29,6 +29,7 @@
 test() ->
     test_format(),
     test_latin1_char_list(),
+    test_printable_range(),
     ok.
 
 test_format() ->
@@ -254,6 +255,10 @@ test_latin1_char_list() ->
     true = io_lib:latin1_char_list("été"),
     false = io_lib:latin1_char_list(["hello"]),
     false = io_lib:latin1_char_list([$h, $e, $l, $l | $o]),
+    ok.
+
+test_printable_range() ->
+    UnicodeRange = io:printable_range() =:= unicode,
     ok.
 
 id(X) ->
