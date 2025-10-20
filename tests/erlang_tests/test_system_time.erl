@@ -26,6 +26,7 @@ start() ->
     ok = test_system_time(second, 1001),
     ok = test_system_time(millisecond, 10),
     ok = test_system_time(microsecond, 1),
+    ok = test_system_time(native, 1),
 
     ok = expect(fun() -> erlang:system_time(not_a_time_unit) end, badarg),
 

@@ -1764,6 +1764,9 @@ term nif_erlang_system_time_1(Context *ctx, int argc, term argv[])
     } else if (argv[0] == MICROSECOND_ATOM) {
         return make_maybe_boxed_int64(ctx, ((int64_t) ts.tv_sec) * 1000000UL + ts.tv_nsec / 1000UL);
 
+    } else if (argv[0] == NATIVE_ATOM) {
+        return make_maybe_boxed_int64(ctx, ((int64_t) ts.tv_sec) * 1000000000ULL + ts.tv_nsec);
+
     } else {
         RAISE_ERROR(BADARG_ATOM);
     }
