@@ -159,7 +159,7 @@ static term nif_erlang_setelement_3(Context *ctx, int argc, term argv[]);
 static term nif_erlang_spawn_opt(Context *ctx, int argc, term argv[]);
 static term nif_erlang_spawn_fun_opt(Context *ctx, int argc, term argv[]);
 static term nif_erlang_whereis_1(Context *ctx, int argc, term argv[]);
-static term nif_erlang_system_time_1(Context *ctx, int argc, term argv[]);
+static term nif_erlang_system_time(Context *ctx, int argc, term argv[]);
 static term nif_erlang_tuple_to_list_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_list_to_tuple_1(Context *ctx, int argc, term argv[]);
 static term nif_erlang_universaltime_0(Context *ctx, int argc, term argv[]);
@@ -574,7 +574,7 @@ static const struct Nif monotonic_time_nif =
 static const struct Nif system_time_nif =
 {
     .base.type = NIFFunctionType,
-    .nif_ptr = nif_erlang_system_time_1
+    .nif_ptr = nif_erlang_system_time
 };
 
 static const struct Nif universaltime_nif =
@@ -1748,12 +1748,14 @@ term nif_erlang_monotonic_time_1(Context *ctx, int argc, term argv[])
     }
 }
 
-term nif_erlang_system_time_1(Context *ctx, int argc, term argv[])
+term nif_erlang_system_time(Context *ctx, int argc, term argv[])
 {
-    UNUSED(argc);
-
     struct timespec ts;
     sys_time(&ts);
+
+    if (argc == 0) {
+        return make_maybe_boxed_int64(ctx, ((int64_t) ts.tv_sec) * 1000000000ULL + ts.tv_nsec);
+    }
 
     if (argv[0] == SECOND_ATOM) {
         return make_maybe_boxed_int64(ctx, ts.tv_sec);

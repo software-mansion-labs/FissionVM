@@ -23,10 +23,13 @@
 -export([start/0]).
 
 start() ->
-    ok = test_system_time(second, 1001),
-    ok = test_system_time(millisecond, 10),
-    ok = test_system_time(microsecond, 1),
-    ok = test_system_time(native, 1),
+    ok = test_system_time(10),
+    ok = test_system_time(1),
+
+    ok = test_system_time_unit(second, 1001),
+    ok = test_system_time_unit(millisecond, 10),
+    ok = test_system_time_unit(microsecond, 1),
+    ok = test_system_time_unit(native, 1),
 
     ok = expect(fun() -> erlang:system_time(not_a_time_unit) end, badarg),
 
@@ -34,7 +37,14 @@ start() ->
 
     0.
 
-test_system_time(Unit, SleepMs) ->
+test_system_time(SleepMs) ->
+    Before = verify_system_time_value(erlang:system_time()),
+    sleep(SleepMs),
+    After = verify_system_time_value(erlang:system_time()),
+    true = (After > Before),
+    ok.
+
+test_system_time_unit(Unit, SleepMs) ->
     Before = verify_system_time_value(erlang:system_time(Unit)),
     sleep(SleepMs),
     After = verify_system_time_value(erlang:system_time(Unit)),

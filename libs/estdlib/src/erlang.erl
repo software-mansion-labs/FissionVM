@@ -120,7 +120,8 @@
     localtime/0,
     unique_integer/0,
     unique_integer/1,
-    bump_reductions/1
+    bump_reductions/1,
+    system_time/0
 ]).
 
 -export_type([
@@ -1413,4 +1414,13 @@ module_loaded(_Module) ->
 %%-----------------------------------------------------------------------------
 -spec bump_reductions(pos_integer()) -> true.
 bump_reductions(Reductions) when is_integer(Reductions), Reductions > 1 ->
+    erlang:nif_error(undefined).
+
+%%-----------------------------------------------------------------------------
+%% @returns An integer representing system time.
+%% @doc     Returns the current OS system time in nanoseconds.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec system_time() -> integer().
+system_time() ->
     erlang:nif_error(undefined).
