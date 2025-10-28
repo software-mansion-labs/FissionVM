@@ -31,10 +31,9 @@
 #include <module.h>
 #include <sys.h>
 
+#include "lib/emscripten_sys.h"
 #include <emscripten.h>
 #include <emscripten/promise.h>
-
-#include "emscripten_sys.h"
 
 static GlobalContext *global = NULL;
 static Module *main_module = NULL;
@@ -136,6 +135,16 @@ EMSCRIPTEN_KEEPALIVE
 em_promise_t call(const char *name, const char *message)
 {
     return sys_enqueue_emscripten_call_message(global, name, message);
+}
+
+/**
+ * @brief Gets a number representing TrackedObject identity.
+ * @return a TrackedObject id.
+ */
+EMSCRIPTEN_KEEPALIVE
+size_t next_tracked_object_key()
+{
+    return sys_get_next_tracked_object_key(global);
 }
 
 /**

@@ -48,6 +48,12 @@
 #include "platform_defaultatoms.h"
 #include "websocket_nifs.h"
 
+size_t sys_get_next_tracked_object_key(GlobalContext *glb)
+{
+    struct EmscriptenPlatformData *platform = glb->platform_data;
+    return platform->next_tracked_object_key++;
+}
+
 /**
  * @brief resolve a promise with an int value and destroy it
  * @details called on the main thread using `emscripten_dispatch_to_thread`
@@ -58,15 +64,9 @@
 void sys_promise_resolve_int_and_destroy(em_promise_t promise, em_promise_result_t result, int value)
 {
     if (result == EM_PROMISE_FULFILL) {
-        EM_ASM({
-            promiseMap.get($0).resolve($1);
-        },
-            promise, value);
+        EM_ASM({ promiseMap.get($0).resolve($1); }, promise, value);
     } else {
-        EM_ASM({
-            promiseMap.get($0).reject($1);
-        },
-            promise, value);
+        EM_ASM({ promiseMap.get($0).reject($1); }, promise, value);
     }
     emscripten_promise_destroy(promise);
 }
@@ -81,15 +81,9 @@ void sys_promise_resolve_int_and_destroy(em_promise_t promise, em_promise_result
 void sys_promise_resolve_str_and_destroy(em_promise_t promise, em_promise_result_t result, int value)
 {
     if (result == EM_PROMISE_FULFILL) {
-        EM_ASM({
-            promiseMap.get($0).resolve(UTF8ToString($1));
-        },
-            promise, value);
+        EM_ASM({ promiseMap.get($0).resolve(UTF8ToString($1)); }, promise, value);
     } else {
-        EM_ASM({
-            promiseMap.get($0).reject(UTF8ToString($1));
-        },
-            promise, value);
+        EM_ASM({ promiseMap.get($0).reject(UTF8ToString($1)); }, promise, value);
     }
     emscripten_promise_destroy(promise);
 }
@@ -130,6 +124,19 @@ static void htmlevent_user_data_down(ErlNifEnv *caller_env, void *obj, ErlNifPid
     }
 }
 
+static void do_remove_tracked_object(atomic_size_t key)
+{
+    EM_ASM({ Module['onTrackedObjectDelete']($0); }, key);
+}
+
+static void tracked_object_dtor(ErlNifEnv *caller_env, void *obj)
+{
+    UNUSED(caller_env);
+
+    struct TrackedObjectResource *tracked_object_rsrc = (struct TrackedObjectResource *) obj;
+    emscripten_dispatch_to_thread(emscripten_main_runtime_thread_id(), EM_FUNC_SIG_VI, do_remove_tracked_object, NULL, tracked_object_rsrc->key);
+}
+
 static const ErlNifResourceTypeInit promise_resource_type_init = {
     .members = 1,
     .dtor = promise_dtor,
@@ -140,6 +147,11 @@ static const ErlNifResourceTypeInit htmlevent_user_data_resource_type_init = {
     .dtor = htmlevent_user_data_dtor,
     .stop = NULL,
     .down = htmlevent_user_data_down,
+};
+
+static const ErlNifResourceTypeInit tracked_object_resource_type_init = {
+    .members = 1,
+    .dtor = tracked_object_dtor
 };
 
 void sys_init_platform(GlobalContext *glb)
@@ -158,21 +170,31 @@ void sys_init_platform(GlobalContext *glb)
         AVM_ABORT();
     }
     list_init(&platform->messages);
+    platform->next_tracked_object_key = 0;
     ErlNifEnv env;
     erl_nif_env_partial_init_from_globalcontext(&env, glb);
+
     platform->promise_resource_type = enif_init_resource_type(&env, "promise", &promise_resource_type_init, ERL_NIF_RT_CREATE, NULL);
     if (IS_NULL_PTR(platform->promise_resource_type)) {
         fprintf(stderr, "Cannot initialize promise_resource_type");
         AVM_ABORT();
     }
+
     platform->htmlevent_user_data_resource_type = enif_init_resource_type(&env, "htmlevent_user_data", &htmlevent_user_data_resource_type_init, ERL_NIF_RT_CREATE, NULL);
     if (IS_NULL_PTR(platform->htmlevent_user_data_resource_type)) {
         fprintf(stderr, "Cannot initialize htmlevent_user_data_resource_type");
         AVM_ABORT();
     }
+
     platform->websocket_resource_type = enif_init_resource_type(&env, "websocket", &websocket_resource_type_init, ERL_NIF_RT_CREATE, NULL);
     if (IS_NULL_PTR(platform->websocket_resource_type)) {
         fprintf(stderr, "Cannot initialize websocket_resource_type");
+        AVM_ABORT();
+    }
+
+    platform->tracked_object_resource_type = enif_init_resource_type(&env, "tracked_object", &tracked_object_resource_type_init, ERL_NIF_RT_CREATE, NULL);
+    if (IS_NULL_PTR(platform->tracked_object_resource_type)) {
+        fprintf(stderr, "Cannot initialize tracked_object resource type");
         AVM_ABORT();
     }
 
