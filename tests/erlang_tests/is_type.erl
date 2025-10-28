@@ -24,7 +24,7 @@
 
 start() ->
     Pid = self(),
-    test_is_type(hello, <<"hello">>, 10, [1, 2, 3], 5, Pid, make_ref(), {1, 2}).
+    test_is_type(hello, <<"hello">>, 10, [1, 2, 3], 5.5, Pid, make_ref(), {1, 2}).
 
 test_is_type(A, B, I, L, N, P, R, T) ->
     all_true(
