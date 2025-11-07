@@ -26,6 +26,8 @@ erlang:list_to_bitstring/1, &list_to_bitstring_nif
 #
 avm_rand:splitmix64_next/1, &rand_splitmix64_next_nif
 #
+erts_internal:cmp_term/2, &erts_internal_cmp_term_nif
+#
 erlang:md5/1, &md5_nif
 #
 # ETS
