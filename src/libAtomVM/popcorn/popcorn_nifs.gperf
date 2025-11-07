@@ -19,6 +19,10 @@ erlang:display_string/2, &display_string_nif
 # Upstreaming in progress - mock implementation
 code:get_object_code/1, &code_get_object_code_nif
 #
+# Not upstreamable 
+#
+erts_internal:cmp_term/2, &erts_internal_cmp_term_nif
+#
 # ETS
 #
 ets:new/2, &ets_new_nif
