@@ -510,6 +510,9 @@ static const struct Nif display_string_nif = {
     .nif_ptr = nif_erlang_display_string_2
 };
 
+// The difference from regular term comparison is that this function
+// always compares term type first, which in practice means that
+// an integer is always lesser than a float.
 static term nif_erts_internal_cmp_term(Context *ctx, int argc, term argv[])
 {
     UNUSED(argc);
@@ -521,6 +524,10 @@ static term nif_erts_internal_cmp_term(Context *ctx, int argc, term argv[])
             return term_from_int4(1);
         case TermLessThan:
             return term_from_int4(-1);
+        case TermCompareMemoryAllocFail:
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        default:
+            AVM_ABORT();
     }
 }
 
