@@ -510,6 +510,25 @@ static const struct Nif display_string_nif = {
     .nif_ptr = nif_erlang_display_string_2
 };
 
+static term nif_erts_internal_cmp_term(Context *ctx, int argc, term argv[])
+{
+    UNUSED(argc);
+    TermCompareResult result = term_compare(argv[0], argv[1], TermCompareExact, ctx->global);
+    switch (result) {
+        case TermEquals:
+            return term_from_int4(0);
+        case TermGreaterThan:
+            return term_from_int4(1);
+        case TermLessThan:
+            return term_from_int4(-1);
+    }
+}
+
+static const struct Nif erts_internal_cmp_term_nif = {
+    .base.type = NIFFunctionType,
+    .nif_ptr = nif_erts_internal_cmp_term
+};
+
 // ETS
 
 static term nif_ets_new(Context *ctx, int argc, term argv[])
