@@ -80,7 +80,7 @@ PopcornEtsErrorCode popcorn_ets_delete(term ref, term key, term *ret, Context *c
 PopcornEtsErrorCode popcorn_ets_drop_table(term ref, term *ret, Context *ctx);
 PopcornEtsErrorCode popcorn_ets_update_counter(term ref, term key, term operation, term default_value, term *ret, Context *ctx);
 PopcornEtsErrorCode popcorn_ets_delete_object(term ref, term tuple, term *ret, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_update_element(term ref, term key, term value, term pos, term *ret, Context *ctx);
+PopcornEtsErrorCode popcorn_ets_update_element(term ref, term key, term element_spec, term *ret, Context *ctx);
 PopcornEtsErrorCode popcorn_ets_take(term ref, term key, term *ret, Context *ctx);
 
 #ifdef __cplusplus
