@@ -374,7 +374,7 @@ PopcornEtsErrorCode popcorn_ets_insert(term ref, term entry, bool *entry_inserte
     return result;
 }
 
-static PopcornEtsErrorCode popcorn_ets_lookup_internal(struct PopcornEtsTable *popcorn_ets_table, term key, size_t index, term *ret, Context *ctx)
+static PopcornEtsErrorCode popcorn_ets_lookup_internal(struct PopcornEtsTable *popcorn_ets_table, term key, size_t index, term *ret, size_t num_roots, term *roots, Context *ctx)
 {
     bool is_duplicate_bag = popcorn_ets_table->table_type == PopcornEtsTableDuplicateBag;
     bool lookup_element = index != ETS_NO_INDEX;
@@ -387,7 +387,7 @@ static PopcornEtsErrorCode popcorn_ets_lookup_internal(struct PopcornEtsTable *p
         // for tuple list and it reversed version - we don't want to copy terms in the loop
         size_t size = 2 * memory_estimate_usage(popcorn_ets_entry);
         // we don't need to preserve tuples, they live on different heap
-        if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        if (UNLIKELY(memory_ensure_free_with_roots(ctx, size, num_roots, roots, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             return PopcornEtsAllocationFailure;
         }
         term tuples = memory_copy_term_tree(&ctx->heap, popcorn_ets_entry);
@@ -415,7 +415,7 @@ static PopcornEtsErrorCode popcorn_ets_lookup_internal(struct PopcornEtsTable *p
             popcorn_ets_entry = term_get_tuple_element(popcorn_ets_entry, index);
         }
         size_t size = (size_t) memory_estimate_usage(popcorn_ets_entry) + CONS_SIZE;
-        if (UNLIKELY(memory_ensure_free_opt(ctx, size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        if (UNLIKELY(memory_ensure_free_with_roots(ctx, size, num_roots, roots, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             return PopcornEtsAllocationFailure;
         }
         term tuple = memory_copy_term_tree(&ctx->heap, popcorn_ets_entry);
@@ -433,7 +433,7 @@ PopcornEtsErrorCode popcorn_ets_lookup(term ref, term key, term *ret, Context *c
         return PopcornEtsBadAccess;
     }
 
-    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, ETS_NO_INDEX, ret, ctx);
+    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, ETS_NO_INDEX, ret, 0, NULL, ctx);
     SMP_UNLOCK(popcorn_ets_table);
 
     return result;
@@ -449,7 +449,7 @@ PopcornEtsErrorCode popcorn_ets_lookup_element(term ref, term key, size_t index,
     bool is_duplicate_bag = popcorn_ets_table->table_type == PopcornEtsTableDuplicateBag;
 
     term entry;
-    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, index, &entry, ctx);
+    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, index, &entry, 0, NULL, ctx);
     if (result != PopcornEtsOk) {
         SMP_UNLOCK(popcorn_ets_table);
         return result;
@@ -667,7 +667,7 @@ PopcornEtsErrorCode popcorn_ets_update_counter(term ref, term key, term operatio
 
     term to_insert = term_invalid_term();
     term list = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, ETS_NO_INDEX, &list, ctx);
+    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, ETS_NO_INDEX, &list, 0, NULL, ctx);
     if (result != PopcornEtsOk) {
         SMP_UNLOCK(popcorn_ets_table);
         return result;
@@ -735,7 +735,38 @@ PopcornEtsErrorCode popcorn_ets_update_counter(term ref, term key, term operatio
     return insert_result;
 }
 
-PopcornEtsErrorCode popcorn_ets_update_element(term ref, term key, term value, size_t index, term *ret, Context *ctx)
+PopcornEtsErrorCode popcorn_ets_update_element_put_tuple(term element_spec_tuple, term to_insert)
+{
+
+    if (UNLIKELY(!term_is_tuple(element_spec_tuple) || term_get_tuple_arity(element_spec_tuple) != 2)) {
+        return PopcornEtsBadEntry;
+    }
+    term pos = term_get_tuple_element(element_spec_tuple, 0);
+    if (UNLIKELY(!term_is_integer(pos))) {
+        return PopcornEtsBadEntry;
+    }
+    term value = term_get_tuple_element(element_spec_tuple, 1);
+
+    avm_int_t index = term_to_int(pos) - 1;
+    if (UNLIKELY(index < 0)) {
+        return PopcornEtsBadEntry;
+    }
+
+    if (!(term_is_tuple(to_insert))) {
+        return PopcornEtsBadEntry;
+    }
+
+    int arity = term_get_tuple_arity(to_insert);
+    if (index >= arity) {
+        return PopcornEtsBadEntry;
+    }
+
+    term_put_tuple_element(to_insert, index, value);
+
+    return PopcornEtsOk;
+}
+
+PopcornEtsErrorCode popcorn_ets_update_element(term ref, term key, term element_spec, term *ret, Context *ctx)
 {
     struct PopcornEtsTable *popcorn_ets_table = popcorn_ets_get_table(&ctx->global->popcorn_ets, ctx->process_id, ref, TableAccessWrite);
     if (popcorn_ets_table == NULL) {
@@ -749,7 +780,7 @@ PopcornEtsErrorCode popcorn_ets_update_element(term ref, term key, term value, s
     }
     term to_insert = term_invalid_term();
     term list = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, ETS_NO_INDEX, &list, ctx);
+    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, ETS_NO_INDEX, &list, 1, &element_spec, ctx);
     if (result != PopcornEtsOk) {
         SMP_UNLOCK(popcorn_ets_table);
         return result;
@@ -762,22 +793,27 @@ PopcornEtsErrorCode popcorn_ets_update_element(term ref, term key, term value, s
 
     to_insert = term_get_list_head(list);
 
-    if (!(term_is_tuple(to_insert))) {
-        SMP_UNLOCK(popcorn_ets_table);
-        return PopcornEtsBadEntry;
+    if (term_is_list(element_spec)) {
+        while (!term_is_nil(element_spec)) {
+            result = popcorn_ets_update_element_put_tuple(term_get_list_head(element_spec), to_insert);
+            element_spec = term_get_list_tail(element_spec);
+            if (result != PopcornEtsOk || !term_is_list(element_spec)) {
+                SMP_UNLOCK(popcorn_ets_table);
+                return result;
+            }
+        }
+    } else {
+        result = popcorn_ets_update_element_put_tuple(element_spec, to_insert);
+        if (result != PopcornEtsOk) {
+            SMP_UNLOCK(popcorn_ets_table);
+            return result;
+        }
     }
 
-    int arity = term_get_tuple_arity(to_insert);
-    if (index >= (size_t) arity) {
-        SMP_UNLOCK(popcorn_ets_table);
-        return PopcornEtsBadEntry;
-    }
-
-    term_put_tuple_element(to_insert, index, value);
-    PopcornEtsErrorCode insert_result = popcorn_ets_insert_internal(popcorn_ets_table, to_insert, NULL, ctx);
+    result = popcorn_ets_insert_internal(popcorn_ets_table, to_insert, NULL, ctx);
     SMP_UNLOCK(popcorn_ets_table);
     *ret = TRUE_ATOM;
-    return insert_result;
+    return result;
 }
 
 PopcornEtsErrorCode popcorn_ets_take(term ref, term key, term *ret, Context *ctx)

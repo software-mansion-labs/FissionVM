@@ -742,22 +742,9 @@ static term nif_ets_update_element(Context *ctx, int argc, term argv[])
     VALIDATE_VALUE(ref, is_popcorn_ets_table_id);
 
     term key = argv[1];
-    term operation = argv[2];
-    VALIDATE_VALUE(operation, term_is_tuple);
-    if (term_get_tuple_arity(operation) != 2) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
-    term pos = term_get_tuple_element(operation, 0);
-    VALIDATE_VALUE(pos, term_is_integer);
-    term value = term_get_tuple_element(operation, 1);
-
-    avm_int_t index = term_to_int(pos) - 1;
-    if (UNLIKELY(index < 0)) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
-
+    term element_spec = argv[2];
     term ret = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_update_element(ref, key, value, (size_t) index, &ret, ctx);
+    PopcornEtsErrorCode result = popcorn_ets_update_element(ref, key, element_spec, &ret, ctx);
     switch (result) {
         case PopcornEtsOk:
             return ret;
