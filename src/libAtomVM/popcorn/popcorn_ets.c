@@ -735,9 +735,8 @@ PopcornEtsErrorCode popcorn_ets_update_counter(term ref, term key, term operatio
     return insert_result;
 }
 
-PopcornEtsErrorCode popcorn_ets_update_element_put_tuple(term element_spec_tuple, term to_insert)
+static PopcornEtsErrorCode popcorn_ets_update_element_internal(term element_spec_tuple, term to_insert)
 {
-
     if (UNLIKELY(!term_is_tuple(element_spec_tuple) || term_get_tuple_arity(element_spec_tuple) != 2)) {
         return PopcornEtsBadEntry;
     }
@@ -752,7 +751,7 @@ PopcornEtsErrorCode popcorn_ets_update_element_put_tuple(term element_spec_tuple
         return PopcornEtsBadEntry;
     }
 
-    if (!(term_is_tuple(to_insert))) {
+    if (!term_is_tuple(to_insert)) {
         return PopcornEtsBadEntry;
     }
 
@@ -772,47 +771,51 @@ PopcornEtsErrorCode popcorn_ets_update_element(term ref, term key, term element_
     if (popcorn_ets_table == NULL) {
         return PopcornEtsBadAccess;
     }
+    PopcornEtsErrorCode result = PopcornEtsOk;
 
     bool is_duplicate_bag = popcorn_ets_table->table_type == PopcornEtsTableDuplicateBag;
     if (is_duplicate_bag) {
-        SMP_UNLOCK(popcorn_ets_table);
-        return PopcornEtsBadAccess;
+        result = PopcornEtsBadAccess;
+        goto popcorn_ets_update_element_cleanup;
     }
     term to_insert = term_invalid_term();
     term list = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_lookup_internal(popcorn_ets_table, key, ETS_NO_INDEX, &list, 1, &element_spec, ctx);
+    result = popcorn_ets_lookup_internal(popcorn_ets_table, key, ETS_NO_INDEX, &list, 1, &element_spec, ctx);
     if (result != PopcornEtsOk) {
-        SMP_UNLOCK(popcorn_ets_table);
-        return result;
+        goto popcorn_ets_update_element_cleanup;
     }
     if (term_is_nil(list)) {
-        SMP_UNLOCK(popcorn_ets_table);
         *ret = FALSE_ATOM;
-        return PopcornEtsOk;
+        result = PopcornEtsOk;
+        goto popcorn_ets_update_element_cleanup;
     }
 
     to_insert = term_get_list_head(list);
 
     if (term_is_list(element_spec)) {
         while (!term_is_nil(element_spec)) {
-            result = popcorn_ets_update_element_put_tuple(term_get_list_head(element_spec), to_insert);
+            result = popcorn_ets_update_element_internal(term_get_list_head(element_spec), to_insert);
+            if (result != PopcornEtsOk) {
+                goto popcorn_ets_update_element_cleanup;
+            }
             element_spec = term_get_list_tail(element_spec);
-            if (result != PopcornEtsOk || !term_is_list(element_spec)) {
-                SMP_UNLOCK(popcorn_ets_table);
-                return result;
+            if (UNLIKELY(!term_is_list(element_spec))) {
+                result = PopcornEtsBadAccess;
+                goto popcorn_ets_update_element_cleanup;
             }
         }
     } else {
-        result = popcorn_ets_update_element_put_tuple(element_spec, to_insert);
+        result = popcorn_ets_update_element_internal(element_spec, to_insert);
         if (result != PopcornEtsOk) {
-            SMP_UNLOCK(popcorn_ets_table);
-            return result;
+            goto popcorn_ets_update_element_cleanup;
         }
     }
 
     result = popcorn_ets_insert_internal(popcorn_ets_table, to_insert, NULL, ctx);
-    SMP_UNLOCK(popcorn_ets_table);
     *ret = TRUE_ATOM;
+
+popcorn_ets_update_element_cleanup:
+    SMP_UNLOCK(popcorn_ets_table);
     return result;
 }
 
