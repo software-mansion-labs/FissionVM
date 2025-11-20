@@ -29,6 +29,7 @@
 #include "atom.h"
 #include "context.h"
 #include "exportedfunction.h"
+#include "trace.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +37,7 @@ extern "C" {
 
 #define VALIDATE_VALUE(value, verify_function) \
     if (UNLIKELY(!verify_function((value)))) { \
+        TRACE_RAISE;                           \
         argv[0] = ERROR_ATOM;                  \
         argv[1] = BADARG_ATOM;                 \
         return term_invalid_term();            \
@@ -44,6 +46,7 @@ extern "C" {
 #define RAISE_ERROR(error_type_atom) \
     ctx->x[0] = ERROR_ATOM;          \
     ctx->x[1] = (error_type_atom);   \
+    TRACE_RAISE;                     \
     return term_invalid_term();
 
 const struct Nif *nifs_get(const char *mfa);

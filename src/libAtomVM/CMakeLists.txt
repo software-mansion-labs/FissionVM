@@ -159,6 +159,14 @@ elseif(SANITIZER STREQUAL "undefined")
     target_link_options(libAtomVM PUBLIC -fsanitize=undefined)
 endif()
 
+if (AVM_ENABLE_TRACE)
+    target_compile_definitions(libAtomVM PUBLIC ENABLE_TRACE)
+endif()
+
+if (AVM_ENABLE_TRACE_RAISE)
+    target_compile_definitions(libAtomVM PUBLIC ENABLE_TRACE_RAISE)
+endif()
+
 target_link_libraries(libAtomVM PUBLIC m)
 include(CheckCSourceCompiles)
 set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -Werror=unknown-pragmas")
