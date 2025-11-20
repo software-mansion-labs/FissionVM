@@ -20,14 +20,21 @@
 
 #ifndef _TRACE_H_
 #define _TRACE_H_
-
 #ifndef TRACE
 #ifdef ENABLE_TRACE
-#define TRACE printf
+#define TRACE(args...) fprintf(stderr, args)
 #define DEBUG_FAIL_NULL(expr) assert((expr) != NULL)
 #else
 #define TRACE(...)
 #define DEBUG_FAIL_NULL(expr)
+#endif
+#endif
+
+#ifndef TRACE_RAISE
+#ifdef ENABLE_TRACE_RAISE
+#define TRACE_RAISE fprintf(stderr, "TRACE RAISE: raise from C at %s:%u\n", __FILE_NAME__, __LINE__)
+#else
+#define TRACE_RAISE
 #endif
 #endif
 

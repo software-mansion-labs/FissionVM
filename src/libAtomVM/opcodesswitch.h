@@ -141,6 +141,7 @@ extern "C" {
 #undef RAISE_ERROR
 #endif
 #define RAISE_ERROR(error_type_atom) \
+    TRACE_RAISE;                     \
     SET_ERROR(error_type_atom)       \
     goto handle_error;
 
@@ -6229,6 +6230,15 @@ schedule_in:
         x_regs[0] = context_exception_class(ctx);
         x_regs[1] = ctx->exception_reason;
         x_regs[2] = ctx->exception_stacktrace;
+        if (x_regs[0] == ERROR_ATOM && x_regs[1] == NIF_NOT_FOUND_ERROR_ATOM) {
+            fprintf(stderr, "nif_not_found_error raised, printing crash dump and aborting\n");
+            context_dump(ctx);
+            AVM_ABORT();
+        }
+        #ifdef ENABLE_TRACE_RAISE
+            fprintf(stderr, "TRACE RAISE: raise detected, dumping process context\n");
+            context_dump(ctx);
+        #endif
         context_set_exception_class(ctx, term_nil());
         ctx->exception_reason = term_nil();
         ctx->exception_stacktrace = term_invalid_term();

@@ -29,6 +29,7 @@
 #include "atom.h"
 #include "context.h"
 #include "exportedfunction.h"
+#include "trace.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +37,7 @@ extern "C" {
 
 #define VALIDATE_VALUE(value, verify_function)        \
     if (UNLIKELY(!verify_function((value)))) {        \
+        TRACE_RAISE;                                  \
         context_set_exception_class(ctx, ERROR_ATOM); \
         ctx->exception_reason = BADARG_ATOM;          \
         return term_invalid_term();                   \
@@ -43,6 +45,7 @@ extern "C" {
 
 #define RAISE_ERROR(error_type_atom)                  \
     do {                                              \
+        TRACE_RAISE;                                  \
         context_set_exception_class(ctx, ERROR_ATOM); \
         ctx->exception_reason = (error_type_atom);    \
         return term_invalid_term();                   \

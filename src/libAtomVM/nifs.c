@@ -6524,8 +6524,8 @@ static term nif_erlang_nif_error(Context *ctx, int argc, term argv[])
     UNUSED(argc);
     UNUSED(argv);
 
-    fprintf(stderr, "Nif not found, aborting\n");
-    AVM_ABORT();
+    fprintf(stderr, "Nif not found\n");
+    RAISE_ERROR(NIF_NOT_FOUND_ERROR_ATOM);
 }
 
 #ifndef AVM_NO_JIT
