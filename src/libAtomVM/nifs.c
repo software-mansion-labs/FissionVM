@@ -4128,7 +4128,7 @@ static term nif_erlang_fun_info_2(Context *ctx, int argc, term argv[])
             RAISE_ERROR(BADARG_ATOM);
     }
 
-    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 2, (term[]){ key, value }, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, TUPLE_SIZE(2), 2, (term[]) { key, value }, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         RAISE_ERROR(OUT_OF_MEMORY_ATOM);
     }
     term fun_info_tuple = term_alloc_tuple(2, &ctx->heap);
@@ -5694,8 +5694,8 @@ static term nif_erlang_nif_error(Context *ctx, int argc, term argv[])
     UNUSED(argc);
     UNUSED(argv);
 
-    fprintf(stderr, "Nif not found, aborting\n");
-    AVM_ABORT();
+    fprintf(stderr, "Nif not found\n");
+    RAISE_ERROR(NIF_NOT_FOUND_ERROR_ATOM);
 }
 
 #ifndef AVM_NO_JIT
