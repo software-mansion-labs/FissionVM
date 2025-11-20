@@ -29,6 +29,8 @@ find_package(Elixir)
 find_package(Gleam)
 
 set(SANITIZER "address" CACHE STRING "Enable Address Sanitizer") # Include address, memory, or undefined sanitizer
+option(AVM_ENABLE_TRACE "Enable opcode-level tracing" OFF)
+option(AVM_ENABLE_TRACE_RAISE "Enable tracing raised errors" OFF)
 
 option(AVM_ENABLE_OLD_OTP_VERSIONS "Enable OTP version < 26" ON)
 option(AVM_DISABLE_FP "Disable floating point support." OFF)
@@ -42,7 +44,7 @@ option(AVM_RELEASE "Build an AtomVM release" OFF)
 option(AVM_CREATE_STACKTRACES "Create stacktraces" ON)
 option(AVM_BUILD_RUNTIME_ONLY "Only build the AtomVM runtime" OFF)
 option(COVERAGE "Build for code coverage" OFF)
-option(AVM_PRINT_PROCESS_CRASH_DUMPS "Print crash reports when processes die with non-standard reasons" ON)
+option(AVM_PRINT_PROCESS_CRASH_DUMPS "Print crash reports when processes die with non-standard reasons" OFF)
 
 # JIT & execution of precompiled code
 if(NOT Erlang_VERSION VERSION_GREATER_EQUAL "23")
