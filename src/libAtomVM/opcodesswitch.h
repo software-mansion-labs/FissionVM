@@ -84,6 +84,7 @@ extern "C" {
 #undef RAISE_ERROR
 #endif
 #define RAISE_ERROR(error_type_atom) \
+    TRACE_RAISE;                     \
     SET_ERROR(error_type_atom)       \
     goto handle_error;
 
@@ -7551,6 +7552,15 @@ do_abort:
 
 handle_error:
         {
+            if (x_regs[0] == ERROR_ATOM && x_regs[1] == NIF_NOT_FOUND_ERROR_ATOM) {
+                fprintf(stderr, "nif_not_found_error raised, printing crash dump and aborting\n");
+                context_dump(ctx);
+                AVM_ABORT();
+            }
+            #ifdef ENABLE_TRACE_RAISE
+                fprintf(stderr, "TRACE RAISE: raise detected, dumping process context\n");
+                context_dump(ctx);
+            #endif
             int target_label = context_get_catch_label(ctx, &mod);
             if (target_label) {
 #if AVM_NO_JIT
