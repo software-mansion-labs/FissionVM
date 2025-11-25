@@ -43,11 +43,13 @@
 #pragma GCC diagnostic pop
 
 #define RAISE_ERROR(error_type_atom) \
+    TRACE_RAISE;                     \
     ctx->x[0] = ERROR_ATOM;          \
     ctx->x[1] = (error_type_atom);   \
     return term_invalid_term();
 
 #define RAISE_ERROR_BIF(fail_label, error_type_atom) \
+    TRACE_RAISE;                                     \
     if (fail_label == 0) {                           \
         ctx->x[0] = ERROR_ATOM;                      \
         ctx->x[1] = (error_type_atom);               \
