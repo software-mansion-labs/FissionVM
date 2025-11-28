@@ -2485,6 +2485,13 @@ int get_float_format_opts(term opts, int *scientific, int *decimals, int *compac
         } else if (head == DEFAULTATOMS_COMPACT_ATOM) {
             *compact = 1;
 
+        } else if (head == SHORT_ATOM) {
+            // FIXME: OTP uses ryu algorithm for short format,
+            // vendored as a lib (https://github.com/erlang/otp/tree/master/erts/emulator/ryu)
+            // Workaround here uses default decimal precision with compacting
+            *scientific = 0;
+            *decimals = 10;
+            *compact = 1;
         } else {
             return 0;
         }
