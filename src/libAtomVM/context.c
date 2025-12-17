@@ -289,6 +289,7 @@ void context_destroy(Context *ctx)
 
     ets_delete_owned_tables(&ctx->global->ets, ctx->process_id, ctx->global);
     popcorn_ets_delete_owned_tables(&ctx->global->popcorn_ets, ctx->process_id, ctx->global);
+    popcorn2_ets_delete_owned_tables(&ctx->global->popcorn2_ets, ctx->process_id, ctx->global);
 
     free(ctx);
 }
