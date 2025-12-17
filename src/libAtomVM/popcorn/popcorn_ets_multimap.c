@@ -268,13 +268,13 @@ static EtsMultimapStatus ets_multimap_find_node(
     }
 
     while (node) {
-        TermCompareResult res = term_compare(key, node_key(multimap, node), TermCompareExact, global);
+        TermCompareResult result = term_compare(key, node_key(multimap, node), TermCompareExact, global);
 
-        if (res == TermCompareMemoryAllocFail) {
+        if (result == TermCompareMemoryAllocFail) {
             return EtsMultimapAllocationError;
         }
 
-        if (res == TermEquals) {
+        if (result == TermEquals) {
             *out_node = node;
             return EtsMultimapOk;
         }
@@ -352,12 +352,12 @@ static EtsMultimapStatus ets_multimap_tuple_exists(
     GlobalContext *global)
 {
     for (struct EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
-        TermCompareResult res = term_compare(tuple, iter->tuple, TermCompareExact, global);
-        if (res == TermCompareMemoryAllocFail) {
+        TermCompareResult result = term_compare(tuple, iter->tuple, TermCompareExact, global);
+        if (result == TermCompareMemoryAllocFail) {
             return EtsMultimapAllocationError;
         }
 
-        if (res == TermEquals) {
+        if (result == TermEquals) {
             *exists = true;
             return EtsMultimapOk;
         }

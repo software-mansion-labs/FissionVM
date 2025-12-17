@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-#define NUM_BUCKETS 1
+#define NUM_BUCKETS 16
 
 typedef enum EtsMultimapType
 {

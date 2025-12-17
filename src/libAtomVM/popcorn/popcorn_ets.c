@@ -328,8 +328,8 @@ static PopcornEtsErrorCode popcorn_ets_insert_multiple_internal(struct PopcornEt
 
         if (insert_new) {
             term key = term_get_tuple_element(entry, popcorn_ets_table->key_index);
-            term res = popcorn_ets_hashtable_lookup(popcorn_ets_table->hashtable, key, ctx->global);
-            bool exists = !term_is_nil(res);
+            term result = popcorn_ets_hashtable_lookup(popcorn_ets_table->hashtable, key, ctx->global);
+            bool exists = !term_is_nil(result);
             if (exists) {
                 *overwritten = false;
                 return PopcornEtsOk;
