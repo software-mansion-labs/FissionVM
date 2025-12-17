@@ -31,6 +31,7 @@
 #include <stdint.h>
 
 #include "popcorn/popcorn_ets.h"
+#include "popcorn/popcorn_ets2.h"
 
 #include "atom.h"
 #include "atom_table.h"
@@ -124,6 +125,7 @@ struct GlobalContext
 
     struct Ets ets;
     struct PopcornEts popcorn_ets;
+    struct Popcorn2Ets popcorn2_ets;
 
     int32_t last_process_id;
 
