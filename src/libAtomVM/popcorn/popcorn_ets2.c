@@ -383,6 +383,8 @@ static Popcorn2EtsStatus popcorn2_ets_insert_one(
 {
     assert(term_is_tuple(tuple));
 
+    EtsMultimapStatus result = EtsMultimapOk;
+
     if (table->keypos >= (size_t) term_get_tuple_arity(tuple)) {
         return Popcorn2EtsBadEntry;
     }
@@ -390,15 +392,18 @@ static Popcorn2EtsStatus popcorn2_ets_insert_one(
     if (new) {
         term key = term_get_tuple_element(tuple, table->keypos);
         size_t existing = 0;
-        ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
+        if ((result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global)) != EtsMultimapOk) {
+            goto error;
+        }
         if (existing > 0) {
             return Popcorn2EtsKeyExists;
         }
     }
 
-    EtsMultimapStatus res = ets_multimap_insert(table->multimap, &tuple, 1, ctx->global);
+    result = ets_multimap_insert(table->multimap, &tuple, 1, ctx->global);
 
-    switch (res) {
+error:
+    switch (result) {
         case EtsMultimapOk:
             return Popcorn2EtsOk;
         case EtsMultimapAllocationError:
@@ -418,6 +423,8 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
 {
     assert(term_is_list(tuples));
 
+    EtsMultimapStatus result = EtsMultimapOk;
+
     size_t count = 0;
     for (term iter = tuples; !term_is_nil(iter); iter = term_get_list_tail(iter), count++) {
         term tuple = term_get_list_head(iter);
@@ -429,7 +436,9 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
         if (new) {
             term key = term_get_tuple_element(tuple, table->keypos);
             size_t existing = 0;
-            ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
+            if ((result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global)) != EtsMultimapOk) {
+                goto error;
+            }
             if (existing > 0) {
                 return Popcorn2EtsKeyExists;
             }
@@ -445,11 +454,12 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
         to_insert[i] = term_get_list_head(tuples);
     }
 
-    EtsMultimapStatus res = ets_multimap_insert(table->multimap, to_insert, count, ctx->global);
+    result = ets_multimap_insert(table->multimap, to_insert, count, ctx->global);
 
     free(to_insert);
 
-    switch (res) {
+error:
+    switch (result) {
         case EtsMultimapOk:
             return Popcorn2EtsOk;
         case EtsMultimapAllocationError:
