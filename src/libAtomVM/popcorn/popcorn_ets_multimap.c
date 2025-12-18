@@ -202,7 +202,7 @@ EtsMultimapStatus ets_multimap_lookup(
 
     *tuples = malloc(sizeof(term) * (*count));
     if (IS_NULL_PTR(*tuples)) {
-        return EtsMultimapError;
+        return EtsMultimapAllocationError;
     }
 
     int i = *count - 1;

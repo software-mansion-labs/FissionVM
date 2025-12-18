@@ -232,6 +232,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
     }
 
     if (count == 0) {
+        free(tuples);
         SMP_UNLOCK(table);
         return Popcorn2EtsOk;
     }
@@ -244,6 +245,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
     }
 
     if (UNLIKELY(memory_ensure_free_opt(ctx, sz + count * CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+        free(tuples);
         SMP_UNLOCK(table);
         return Popcorn2EtsAllocationError;
     }
