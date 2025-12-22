@@ -24,9 +24,11 @@
 
 #include <stdbool.h>
 
-#include "list.h"
-#include "synclist.h"
-#include "term.h"
+struct GlobalContext;
+struct Context;
+
+#include "../synclist.h"
+#include "../term.h"
 
 #ifdef __cplusplus
 extern "C" {
