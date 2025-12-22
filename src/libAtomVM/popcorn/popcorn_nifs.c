@@ -593,6 +593,7 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
         case Popcorn2EtsAllocationError:
             RAISE_ERROR(MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
@@ -616,14 +617,13 @@ static term nif_ets_insert(Context *ctx, int argc, term argv[])
     switch (result) {
         case Popcorn2EtsOk:
             return TRUE_ATOM;
-        case Popcorn2EtsKeyExists:
-            return FALSE_ATOM;
         case Popcorn2EtsBadAccess:
         case Popcorn2EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
@@ -650,6 +650,7 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
         case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
@@ -675,6 +676,7 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
         case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
@@ -837,9 +839,8 @@ static term nif_ets_delete(Context *ctx, int argc, term argv[])
             return TRUE_ATOM;
         case Popcorn2EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
-            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
