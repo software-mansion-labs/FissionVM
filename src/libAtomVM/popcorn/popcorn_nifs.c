@@ -557,20 +557,24 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
     term private = interop_kv_get_value(options, ATOM_STR("\x7", "private"), ctx->global);
     term public = interop_kv_get_value(options, ATOM_STR("\x6", "public"), ctx->global);
 
+    // NOTE: If multiple accesses are specified, the precedence is: public > private > protected
     Popcorn2EtsTableAccess access = Popcorn2EtsTableAccessProtected;
     if (!term_is_invalid_term(private)) {
         access = Popcorn2EtsTableAccessPrivate;
-    } else if (!term_is_invalid_term(public)) {
+    }
+    if (!term_is_invalid_term(public)) {
         access = Popcorn2EtsTableAccessPublic;
     }
 
     term bag = interop_kv_get_value(options, ATOM_STR("\x3", "bag"), ctx->global);
     term duplicate_bag = interop_kv_get_value(options, ATOM_STR("\xd", "duplicate_bag"), ctx->global);
 
+    // NOTE: If multiple table types are specified, the precedence is: duplicate_bag > bag > set
     Popcorn2EtsTableType type = Popcorn2EtsTableSet;
     if (!term_is_invalid_term(bag)) {
         type = Popcorn2EtsTableBag;
-    } else if (!term_is_invalid_term(duplicate_bag)) {
+    } 
+    if (!term_is_invalid_term(duplicate_bag)) {
         type = Popcorn2EtsTableDuplicateBag;
     }
 

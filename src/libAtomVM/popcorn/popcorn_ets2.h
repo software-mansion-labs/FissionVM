@@ -71,7 +71,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     bool named,
     Popcorn2EtsTableType type,
     Popcorn2EtsTableAccess access,
-    size_t keypos,
+    size_t index,
     term *ret,
     Context *ctx);
 void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, GlobalContext *global);
