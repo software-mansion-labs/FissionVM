@@ -49,7 +49,7 @@ static EtsMultimapStatus ets_multimap_tuple_exists(
     GlobalContext *global);
 static term node_key(struct EtsMultimap *multimap, struct EtsMultimapNode *node);
 
-struct EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t keypos)
+struct EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t index)
 {
     struct EtsMultimap *multimap = malloc(sizeof(struct EtsMultimap));
     if (IS_NULL_PTR(multimap)) {
@@ -57,7 +57,7 @@ struct EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t keypos)
     }
 
     multimap->type = type;
-    multimap->keypos = keypos;
+    multimap->index = index;
 
     for (size_t i = 0; i < NUM_BUCKETS; i++) {
         multimap->buckets[i] = NULL;
@@ -110,7 +110,7 @@ EtsMultimapStatus ets_multimap_insert(
 
     for (size_t i = 0; i < count; i++) {
         struct EtsMultimapEntry *entry = entries[i];
-        term key = term_get_tuple_element(entry->tuple, multimap->keypos);
+        term key = term_get_tuple_element(entry->tuple, multimap->index);
 
         struct EtsMultimapNode *node;
         if (ets_multimap_find_node(multimap, key, &node, global) == EtsMultimapAllocationError) {
@@ -370,7 +370,7 @@ static EtsMultimapStatus ets_multimap_tuple_exists(
 static term node_key(struct EtsMultimap *multimap, struct EtsMultimapNode *node)
 {
     struct EtsMultimapEntry *entry = node->entries;
-    return entry != NULL ? term_get_tuple_element(entry->tuple, multimap->keypos) : term_nil();
+    return entry != NULL ? term_get_tuple_element(entry->tuple, multimap->index) : term_nil();
 }
 
 static struct EtsMultimapNode *ets_multimap_node_new(struct EtsMultimapNode *next, struct EtsMultimapEntry *entries)
