@@ -226,7 +226,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
     size_t count = 0;
 
     EtsMultimapStatus result = ets_multimap_lookup(table->multimap, key, &tuples, &count, ctx->global);
-    if (result == EtsMultimapAllocationError) {
+    if (UNLIKELY(result == EtsMultimapAllocationError)) {
         SMP_UNLOCK(table);
         return Popcorn2EtsAllocationError;
     }
@@ -394,7 +394,8 @@ static Popcorn2EtsStatus popcorn2_ets_insert_one(
     if (new) {
         term key = term_get_tuple_element(tuple, table->keypos);
         size_t existing = 0;
-        if ((result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global)) != EtsMultimapOk) {
+        result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
+        if (UNLIKELY(result != EtsMultimapOk)) {
             goto error;
         }
         if (existing > 0) {
@@ -438,7 +439,8 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
         if (new) {
             term key = term_get_tuple_element(tuple, table->keypos);
             size_t existing = 0;
-            if ((result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global)) != EtsMultimapOk) {
+            result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
+            if (UNLIKELY(result != EtsMultimapOk)) {
                 goto error;
             }
             if (existing > 0) {
