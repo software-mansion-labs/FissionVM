@@ -58,13 +58,13 @@ typedef enum Popcorn2EtsStatus
     Popcorn2EtsAllocationError
 } Popcorn2EtsStatus;
 
-struct Popcorn2Ets
+typedef struct Popcorn2Ets
 {
     struct SyncList ets_tables;
-};
+} Popcorn2Ets;
 
-void popcorn2_ets_init(struct Popcorn2Ets *ets);
-void popcorn2_ets_destroy(struct Popcorn2Ets *ets, GlobalContext *global);
+void popcorn2_ets_init(Popcorn2Ets *ets);
+void popcorn2_ets_destroy(Popcorn2Ets *ets, GlobalContext *global);
 
 Popcorn2EtsStatus popcorn2_ets_create_table(
     term name,
@@ -74,7 +74,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     size_t keypos,
     term *ret,
     Context *ctx);
-void popcorn2_ets_delete_owned_tables(struct Popcorn2Ets *ets, int32_t process_id, GlobalContext *global);
+void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, GlobalContext *global);
 
 Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool new, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Context *ctx);
