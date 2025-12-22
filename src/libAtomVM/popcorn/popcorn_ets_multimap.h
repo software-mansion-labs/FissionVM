@@ -48,7 +48,7 @@ typedef enum EtsMultimapStatus
 struct EtsMultimap
 {
     EtsMultimapType type;
-    size_t keypos;
+    size_t index;
     struct EtsMultimapNode *buckets[NUM_BUCKETS];
 };
 
@@ -65,7 +65,7 @@ struct EtsMultimapEntry
     Heap *heap;
 };
 
-struct EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t keypos);
+struct EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t index);
 
 void ets_multimap_delete(struct EtsMultimap *multimap, GlobalContext *global);
 

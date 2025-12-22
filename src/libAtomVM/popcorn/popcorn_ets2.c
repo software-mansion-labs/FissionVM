@@ -55,7 +55,7 @@ struct Popcorn2EtsTable
 
     term name;
     bool named;
-    size_t keypos;
+    size_t index;
     Popcorn2EtsTableType type;
     Popcorn2EtsTableAccess access;
 
@@ -112,7 +112,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     bool named,
     Popcorn2EtsTableType type,
     Popcorn2EtsTableAccess access,
-    size_t keypos,
+    size_t index,
     term *ret,
     Context *ctx)
 {
@@ -142,7 +142,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
         multimap_type = EtsMultimapTypeList;
     }
 
-    struct EtsMultimap *multimap = ets_multimap_new(multimap_type, keypos);
+    struct EtsMultimap *multimap = ets_multimap_new(multimap_type, index);
     if (IS_NULL_PTR(multimap)) {
         free(table);
         return Popcorn2EtsAllocationError;
@@ -154,7 +154,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     table->named = named;
     table->type = type;
     table->access = access;
-    table->keypos = keypos;
+    table->index = index;
     table->owner_process_id = ctx->process_id;
     table->ref_ticks = globalcontext_get_ref_ticks(ctx->global);
     table->multimap = multimap;
@@ -239,12 +239,12 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
 
     assert(tuples != NULL);
 
-    size_t sz = 0;
+    size_t tuples_size = 0;
     for (size_t i = 0; i < count; i++) {
-        sz += memory_estimate_usage(tuples[i]);
+        tuples_size += memory_estimate_usage(tuples[i]);
     }
 
-    if (UNLIKELY(memory_ensure_free_opt(ctx, sz + count * CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_opt(ctx, tuples_size + count * CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(tuples);
         SMP_UNLOCK(table);
         return Popcorn2EtsAllocationError;
@@ -387,12 +387,12 @@ static Popcorn2EtsStatus popcorn2_ets_insert_one(
 
     EtsMultimapStatus result = EtsMultimapOk;
 
-    if (table->keypos >= (size_t) term_get_tuple_arity(tuple)) {
+    if (table->index >= (size_t) term_get_tuple_arity(tuple)) {
         return Popcorn2EtsBadEntry;
     }
 
     if (new) {
-        term key = term_get_tuple_element(tuple, table->keypos);
+        term key = term_get_tuple_element(tuple, table->index);
         size_t existing = 0;
         result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
         if (UNLIKELY(result != EtsMultimapOk)) {
@@ -432,12 +432,12 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
     for (term iter = tuples; !term_is_nil(iter); iter = term_get_list_tail(iter), count++) {
         term tuple = term_get_list_head(iter);
 
-        if (!term_is_tuple(tuple) || table->keypos >= (size_t) term_get_tuple_arity(tuple)) {
+        if (!term_is_tuple(tuple) || table->index >= (size_t) term_get_tuple_arity(tuple)) {
             return Popcorn2EtsBadEntry;
         }
 
         if (new) {
-            term key = term_get_tuple_element(tuple, table->keypos);
+            term key = term_get_tuple_element(tuple, table->index);
             size_t existing = 0;
             result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
             if (UNLIKELY(result != EtsMultimapOk)) {
