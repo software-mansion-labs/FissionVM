@@ -174,9 +174,7 @@ EtsMultimapStatus ets_multimap_lookup(
     size_t *count,
     GlobalContext *global)
 {
-    if (count == NULL) {
-        return EtsMultimapError;
-    }
+    assert(count != NULL);
     *count = 0;
 
     EtsMultimapStatus result;
@@ -196,7 +194,7 @@ EtsMultimapStatus ets_multimap_lookup(
     }
 
     if (tuples == NULL) {
-        /* only return number of tuples found */
+        // only return number of tuples found
         return EtsMultimapOk;
     }
 

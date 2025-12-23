@@ -41,8 +41,7 @@ typedef enum EtsMultimapStatus
 {
     EtsMultimapOk,
     EtsMultimapKeyExists,
-    EtsMultimapAllocationError,
-    EtsMultimapError
+    EtsMultimapAllocationError
 } EtsMultimapStatus;
 
 struct EtsMultimap
