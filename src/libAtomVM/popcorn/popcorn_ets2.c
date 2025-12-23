@@ -425,6 +425,10 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
 
     size_t count = 0;
     for (term iter = tuples; !term_is_nil(iter); iter = term_get_list_tail(iter), count++) {
+        if (!term_is_list(iter)) {
+            return Popcorn2EtsBadEntry;  // improper list
+        } 
+
         term tuple = term_get_list_head(iter);
 
         if (!term_is_tuple(tuple) || table->index >= (size_t) term_get_tuple_arity(tuple)) {
@@ -450,6 +454,7 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
     }
 
     for (size_t i = 0; !term_is_nil(tuples); tuples = term_get_list_tail(tuples), i++) {
+        assert(term_is_list(tuples));
         to_insert[i] = term_get_list_head(tuples);
     }
 
