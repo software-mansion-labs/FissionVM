@@ -23,22 +23,22 @@
 
 #include "popcorn_ets_multimap.h"
 #include "popcorn_ets_multimap_hash.h"
-#include "smp.h"
-#include "term.h"
-#include "utils.h"
+#include "../smp.h"
+#include "../term.h"
+#include "../utils.h"
 
 static struct EtsMultimapNode *ets_multimap_node_new(struct EtsMultimapNode *next, struct EtsMultimapEntry *entries);
 static struct EtsMultimapEntry *ets_multimap_entry_new(term tuple);
 static void ets_multimap_node_delete(struct EtsMultimapNode *node, GlobalContext *global);
 static void ets_multimap_entry_delete(struct EtsMultimapEntry *entry, GlobalContext *global);
 static EtsMultimapStatus ets_multimap_find_node(
-    struct EtsMultimap *multimap,
+    EtsMultimap *multimap,
     term key,
     struct EtsMultimapNode **out_node,
     GlobalContext *global);
-static void ets_multimap_to_one(struct EtsMultimap *multimap, GlobalContext *global);
+static void ets_multimap_to_one(EtsMultimap *multimap, GlobalContext *global);
 static void ets_multimap_revert_insert(
-    struct EtsMultimap *multimap,
+    EtsMultimap *multimap,
     struct EtsMultimapEntry **entries,
     size_t count,
     GlobalContext *global);
@@ -47,11 +47,11 @@ static EtsMultimapStatus ets_multimap_tuple_exists(
     term tuple,
     bool *exists,
     GlobalContext *global);
-static term node_key(struct EtsMultimap *multimap, struct EtsMultimapNode *node);
+static term node_key(EtsMultimap *multimap, struct EtsMultimapNode *node);
 
-struct EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t index)
+EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t index)
 {
-    struct EtsMultimap *multimap = malloc(sizeof(struct EtsMultimap));
+    EtsMultimap *multimap = malloc(sizeof(EtsMultimap));
     if (IS_NULL_PTR(multimap)) {
         return NULL;
     }
@@ -66,7 +66,7 @@ struct EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t index)
     return multimap;
 }
 
-void ets_multimap_delete(struct EtsMultimap *multimap, GlobalContext *global)
+void ets_multimap_delete(EtsMultimap *multimap, GlobalContext *global)
 {
     for (size_t i = 0; i < NUM_BUCKETS; i++) {
         struct EtsMultimapNode *node = multimap->buckets[i];
@@ -80,7 +80,7 @@ void ets_multimap_delete(struct EtsMultimap *multimap, GlobalContext *global)
 }
 
 EtsMultimapStatus ets_multimap_insert(
-    struct EtsMultimap *multimap,
+    EtsMultimap *multimap,
     term *tuples,
     size_t count,
     GlobalContext *global)
@@ -168,7 +168,7 @@ EtsMultimapStatus ets_multimap_insert(
 }
 
 EtsMultimapStatus ets_multimap_lookup(
-    struct EtsMultimap *multimap,
+    EtsMultimap *multimap,
     term key,
     term **tuples,
     size_t *count,
@@ -213,7 +213,7 @@ EtsMultimapStatus ets_multimap_lookup(
 }
 
 EtsMultimapStatus ets_multimap_remove(
-    struct EtsMultimap *multimap,
+    EtsMultimap *multimap,
     term key,
     GlobalContext *global)
 {
@@ -252,7 +252,7 @@ EtsMultimapStatus ets_multimap_remove(
 }
 
 static EtsMultimapStatus ets_multimap_find_node(
-    struct EtsMultimap *multimap,
+    EtsMultimap *multimap,
     term key,
     struct EtsMultimapNode **out_node,
     GlobalContext *global)
@@ -285,7 +285,7 @@ static EtsMultimapStatus ets_multimap_find_node(
 }
 
 static void ets_multimap_revert_insert(
-    struct EtsMultimap *multimap,
+    EtsMultimap *multimap,
     struct EtsMultimapEntry **entries,
     size_t count,
     GlobalContext *global)
@@ -325,7 +325,7 @@ static void ets_multimap_revert_insert(
     }
 }
 
-static void ets_multimap_to_one(struct EtsMultimap *multimap, GlobalContext *global)
+static void ets_multimap_to_one(EtsMultimap *multimap, GlobalContext *global)
 {
     for (size_t i = 0; i < NUM_BUCKETS; i++) {
         for (struct EtsMultimapNode *node = multimap->buckets[i]; node != NULL; node = node->next) {
@@ -365,7 +365,7 @@ static EtsMultimapStatus ets_multimap_tuple_exists(
     return EtsMultimapOk;
 }
 
-static term node_key(struct EtsMultimap *multimap, struct EtsMultimapNode *node)
+static term node_key(EtsMultimap *multimap, struct EtsMultimapNode *node)
 {
     struct EtsMultimapEntry *entry = node->entries;
     return entry != NULL ? term_get_tuple_element(entry->tuple, multimap->index) : term_nil();

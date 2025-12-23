@@ -125,7 +125,7 @@ struct GlobalContext
 
     struct Ets ets;
     struct PopcornEts popcorn_ets;
-    struct Popcorn2Ets popcorn2_ets;
+    Popcorn2Ets popcorn2_ets;
 
     int32_t last_process_id;
 
