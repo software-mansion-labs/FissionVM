@@ -121,6 +121,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
             TableAccessNone);
 
         if (table != NULL) {
+            // Don't need to drop lock as we used TableAccessNone
             return Popcorn2EtsTableNameExists;
         }
     }
@@ -246,8 +247,8 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
     }
 
     term list = term_nil();
-    for (int i = count - 1; i >= 0; i--) {
-        term tuple = memory_copy_term_tree(&ctx->heap, tuples[i]);
+    for (size_t i = count; i > 0; i--) {
+        term tuple = memory_copy_term_tree(&ctx->heap, tuples[i - 1]);
         list = term_list_prepend(tuple, list, &ctx->heap);
     }
 
@@ -390,8 +391,8 @@ static Popcorn2EtsStatus popcorn2_ets_insert_one(
         term key = term_get_tuple_element(tuple, table->index);
         size_t existing = 0;
         result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
-        if (UNLIKELY(result != EtsMultimapOk)) {
-            goto error;
+        if (UNLIKELY(result == EtsMultimapAllocationError)) {
+            return Popcorn2EtsAllocationError;
         }
         if (existing > 0) {
             return Popcorn2EtsKeyExists;
@@ -400,7 +401,6 @@ static Popcorn2EtsStatus popcorn2_ets_insert_one(
 
     result = ets_multimap_insert(table->multimap, &tuple, 1, ctx->global);
 
-error:
     switch (result) {
         case EtsMultimapOk:
             return Popcorn2EtsOk;
@@ -409,7 +409,7 @@ error:
         case EtsMultimapKeyExists:
             return Popcorn2EtsKeyExists;
         default:
-            return Popcorn2EtsAllocationError;
+            UNREACHABLE();
     }
 }
 
@@ -435,8 +435,8 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
             term key = term_get_tuple_element(tuple, table->index);
             size_t existing = 0;
             result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
-            if (UNLIKELY(result != EtsMultimapOk)) {
-                goto error;
+            if (UNLIKELY(result == EtsMultimapAllocationError)) {
+                return Popcorn2EtsAllocationError;
             }
             if (existing > 0) {
                 return Popcorn2EtsKeyExists;
@@ -457,7 +457,6 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
 
     free(to_insert);
 
-error:
     switch (result) {
         case EtsMultimapOk:
             return Popcorn2EtsOk;
@@ -466,6 +465,6 @@ error:
         case EtsMultimapKeyExists:
             return Popcorn2EtsKeyExists;
         default:
-            return Popcorn2EtsAllocationError;
+            UNREACHABLE();
     }
 }
