@@ -54,7 +54,7 @@ struct Popcorn2EtsTable
     Popcorn2EtsTableType type;
     Popcorn2EtsTableAccess access;
 
-    struct EtsMultimap *multimap;
+    EtsMultimap *multimap;
 
     int32_t owner_process_id;
     uint64_t ref_ticks;
@@ -138,7 +138,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
         multimap_type = EtsMultimapTypeList;
     }
 
-    struct EtsMultimap *multimap = ets_multimap_new(multimap_type, index);
+    EtsMultimap *multimap = ets_multimap_new(multimap_type, index);
     if (IS_NULL_PTR(multimap)) {
         free(table);
         return Popcorn2EtsAllocationError;
