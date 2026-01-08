@@ -463,6 +463,9 @@ static void mapped_file_avm_pack_destructor(struct AVMPackData *obj, GlobalConte
 
 Module *sys_load_module_from_file(GlobalContext *global, const char *path)
 {
+    // FIXME it should be configurable whether to try loading particular
+    // modules from files
+    return NULL;
     TRACE("sys_load_module_from_file: Going to load: %s\n", path);
 
     MappedFile *beam_file = mapped_file_open_beam(path);
