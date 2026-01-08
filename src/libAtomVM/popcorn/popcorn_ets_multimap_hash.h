@@ -38,7 +38,7 @@
 
 #include <stdint.h>
 
-#include "term.h"
+#include "../term.h"
 
 #define LARGE_PRIME_INITIAL 16777259
 #define LARGE_PRIME_ATOM 16777643
