@@ -27,15 +27,10 @@ start() ->
     ok = isolated(fun test_permissions/0),
     ok = isolated(fun test_keys/0),
     ok = isolated(fun test_keypos/0),
-    ok = isolated(fun test_insert_set/0),
-    ok = isolated(fun test_insert_bag/0),
-    ok = isolated(fun test_insert_duplicate_bag/0),
-    ok = isolated(fun test_insert_new_set/0),
-    ok = isolated(fun test_insert_new_bag/0),
-    ok = isolated(fun test_insert_new_duplicate_bag/0),
+    ok = isolated(fun test_insert/0),
     ok = isolated(fun test_delete/0),
-    % ok = isolated(fun test_lookup_element/0),
-    % ok = isolated(fun test_update_counter/0),
+    ok = isolated(fun test_lookup_element/0),
+    ok = isolated(fun test_update_counter/0),
     0.
 
 test_ets_new() ->
@@ -54,11 +49,11 @@ test_ets_new() ->
     assert_badarg(fun() -> ets:new(keypos_test, [{keypos, -1}]) end),
 
     ets:new(type_test, [set]),
-    ets:new(type_test, [bag]),
-    ets:new(type_test, [duplicate_bag]),
 
     % Unimplemented
     ets:new(type_test, [ordered_set]),
+    ets:new(type_test, [bag]),
+    ets:new(type_test, [duplicate_bag]),
     ets:new(heir_test, [{heir, self(), []}]),
     ets:new(heir_test, [{heir, none}]),
     ets:new(write_conc_test, [{write_concurrency, true}]),
@@ -153,7 +148,7 @@ test_keypos() ->
     assert_badarg(fun() -> ets:insert(T, {value}) end),
     ok.
 
-test_insert_set() ->
+test_insert() ->
     T = ets:new(test, []),
     [] = ets:lookup(T, key),
     true = ets:insert(T, {key, value}),
@@ -182,156 +177,6 @@ test_insert_set() ->
     [] = ets:lookup(TErr, list),
     ok.
 
-test_insert_bag() ->
-    T = ets:new(test, [bag]),
-    [] = ets:lookup(T, key),
-    true = ets:insert(T, {key, value}),
-    [{key, value}] = ets:lookup(T, key),
-    true = ets:insert(T, {key, new_value}),
-    [{key, value}, {key, new_value}] = ets:lookup(T, key),
-    true = ets:insert(T, {key, new_value}),
-    [{key, value}, {key, new_value}] = ets:lookup(T, key),
-
-    TList = ets:new(test, [bag]),
-    true = ets:insert(TList, []),
-    true = ets:insert(TList, [{key, value}, {key2, value2}]),
-    true = ets:insert(TList, [{key2, new_value2}, {key3, value3}]),
-    true = ets:insert(TList, [{key2, new_value2}, {key3, new_value3}]),
-    [{key, value}] = ets:lookup(TList, key),
-    [{key2, value2}, {key2, new_value2}] = ets:lookup(TList, key2),
-    [{key3, value3}, {key3, new_value3}] = ets:lookup(TList, key3),
-
-    TErr = ets:new(test, [bag]),
-    assert_badarg(fun() -> ets:insert(TErr, {}) end),
-    assert_badarg(fun() -> ets:insert(TErr, [{}]) end),
-    assert_badarg(fun() -> ets:insert(TErr, [{key, value}, not_a_tuple]) end),
-    assert_badarg(fun() -> ets:insert(TErr, [{improper, true} | {list, true}]) end),
-    assert_badarg(fun() -> ets:insert(TErr, not_a_tuple) end),
-    assert_badarg(fun() -> ets:insert([not_a_ref], {key, value}) end),
-    [] = ets:lookup(TErr, key),
-    [] = ets:lookup(TErr, improper),
-    [] = ets:lookup(TErr, list),
-    ok.
-
-test_insert_duplicate_bag() ->
-    T = ets:new(test, [duplicate_bag]),
-    [] = ets:lookup(T, key),
-    true = ets:insert(T, {key, value}),
-    [{key, value}] = ets:lookup(T, key),
-    true = ets:insert(T, {key, new_value}),
-    [{key, value}, {key, new_value}] = ets:lookup(T, key),
-    true = ets:insert(T, {key, new_value}),
-    [{key, value}, {key, new_value}, {key, new_value}] = ets:lookup(T, key),
-
-    TList = ets:new(test, [duplicate_bag]),
-    true = ets:insert(TList, []),
-    true = ets:insert(TList, [{key, value}, {key2, value2}]),
-    true = ets:insert(TList, [{key2, new_value2}, {key3, value3}]),
-    true = ets:insert(TList, [{key2, new_value2}, {key3, new_value3}]),
-    [{key, value}] = ets:lookup(TList, key),
-    [{key2, value2}, {key2, new_value2}, {key2, new_value2}] = ets:lookup(TList, key2),
-    [{key3, value3}, {key3, new_value3}] = ets:lookup(TList, key3),
-
-    TErr = ets:new(test, [duplicate_bag]),
-    assert_badarg(fun() -> ets:insert(TErr, {}) end),
-    assert_badarg(fun() -> ets:insert(TErr, [{}]) end),
-    assert_badarg(fun() -> ets:insert(TErr, [{key, value}, not_a_tuple]) end),
-    assert_badarg(fun() -> ets:insert(TErr, [{improper, true} | {list, true}]) end),
-    assert_badarg(fun() -> ets:insert(TErr, not_a_tuple) end),
-    assert_badarg(fun() -> ets:insert([not_a_ref], {key, value}) end),
-    [] = ets:lookup(TErr, key),
-    [] = ets:lookup(TErr, improper),
-    [] = ets:lookup(TErr, list),
-    ok.
-
-test_insert_new_set() ->
-    T = ets:new(test, []),
-    [] = ets:lookup(T, key),
-    true = ets:insert_new(T, {key, value}),
-    [{key, value}] = ets:lookup(T, key),
-    false = ets:insert_new(T, {key, new_value}),
-    [{key, value}] = ets:lookup(T, key),
-
-    TList = ets:new(test, []),
-    true = ets:insert_new(TList, []),
-    true = ets:insert_new(TList, [{key, value}, {key2, value2}]),
-    false = ets:insert_new(TList, [{key2, new_value2}, {key3, value3}]),
-    [{key, value}] = ets:lookup(TList, key),
-    [{key2, value2}] = ets:lookup(TList, key2),
-    [] = ets:lookup(TList, key3),
-
-    TErr = ets:new(test, []),
-    assert_badarg(fun() -> ets:insert_new(TErr, {}) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{}]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{key, value}, not_a_tuple]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{improper, true} | {list, true}]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, not_a_tuple) end),
-    assert_badarg(fun() -> ets:insert_new([not_a_ref], {key, value}) end),
-    [] = ets:lookup(TErr, key),
-    [] = ets:lookup(TErr, improper),
-    [] = ets:lookup(TErr, list),
-    ok.
-
-test_insert_new_bag() ->
-    T = ets:new(test, [bag]),
-    [] = ets:lookup(T, key),
-    true = ets:insert_new(T, {key, value}),
-    [{key, value}] = ets:lookup(T, key),
-    false = ets:insert_new(T, {key, new_value}),
-    [{key, value}] = ets:lookup(T, key),
-
-    TList = ets:new(test, [bag]),
-    true = ets:insert_new(TList, []),
-    true = ets:insert_new(TList, [{key, value}, {key2, value2}]),
-    false = ets:insert_new(TList, [{key2, new_value2}, {key3, value3}]),
-    true = ets:insert_new(TList, [{key4, value4}, {key3, value3}, {key4, new_value4}]),
-    [{key, value}] = ets:lookup(TList, key),
-    [{key2, value2}] = ets:lookup(TList, key2),
-    [{key3, value3}] = ets:lookup(TList, key3),
-    [{key4, value4}, {key4, new_value4}] = ets:lookup(TList, key4),
-
-    TErr = ets:new(test, [bag]),
-    assert_badarg(fun() -> ets:insert_new(TErr, {}) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{}]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{key, value}, not_a_tuple]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{improper, true} | {list, true}]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, not_a_tuple) end),
-    assert_badarg(fun() -> ets:insert_new([not_a_ref], {key, value}) end),
-    [] = ets:lookup(TErr, key),
-    [] = ets:lookup(TErr, improper),
-    [] = ets:lookup(TErr, list),
-    ok.
-
-test_insert_new_duplicate_bag() ->
-    T = ets:new(test, [duplicate_bag]),
-    [] = ets:lookup(T, key),
-    true = ets:insert_new(T, {key, value}),
-    [{key, value}] = ets:lookup(T, key),
-    false = ets:insert_new(T, {key, new_value}),
-    [{key, value}] = ets:lookup(T, key),
-
-    TList = ets:new(test, [duplicate_bag]),
-    true = ets:insert_new(TList, []),
-    true = ets:insert_new(TList, [{key, value}, {key2, value2}]),
-    false = ets:insert_new(TList, [{key2, new_value2}, {key3, value3}]),
-    true = ets:insert_new(TList, [{key4, value4}, {key3, value3}, {key4, value4}]),
-    [{key, value}] = ets:lookup(TList, key),
-    [{key2, value2}] = ets:lookup(TList, key2),
-    [{key3, value3}] = ets:lookup(TList, key3),
-    [{key4, value4}, {key4, value4}] = ets:lookup(TList, key4),
-
-    TErr = ets:new(test, [duplicate_bag]),
-    assert_badarg(fun() -> ets:insert_new(TErr, {}) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{}]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{key, value}, not_a_tuple]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, [{improper, true} | {list, true}]) end),
-    assert_badarg(fun() -> ets:insert_new(TErr, not_a_tuple) end),
-    assert_badarg(fun() -> ets:insert_new([not_a_ref], {key, value}) end),
-    [] = ets:lookup(TErr, key),
-    [] = ets:lookup(TErr, improper),
-    [] = ets:lookup(TErr, list),
-    ok.
-
 test_delete() ->
     T = ets:new(test, []),
 
@@ -352,10 +197,10 @@ test_delete() ->
     [{key, new_value}] = ets:lookup(T, key),
 
     % Drop entire table
-    % true = ets:delete(T),
-    % assert_badarg(fun() -> ets:lookup(T, key) end),
-    % assert_badarg(fun() -> ets:delete(T) end),
-    % assert_badarg(fun() -> ets:delete(none) end),
+    true = ets:delete(T),
+    assert_badarg(fun() -> ets:lookup(T, key) end),
+    assert_badarg(fun() -> ets:delete(T) end),
+    assert_badarg(fun() -> ets:delete(none) end),
     ok.
 
 test_lookup_element() ->
