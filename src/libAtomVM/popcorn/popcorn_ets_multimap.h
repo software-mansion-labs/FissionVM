@@ -47,7 +47,7 @@ typedef enum EtsMultimapStatus
 typedef struct EtsMultimap
 {
     EtsMultimapType type;
-    size_t index;
+    size_t key_index;
     struct EtsMultimapNode *buckets[NUM_BUCKETS];
 } EtsMultimap;
 
@@ -110,7 +110,7 @@ EtsMultimapStatus ets_multimap_insert(
  * @note Terms returned by this function come from the ETS heap and should be copied
  *       to the process heap if needed.
  * @warning The caller is responsible for freeing the memory pointed to by `tuples`
- *          using `free()`.
+ *          using `free()`. When count is zero, memory is not allocated and `tuples` is set to NULL.
  */
 EtsMultimapStatus ets_multimap_lookup(
     EtsMultimap *multimap,
