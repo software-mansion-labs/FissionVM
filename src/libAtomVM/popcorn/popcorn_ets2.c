@@ -71,21 +71,21 @@ typedef enum TableAccess
     TableAccessWrite
 } TableAccess;
 
-static struct Popcorn2EtsTable *popcorn2_ets_get_table(
+static struct Popcorn2EtsTable *get_table(
     Popcorn2Ets *ets,
     term name_or_ref,
     int32_t process_id,
     TableAccess access);
-static void popcorn2_ets_add_table(Popcorn2Ets *ets, struct Popcorn2EtsTable *table);
-static void popcorn2_ets_delete_all_tables(Popcorn2Ets *ets, GlobalContext *global);
-static void popcorn2_ets_table_destroy(struct Popcorn2EtsTable *table, GlobalContext *global);
+static void add_table(Popcorn2Ets *ets, struct Popcorn2EtsTable *table);
+static void delete_all_tables(Popcorn2Ets *ets, GlobalContext *global);
+static void table_destroy(struct Popcorn2EtsTable *table, GlobalContext *global);
 
-static Popcorn2EtsStatus popcorn2_ets_insert_one(
+static Popcorn2EtsStatus insert_one(
     struct Popcorn2EtsTable *table,
     term tuple,
     bool new,
     Context *ctx);
-static Popcorn2EtsStatus popcorn2_ets_insert_many(
+static Popcorn2EtsStatus insert_many(
     struct Popcorn2EtsTable *table,
     term tuples,
     bool new,
@@ -98,7 +98,7 @@ void popcorn2_ets_init(Popcorn2Ets *ets)
 
 void popcorn2_ets_destroy(Popcorn2Ets *ets, GlobalContext *global)
 {
-    popcorn2_ets_delete_all_tables(ets, global);
+    delete_all_tables(ets, global);
     synclist_destroy(&ets->ets_tables);
 }
 
@@ -114,7 +114,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     assert(ret != NULL);
 
     if (named) {
-        struct Popcorn2EtsTable *table = popcorn2_ets_get_table(
+        struct Popcorn2EtsTable *table = get_table(
             &ctx->global->popcorn2_ets,
             name,
             ETS_ANY_PROCESS,
@@ -173,14 +173,14 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
         *ret = term_from_ref_ticks(table->ref_ticks, &ctx->heap);
     }
 
-    popcorn2_ets_add_table(&ctx->global->popcorn2_ets, table);
+    add_table(&ctx->global->popcorn2_ets, table);
 
     return Popcorn2EtsOk;
 }
 
 Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool new, Context *ctx)
 {
-    struct Popcorn2EtsTable *table = popcorn2_ets_get_table(
+    struct Popcorn2EtsTable *table = get_table(
         &ctx->global->popcorn2_ets,
         name_or_ref,
         ctx->process_id,
@@ -193,9 +193,9 @@ Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool new, Co
     Popcorn2EtsStatus result = Popcorn2EtsBadEntry;
 
     if (term_is_tuple(entry)) {
-        result = popcorn2_ets_insert_one(table, entry, new, ctx);
+        result = insert_one(table, entry, new, ctx);
     } else if (term_is_list(entry)) {
-        result = popcorn2_ets_insert_many(table, entry, new, ctx);
+        result = insert_many(table, entry, new, ctx);
     } else {
         result = Popcorn2EtsBadEntry;
     }
@@ -209,7 +209,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
 {
     assert(ret != NULL);
 
-    struct Popcorn2EtsTable *table = popcorn2_ets_get_table(
+    struct Popcorn2EtsTable *table = get_table(
         &ctx->global->popcorn2_ets,
         name_or_ref,
         ctx->process_id,
@@ -265,7 +265,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
 
 Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx)
 {
-    struct Popcorn2EtsTable *table = popcorn2_ets_get_table(
+    struct Popcorn2EtsTable *table = get_table(
         &ctx->global->popcorn2_ets,
         name_or_ref,
         ctx->process_id,
@@ -291,14 +291,14 @@ void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, Glob
 
         if (table->owner_process_id == process_id) {
             list_remove(&table->head);
-            popcorn2_ets_table_destroy(table, global);
+            table_destroy(table, global);
         }
     }
 
     synclist_unlock(&ets->ets_tables);
 }
 
-static void popcorn2_ets_table_destroy(struct Popcorn2EtsTable *table, GlobalContext *global)
+static void table_destroy(struct Popcorn2EtsTable *table, GlobalContext *global)
 {
     SMP_WRLOCK(table);
     ets_multimap_delete(table->multimap, global);
@@ -311,7 +311,7 @@ static void popcorn2_ets_table_destroy(struct Popcorn2EtsTable *table, GlobalCon
     free(table);
 }
 
-static void popcorn2_ets_delete_all_tables(Popcorn2Ets *ets, GlobalContext *global)
+static void delete_all_tables(Popcorn2Ets *ets, GlobalContext *global)
 {
     struct ListHead *ets_tables = synclist_wrlock(&ets->ets_tables);
 
@@ -319,20 +319,20 @@ static void popcorn2_ets_delete_all_tables(Popcorn2Ets *ets, GlobalContext *glob
     MUTABLE_LIST_FOR_EACH (item, tmp, ets_tables) {
         struct Popcorn2EtsTable *table = GET_LIST_ENTRY(item, struct Popcorn2EtsTable, head);
         list_remove(&table->head);
-        popcorn2_ets_table_destroy(table, global);
+        table_destroy(table, global);
     }
 
     synclist_unlock(&ets->ets_tables);
 }
 
-static void popcorn2_ets_add_table(Popcorn2Ets *ets, struct Popcorn2EtsTable *table)
+static void add_table(Popcorn2Ets *ets, struct Popcorn2EtsTable *table)
 {
     struct ListHead *tables = synclist_wrlock(&ets->ets_tables);
     list_append(tables, &table->head);
     synclist_unlock(&ets->ets_tables);
 }
 
-static struct Popcorn2EtsTable *popcorn2_ets_get_table(
+static struct Popcorn2EtsTable *get_table(
     Popcorn2Ets *ets,
     term name_or_ref,
     int32_t process_id,
@@ -377,7 +377,7 @@ static struct Popcorn2EtsTable *popcorn2_ets_get_table(
     return ret;
 }
 
-static Popcorn2EtsStatus popcorn2_ets_insert_one(
+static Popcorn2EtsStatus insert_one(
     struct Popcorn2EtsTable *table,
     term tuple,
     bool new,
@@ -417,7 +417,7 @@ static Popcorn2EtsStatus popcorn2_ets_insert_one(
     }
 }
 
-static Popcorn2EtsStatus popcorn2_ets_insert_many(
+static Popcorn2EtsStatus insert_many(
     struct Popcorn2EtsTable *table,
     term tuples,
     bool new,
