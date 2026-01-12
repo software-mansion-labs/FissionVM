@@ -548,9 +548,9 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
 
     term is_named = interop_kv_get_value_default(options, ATOM_STR("\xB", "named_table"), FALSE_ATOM, ctx->global);
     term keypos = interop_kv_get_value_default(options, ATOM_STR("\x6", "keypos"), term_from_int(1), ctx->global);
-    avm_int_t index = term_to_int(keypos) - 1;
+    avm_int_t key_index = term_to_int(keypos) - 1;
 
-    if (UNLIKELY(index < 0)) {
+    if (UNLIKELY(key_index < 0)) {
         RAISE_ERROR(BADARG_ATOM);
     }
 
@@ -585,7 +585,7 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
         is_named == TRUE_ATOM,
         type,
         access,
-        (size_t) index,
+        (size_t) key_index,
         &table,
         ctx);
 

@@ -50,7 +50,7 @@ struct Popcorn2EtsTable
 
     term name;
     bool named;
-    size_t index;
+    size_t key_index;
     Popcorn2EtsTableType type;
     Popcorn2EtsTableAccess access;
 
@@ -107,7 +107,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     bool named,
     Popcorn2EtsTableType type,
     Popcorn2EtsTableAccess access,
-    size_t index,
+    size_t key_index,
     term *ret,
     Context *ctx)
 {
@@ -138,7 +138,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
         multimap_type = EtsMultimapTypeList;
     }
 
-    EtsMultimap *multimap = ets_multimap_new(multimap_type, index);
+    EtsMultimap *multimap = ets_multimap_new(multimap_type, key_index);
     if (IS_NULL_PTR(multimap)) {
         free(table);
         return Popcorn2EtsAllocationError;
@@ -150,7 +150,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     table->named = named;
     table->type = type;
     table->access = access;
-    table->index = index;
+    table->key_index = key_index;
     table->owner_process_id = ctx->process_id;
     table->ref_ticks = globalcontext_get_ref_ticks(ctx->global);
     table->multimap = multimap;
@@ -164,6 +164,9 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     } else {
         if (UNLIKELY(memory_ensure_free_opt(ctx, REF_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             ets_multimap_delete(multimap, ctx->global);
+#ifndef AVM_NO_SMP
+            smp_rwlock_destroy(table->lock);
+#endif
             free(table);
             return Popcorn2EtsAllocationError;
         }
@@ -228,7 +231,6 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
     }
 
     if (count == 0) {
-        free(tuples);
         SMP_UNLOCK(table);
         return Popcorn2EtsOk;
     }
@@ -240,6 +242,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
         tuples_size += memory_estimate_usage(tuples[i]);
     }
 
+    // Terms in `tuples` come from ETS heap, we need to copy them to process heap before returning.
     if (UNLIKELY(memory_ensure_free_opt(ctx, tuples_size + count * CONS_SIZE, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(tuples);
         SMP_UNLOCK(table);
@@ -247,8 +250,9 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
     }
 
     term list = term_nil();
-    for (size_t i = count; i > 0; i--) {
-        term tuple = memory_copy_term_tree(&ctx->heap, tuples[i - 1]);
+    for (size_t fwd_i = 0; fwd_i < count; fwd_i++) {
+        size_t i = count - fwd_i - 1;
+        term tuple = memory_copy_term_tree(&ctx->heap, tuples[i]);
         list = term_list_prepend(tuple, list, &ctx->heap);
     }
 
@@ -383,12 +387,12 @@ static Popcorn2EtsStatus popcorn2_ets_insert_one(
 
     EtsMultimapStatus result = EtsMultimapOk;
 
-    if (table->index >= (size_t) term_get_tuple_arity(tuple)) {
+    if (table->key_index >= (size_t) term_get_tuple_arity(tuple)) {
         return Popcorn2EtsBadEntry;
     }
 
     if (new) {
-        term key = term_get_tuple_element(tuple, table->index);
+        term key = term_get_tuple_element(tuple, table->key_index);
         size_t existing = 0;
         result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
         if (UNLIKELY(result == EtsMultimapAllocationError)) {
@@ -431,12 +435,12 @@ static Popcorn2EtsStatus popcorn2_ets_insert_many(
 
         term tuple = term_get_list_head(iter);
 
-        if (!term_is_tuple(tuple) || table->index >= (size_t) term_get_tuple_arity(tuple)) {
+        if (!term_is_tuple(tuple) || table->key_index >= (size_t) term_get_tuple_arity(tuple)) {
             return Popcorn2EtsBadEntry;
         }
 
         if (new) {
-            term key = term_get_tuple_element(tuple, table->index);
+            term key = term_get_tuple_element(tuple, table->key_index);
             size_t existing = 0;
             result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
             if (UNLIKELY(result == EtsMultimapAllocationError)) {
