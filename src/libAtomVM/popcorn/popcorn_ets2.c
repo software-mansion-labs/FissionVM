@@ -131,7 +131,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
         return Popcorn2EtsAllocationError;
     }
 
-    EtsMultimapType multimap_type = EtsMultimapTypeOne;
+    EtsMultimapType multimap_type = EtsMultimapTypeSingle;
     if (type == Popcorn2EtsTableBag) {
         multimap_type = EtsMultimapTypeSet;
     } else if (type == Popcorn2EtsTableDuplicateBag) {
