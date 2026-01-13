@@ -699,12 +699,14 @@ Module *globalcontext_get_module(GlobalContext *global, atom_index_t module_name
             // Platform may implement sys_load_module_from_file
             loaded_module = sys_load_module_from_file(global, module_file_name);
         }
-        if (UNLIKELY(!loaded_module || (globalcontext_insert_module(global, loaded_module) < 0))) {
+        if (!loaded_module) {
+            free(module_file_name);
+            return NULL;
+        }
+        if (UNLIKELY(globalcontext_insert_module(global, loaded_module) < 0)) {
             fprintf(stderr, "Failed load module: %s\n", module_file_name);
             free(module_file_name);
-            if (loaded_module) {
-                module_destroy(loaded_module);
-            }
+            module_destroy(loaded_module);
             return NULL;
         }
 
