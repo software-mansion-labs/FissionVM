@@ -24,27 +24,27 @@
 #include "popcorn_ets_multimap.h"
 #include "popcorn_ets_multimap_hash.h"
 
-static struct EtsMultimapNode *ets_multimap_node_new(struct EtsMultimapNode *next, struct EtsMultimapEntry *entries);
-static struct EtsMultimapEntry *ets_multimap_entry_new(term tuple);
-static void ets_multimap_node_delete(struct EtsMultimapNode *node, GlobalContext *global);
-static void ets_multimap_entry_delete(struct EtsMultimapEntry *entry, GlobalContext *global);
+static EtsMultimapNode *ets_multimap_node_new(EtsMultimapNode *next, EtsMultimapEntry *entries);
+static EtsMultimapEntry *ets_multimap_entry_new(term tuple);
+static void ets_multimap_node_delete(EtsMultimapNode *node, GlobalContext *global);
+static void ets_multimap_entry_delete(EtsMultimapEntry *entry, GlobalContext *global);
 static EtsMultimapStatus ets_multimap_find_node(
     EtsMultimap *multimap,
     term key,
-    struct EtsMultimapNode **out_node,
+    EtsMultimapNode **out_node,
     GlobalContext *global);
 static void ets_multimap_to_single(EtsMultimap *multimap, GlobalContext *global);
 static void ets_multimap_revert_insert(
     EtsMultimap *multimap,
-    struct EtsMultimapEntry **entries,
+    EtsMultimapEntry **entries,
     size_t count,
     GlobalContext *global);
 static EtsMultimapStatus ets_multimap_tuple_exists(
-    struct EtsMultimapNode *node,
+    EtsMultimapNode *node,
     term tuple,
     bool *exists,
     GlobalContext *global);
-static term node_key(EtsMultimap *multimap, struct EtsMultimapNode *node);
+static term node_key(EtsMultimap *multimap, EtsMultimapNode *node);
 
 EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t key_index)
 {
@@ -66,9 +66,9 @@ EtsMultimap *ets_multimap_new(EtsMultimapType type, size_t key_index)
 void ets_multimap_delete(EtsMultimap *multimap, GlobalContext *global)
 {
     for (size_t i = 0; i < NUM_BUCKETS; i++) {
-        struct EtsMultimapNode *node = multimap->buckets[i];
+        EtsMultimapNode *node = multimap->buckets[i];
         while (node != NULL) {
-            struct EtsMultimapNode *next = node->next;
+            EtsMultimapNode *next = node->next;
             ets_multimap_node_delete(node, global);
             node = next;
         }
@@ -86,7 +86,7 @@ EtsMultimapStatus ets_multimap_insert(
         return EtsMultimapOk;
     }
 
-    struct EtsMultimapEntry **entries = malloc(sizeof(struct EtsMultimapEntry *) * count);
+    EtsMultimapEntry **entries = malloc(sizeof(EtsMultimapEntry *) * count);
     if (IS_NULL_PTR(entries)) {
         return EtsMultimapAllocationError;
     }
@@ -105,17 +105,17 @@ EtsMultimapStatus ets_multimap_insert(
     EtsMultimapStatus status = EtsMultimapOk;
 
     for (size_t i = 0; i < count; i++) {
-        struct EtsMultimapEntry *entry = entries[i];
+        EtsMultimapEntry *entry = entries[i];
         term key = term_get_tuple_element(entry->tuple, multimap->key_index);
 
-        struct EtsMultimapNode *node;
+        EtsMultimapNode *node;
         if (UNLIKELY(ets_multimap_find_node(multimap, key, &node, global) == EtsMultimapAllocationError)) {
             status = EtsMultimapAllocationError;
             break;
         }
 
         if (node == NULL) {
-            struct EtsMultimapNode *new_node = ets_multimap_node_new(NULL, entry);
+            EtsMultimapNode *new_node = ets_multimap_node_new(NULL, entry);
             if (IS_NULL_PTR(new_node)) {
                 status = EtsMultimapAllocationError;
                 break;
@@ -166,14 +166,11 @@ EtsMultimapStatus ets_multimap_lookup(
     size_t *count,
     GlobalContext *global)
 {
-    if (count == NULL) {
-        // TODO: return error?
-        return EtsMultimapOk;
-    }
+    assert(count != NULL);
 
     *count = 0;
 
-    struct EtsMultimapNode *node;
+    EtsMultimapNode *node;
     EtsMultimapStatus result = ets_multimap_find_node(multimap, key, &node, global);
     if (UNLIKELY(result == EtsMultimapAllocationError)) {
         return result;
@@ -185,12 +182,17 @@ EtsMultimapStatus ets_multimap_lookup(
 
     assert(node->entries != NULL);
 
-    for (struct EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
         (*count)++;
     }
 
     if (tuples == NULL) {
         // only return number of tuples found
+        return EtsMultimapOk;
+    }
+
+    if (*count == 0) {
+        *tuples = NULL;
         return EtsMultimapOk;
     }
 
@@ -200,7 +202,7 @@ EtsMultimapStatus ets_multimap_lookup(
     }
 
     size_t i = *count;
-    for (struct EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next, i--) {
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next, i--) {
         assert(i > 0);
         (*tuples)[i - 1] = iter->tuple;
     }
@@ -213,7 +215,7 @@ EtsMultimapStatus ets_multimap_remove(
     term key,
     GlobalContext *global)
 {
-    struct EtsMultimapNode *node;
+    EtsMultimapNode *node;
     if (UNLIKELY(ets_multimap_find_node(multimap, key, &node, global) == EtsMultimapAllocationError)) {
         return EtsMultimapAllocationError;
     }
@@ -226,8 +228,8 @@ EtsMultimapStatus ets_multimap_remove(
     assert(term_compare(key, node_key(multimap, node), TermCompareExact, global) == TermEquals);
 
     uint32_t idx = hash_term(key, global) % NUM_BUCKETS;
-    struct EtsMultimapNode *iter = multimap->buckets[idx];
-    struct EtsMultimapNode *prev = NULL;
+    EtsMultimapNode *iter = multimap->buckets[idx];
+    EtsMultimapNode *prev = NULL;
 
     while (iter) {
         if (iter == node) {
@@ -250,7 +252,7 @@ EtsMultimapStatus ets_multimap_remove(
 static EtsMultimapStatus ets_multimap_find_node(
     EtsMultimap *multimap,
     term key,
-    struct EtsMultimapNode **out_node,
+    EtsMultimapNode **out_node,
     GlobalContext *global)
 {
     assert(out_node != NULL);
@@ -258,7 +260,7 @@ static EtsMultimapStatus ets_multimap_find_node(
     *out_node = NULL;
 
     uint32_t idx = hash_term(key, global) % NUM_BUCKETS;
-    struct EtsMultimapNode *node = multimap->buckets[idx];
+    EtsMultimapNode *node = multimap->buckets[idx];
 
     if (node == NULL) {
         return EtsMultimapOk;
@@ -284,21 +286,21 @@ static EtsMultimapStatus ets_multimap_find_node(
 
 static void ets_multimap_revert_insert(
     EtsMultimap *multimap,
-    struct EtsMultimapEntry **entries,
+    EtsMultimapEntry **entries,
     size_t count,
     GlobalContext *global)
 {
     for (size_t i = 0; i < NUM_BUCKETS; i++) {
-        struct EtsMultimapNode *node = multimap->buckets[i];
+        EtsMultimapNode *node = multimap->buckets[i];
 
         while (node != NULL) {
-            struct EtsMultimapNode *next_node = node->next;
-            struct EtsMultimapEntry *entry = node->entries;
+            EtsMultimapNode *next_node = node->next;
+            EtsMultimapEntry *entry = node->entries;
 
             assert(entry != NULL);
 
             while (entry != NULL) {
-                struct EtsMultimapEntry *next_entry = entry->next;
+                EtsMultimapEntry *next_entry = entry->next;
 
                 for (size_t j = 0; j < count; j++) {
                     if (entry == entries[j]) {
@@ -326,12 +328,12 @@ static void ets_multimap_revert_insert(
 static void ets_multimap_to_single(EtsMultimap *multimap, GlobalContext *global)
 {
     for (size_t i = 0; i < NUM_BUCKETS; i++) {
-        for (struct EtsMultimapNode *node = multimap->buckets[i]; node != NULL; node = node->next) {
+        for (EtsMultimapNode *node = multimap->buckets[i]; node != NULL; node = node->next) {
             assert(node->entries != NULL);
-            struct EtsMultimapEntry *entry = node->entries->next;
+            EtsMultimapEntry *entry = node->entries->next;
 
             while (entry != NULL) {
-                struct EtsMultimapEntry *next = entry->next;
+                EtsMultimapEntry *next = entry->next;
                 ets_multimap_entry_delete(entry, global);
                 entry = next;
             }
@@ -342,12 +344,12 @@ static void ets_multimap_to_single(EtsMultimap *multimap, GlobalContext *global)
 }
 
 static EtsMultimapStatus ets_multimap_tuple_exists(
-    struct EtsMultimapNode *node,
+    EtsMultimapNode *node,
     term tuple,
     bool *exists,
     GlobalContext *global)
 {
-    for (struct EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
         TermCompareResult result = term_compare(tuple, iter->tuple, TermCompareExact, global);
 
         if (UNLIKELY(result == TermCompareMemoryAllocFail)) {
@@ -364,16 +366,16 @@ static EtsMultimapStatus ets_multimap_tuple_exists(
     return EtsMultimapOk;
 }
 
-static term node_key(EtsMultimap *multimap, struct EtsMultimapNode *node)
+static term node_key(EtsMultimap *multimap, EtsMultimapNode *node)
 {
-    struct EtsMultimapEntry *entry = node->entries;
+    EtsMultimapEntry *entry = node->entries;
     assert(entry != NULL);
     return term_get_tuple_element(entry->tuple, multimap->key_index);
 }
 
-static struct EtsMultimapNode *ets_multimap_node_new(struct EtsMultimapNode *next, struct EtsMultimapEntry *entries)
+static EtsMultimapNode *ets_multimap_node_new(EtsMultimapNode *next, EtsMultimapEntry *entries)
 {
-    struct EtsMultimapNode *node = malloc(sizeof(struct EtsMultimapNode));
+    EtsMultimapNode *node = malloc(sizeof(EtsMultimapNode));
     if (IS_NULL_PTR(node)) {
         return NULL;
     }
@@ -382,9 +384,9 @@ static struct EtsMultimapNode *ets_multimap_node_new(struct EtsMultimapNode *nex
     return node;
 }
 
-static struct EtsMultimapEntry *ets_multimap_entry_new(term tuple)
+static EtsMultimapEntry *ets_multimap_entry_new(term tuple)
 {
-    struct EtsMultimapEntry *entry = malloc(sizeof(struct EtsMultimapEntry));
+    EtsMultimapEntry *entry = malloc(sizeof(EtsMultimapEntry));
     if (IS_NULL_PTR(entry)) {
         return NULL;
     }
@@ -411,12 +413,12 @@ static struct EtsMultimapEntry *ets_multimap_entry_new(term tuple)
     return entry;
 }
 
-static void ets_multimap_node_delete(struct EtsMultimapNode *node, GlobalContext *global)
+static void ets_multimap_node_delete(EtsMultimapNode *node, GlobalContext *global)
 {
-    struct EtsMultimapEntry *entry = node->entries;
+    EtsMultimapEntry *entry = node->entries;
 
     while (entry != NULL) {
-        struct EtsMultimapEntry *next = entry->next;
+        EtsMultimapEntry *next = entry->next;
         ets_multimap_entry_delete(entry, global);
         entry = next;
     }
@@ -424,7 +426,7 @@ static void ets_multimap_node_delete(struct EtsMultimapNode *node, GlobalContext
     free(node);
 }
 
-static void ets_multimap_entry_delete(struct EtsMultimapEntry *entry, GlobalContext *global)
+static void ets_multimap_entry_delete(EtsMultimapEntry *entry, GlobalContext *global)
 {
     memory_destroy_heap(entry->heap, global);
     free(entry);
