@@ -735,6 +735,10 @@ enum OpenAVMResult sys_open_avm_from_file(
 
 Module *sys_load_module_from_file(GlobalContext *global, const char *path)
 {
+    // FIXME it should be configurable whether to request
+    // modules from the server. Alternatively, we could
+    // call a JS callback instead of doing fetch requests.
+    return NULL;
     TRACE("sys_open_avm_from_file: Going to open: %s\n", path);
 
     size_t size;
