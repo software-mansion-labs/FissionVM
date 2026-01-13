@@ -51,18 +51,18 @@ typedef struct EtsMultimap
     struct EtsMultimapNode *buckets[NUM_BUCKETS];
 } EtsMultimap;
 
-struct EtsMultimapNode
+typedef struct EtsMultimapNode
 {
     struct EtsMultimapNode *next;
     struct EtsMultimapEntry *entries;
-};
+} EtsMultimapNode;
 
-struct EtsMultimapEntry
+typedef struct EtsMultimapEntry
 {
     struct EtsMultimapEntry *next;
     term tuple;
     Heap *heap;
-};
+} EtsMultimapEntry;
 
 /**
  * @brief Create a new multimap.
@@ -103,7 +103,7 @@ EtsMultimapStatus ets_multimap_insert(
  * @param multimap the multimap
  * @param key the key to lookup
  * @param[out] tuples the found tuples (or NULL to only get the count)
- * @param[out] count the number of found tuples
+ * @param[out] count the number of found tuples; must not be NULL
  * @param global the global context
  * @return EtsMultimapOk on success, otherwise an error status
  *
