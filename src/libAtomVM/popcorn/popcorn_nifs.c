@@ -784,12 +784,15 @@ static term nif_ets_update_element(Context *ctx, int argc, term argv[])
 
 static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
 {
-    term ref = argv[0];
-    VALIDATE_VALUE(ref, is_ets_table_id);
+    assert(argc == 3 || argc == 4);
 
+    term name_or_ref = argv[0];
     term key = argv[1];
     term pos = argv[2];
+
+    VALIDATE_VALUE(name_or_ref, is_ets_table_id);
     VALIDATE_VALUE(pos, term_is_integer);
+
     avm_int_t index = term_to_int(pos) - 1;
     if (UNLIKELY(index < 0)) {
         RAISE_ERROR(BADARG_ATOM);
@@ -801,18 +804,23 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
     }
 
     term ret = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_lookup_element(ref, key, (size_t) index, &ret, ctx);
+
+    Popcorn2EtsStatus result = popcorn2_ets_lookup_element(name_or_ref, key, (size_t) index, &ret, ctx);
+
     switch (result) {
-        case PopcornEtsOk:
-            return ret;
-        case PopcornEtsEntryNotFound:
+        case Popcorn2EtsOk:
+            if (!term_is_nil(ret)) {
+                return ret;
+            }
+
             if (!term_is_invalid_term(default_value)) {
                 return default_value;
             }
-        case PopcornEtsBadPosition:
-        case PopcornEtsBadAccess:
+            /* fall through */
+        case Popcorn2EtsBadAccess:
+        case Popcorn2EtsBadIndex:
             RAISE_ERROR(BADARG_ATOM);
-        case PopcornEtsAllocationFailure:
+        case Popcorn2EtsAllocationError:
             RAISE_ERROR(MEMORY_ATOM);
         default:
             AVM_ABORT();
