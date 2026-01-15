@@ -33,8 +33,8 @@ extern "C" {
 typedef enum EtsMultimapType
 {
     EtsMultimapTypeSingle, // Only one value per key
-    EtsMultimapTypeSet,    // Only unique values per key
-    EtsMultimapTypeList    // Allow duplicate values per key
+    EtsMultimapTypeSet, // Only unique values per key
+    EtsMultimapTypeList // Allow duplicate values per key
 } EtsMultimapType;
 
 typedef enum EtsMultimapStatus
