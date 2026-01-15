@@ -34,7 +34,7 @@ start() ->
     ok = isolated(fun test_insert_new_bag/0),
     ok = isolated(fun test_insert_new_duplicate_bag/0),
     ok = isolated(fun test_delete/0),
-    % ok = isolated(fun test_lookup_element/0),
+    ok = isolated(fun test_lookup_element/0),
     % ok = isolated(fun test_update_counter/0),
     0.
 
@@ -359,14 +359,55 @@ test_delete() ->
     ok.
 
 test_lookup_element() ->
-    T = ets:new(test, []),
-    true = ets:insert(T, {key, value}),
-    key = ets:lookup_element(T, key, 1),
-    value = ets:lookup_element(T, key, 2),
-    assert_badarg(fun() -> ets:lookup_element(T, none, 1) end),
-    assert_badarg(fun() -> ets:lookup_element(T, key, 3) end),
-    assert_badarg(fun() -> ets:lookup_element(T, key, 0) end),
-    assert_badarg(fun() -> ets:lookup_element(T, key, -1) end),
+    % set
+    S = ets:new(test, []),
+    true = ets:insert(S, {key, value}),
+    key = ets:lookup_element(S, key, 1),
+    value = ets:lookup_element(S, key, 2),
+    not_found = ets:lookup_element(S, none, 1, not_found),
+    assert_badarg(fun() -> ets:lookup_element(S, none, 1) end),
+    assert_badarg(fun() -> ets:lookup_element(S, key, 3) end),
+    assert_badarg(fun() -> ets:lookup_element(S, key, 0) end),
+    assert_badarg(fun() -> ets:lookup_element(S, key, -1) end),
+    assert_badarg(fun() -> ets:lookup_element(S, key, -1, not_found) end),
+
+    % bag
+    B = ets:new(test, [bag]),
+    true = ets:insert(B, {key, value}),
+    [key] = ets:lookup_element(B, key, 1),
+    [value] = ets:lookup_element(B, key, 2),
+
+    true = ets:insert(B, {key, value2}),
+    [key, key] = ets:lookup_element(B, key, 1),
+    [value, value2] = ets:lookup_element(B, key, 2),
+    not_found = ets:lookup_element(B, none, 1, not_found),
+
+    assert_badarg(fun() -> ets:lookup_element(B, none, 1) end),
+    assert_badarg(fun() -> ets:lookup_element(B, key, 3) end),
+    assert_badarg(fun() -> ets:lookup_element(B, key, 0) end),
+    assert_badarg(fun() -> ets:lookup_element(B, key, -1) end),
+    assert_badarg(fun() -> ets:lookup_element(B, key, -1, not_found) end),
+
+    % duplicate_bag
+    DB = ets:new(test, [duplicate_bag]),
+    true = ets:insert(DB, {key, value}),
+    [key] = ets:lookup_element(DB, key, 1),
+    [value] = ets:lookup_element(DB, key, 2),
+    not_found = ets:lookup_element(DB, none, 1, not_found),
+
+    true = ets:insert(DB, {key, value2}),
+    [key, key] = ets:lookup_element(DB, key, 1),
+    [value, value2] = ets:lookup_element(DB, key, 2),
+
+    true = ets:insert(DB, {key, value2}),
+    [key, key, key] = ets:lookup_element(DB, key, 1),
+    [value, value2, value2] = ets:lookup_element(DB, key, 2),
+
+    assert_badarg(fun() -> ets:lookup_element(DB, none, 1) end),
+    assert_badarg(fun() -> ets:lookup_element(DB, key, 3) end),
+    assert_badarg(fun() -> ets:lookup_element(DB, key, 0) end),
+    assert_badarg(fun() -> ets:lookup_element(DB, key, -1) end),
+    assert_badarg(fun() -> ets:lookup_element(DB, key, -1, not_found) end),
     ok.
 
 test_update_counter() ->
