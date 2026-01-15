@@ -201,10 +201,10 @@ EtsMultimapStatus ets_multimap_lookup(
         return EtsMultimapAllocationError;
     }
 
-    size_t i = *count;
-    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next, i--) {
-        assert(i > 0);
-        (*tuples)[i - 1] = iter->tuple;
+    size_t i = 0;
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next, i++) {
+        assert(i < *count);
+        (*tuples)[i] = iter->tuple;
     }
 
     return EtsMultimapOk;
