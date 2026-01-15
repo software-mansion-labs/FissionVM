@@ -524,16 +524,14 @@ static Popcorn2EtsStatus lookup_with_index(
     if (return_list) {
         term list = term_nil();
 
-        for (size_t fwd_i = 0; fwd_i < count; fwd_i++) {
-            size_t i = count - fwd_i - 1;
-
+        for (size_t i = 0; i < count; i++) {
             term tuple = tuples[i];
             term element;
 
-            if (index != ETS_NO_INDEX) {
-                element = term_get_tuple_element(tuple, index);
-            } else {
+            if (index == ETS_NO_INDEX) {
                 element = tuple;
+            } else {
+                element = term_get_tuple_element(tuple, index);
             }
 
             element = memory_copy_term_tree(&ctx->heap, element);
