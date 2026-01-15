@@ -573,7 +573,7 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
     Popcorn2EtsTableType type = Popcorn2EtsTableSet;
     if (!term_is_invalid_term(bag)) {
         type = Popcorn2EtsTableBag;
-    } 
+    }
     if (!term_is_invalid_term(duplicate_bag)) {
         type = Popcorn2EtsTableDuplicateBag;
     }

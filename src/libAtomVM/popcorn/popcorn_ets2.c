@@ -418,7 +418,7 @@ static Popcorn2EtsStatus insert_many(
     size_t count = 0;
     for (term iter = tuples; !term_is_nil(iter); iter = term_get_list_tail(iter), count++) {
         if (!term_is_list(iter)) {
-            return Popcorn2EtsBadEntry;  // improper list
+            return Popcorn2EtsBadEntry; // improper list
         }
 
         term tuple = term_get_list_head(iter);
@@ -542,7 +542,7 @@ static Popcorn2EtsStatus lookup_with_index(
         *ret = list;
     } else {
         assert(index != ETS_NO_INDEX);
-        assert(count == 1); 
+        assert(count == 1);
 
         term element = term_get_tuple_element(tuples[0], index);
         *ret = memory_copy_term_tree(&ctx->heap, element);
