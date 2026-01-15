@@ -109,6 +109,8 @@ EtsMultimapStatus ets_multimap_insert(
  *
  * @note Terms returned by this function come from the ETS heap and should be copied
  *       to the process heap if needed.
+ * @note The returned tuples are ordered in reverse insertion order
+ *       (most recently added elements first).
  * @warning The caller is responsible for freeing the memory pointed to by `tuples`
  *          using `free()`. When count is zero, memory is not allocated and `tuples` is set to NULL.
  */
