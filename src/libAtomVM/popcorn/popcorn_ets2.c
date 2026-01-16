@@ -32,7 +32,7 @@
 #include "popcorn_ets_multimap.h"
 
 #define ETS_ANY_PROCESS -1
-#define ETS_NO_INDEX SIZE_MAX
+#define ETS_WHOLE_TUPLE SIZE_MAX
 
 #ifndef AVM_NO_SMP
 #include "../smp.h"
@@ -90,7 +90,7 @@ static Popcorn2EtsStatus insert_many(
     term tuples,
     bool new,
     Context *ctx);
-static Popcorn2EtsStatus lookup_with_index(
+static Popcorn2EtsStatus lookup_project(
     struct Popcorn2EtsTable *table,
     term key,
     size_t index,
@@ -225,7 +225,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
         return Popcorn2EtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = lookup_with_index(table, key, ETS_NO_INDEX, ret, ctx);
+    Popcorn2EtsStatus result = lookup_project(table, key, ETS_WHOLE_TUPLE, ret, ctx);
 
     SMP_UNLOCK(table);
     return result;
@@ -245,7 +245,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup_element(term name_or_ref, term key, size_t
         return Popcorn2EtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = lookup_with_index(table, key, index, ret, ctx);
+    Popcorn2EtsStatus result = lookup_project(table, key, index, ret, ctx);
 
     SMP_UNLOCK(table);
     return result;
@@ -466,7 +466,7 @@ static Popcorn2EtsStatus insert_many(
     }
 }
 
-static Popcorn2EtsStatus lookup_with_index(
+static Popcorn2EtsStatus lookup_project(
     struct Popcorn2EtsTable *table,
     term key,
     size_t index,
@@ -478,8 +478,8 @@ static Popcorn2EtsStatus lookup_with_index(
     *ret = term_nil();
 
     term *tuples = NULL;
-    size_t count;
 
+    size_t count;
     EtsMultimapStatus result = ets_multimap_lookup(table->multimap, key, &tuples, &count, ctx->global);
     if (UNLIKELY(result == EtsMultimapAllocationError)) {
         return Popcorn2EtsAllocationError;
@@ -495,7 +495,7 @@ static Popcorn2EtsStatus lookup_with_index(
     for (size_t i = 0; i < count; i++) {
         term tuple = tuples[i];
 
-        if (index == ETS_NO_INDEX) {
+        if (index == ETS_WHOLE_TUPLE) {
             elements_size += memory_estimate_usage(tuple);
         } else {
             if (index >= (size_t) term_get_tuple_arity(tuple)) {
@@ -509,7 +509,7 @@ static Popcorn2EtsStatus lookup_with_index(
 
     bool return_list = table->type == Popcorn2EtsTableBag ||
                        table->type == Popcorn2EtsTableDuplicateBag ||
-                       index == ETS_NO_INDEX;
+                       index == ETS_WHOLE_TUPLE;
 
     if (return_list) {
         elements_size += count * CONS_SIZE;
@@ -528,7 +528,7 @@ static Popcorn2EtsStatus lookup_with_index(
             term tuple = tuples[i];
             term element;
 
-            if (index == ETS_NO_INDEX) {
+            if (index == ETS_WHOLE_TUPLE) {
                 element = tuple;
             } else {
                 element = term_get_tuple_element(tuple, index);
@@ -539,7 +539,7 @@ static Popcorn2EtsStatus lookup_with_index(
         }
         *ret = list;
     } else {
-        assert(index != ETS_NO_INDEX);
+        assert(index != ETS_WHOLE_TUPLE);
         assert(count == 1);
 
         term element = term_get_tuple_element(tuples[0], index);
