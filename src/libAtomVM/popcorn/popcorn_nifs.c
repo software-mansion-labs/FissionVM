@@ -816,7 +816,8 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
             if (!term_is_invalid_term(default_value)) {
                 return default_value;
             }
-            /* fall through */
+
+            RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsBadAccess:
         case Popcorn2EtsBadIndex:
             RAISE_ERROR(BADARG_ATOM);
