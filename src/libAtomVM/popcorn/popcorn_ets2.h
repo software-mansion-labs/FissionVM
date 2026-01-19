@@ -83,6 +83,8 @@ Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool new, Co
 Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_lookup_element(term name_or_ref, term key, size_t index, term *ret, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx);
+Popcorn2EtsStatus popcorn2_ets_delete_table(term name_or_ref, Context *ctx);
+Popcorn2EtsStatus popcorn2_ets_delete_object(term name_or_ref, term tuple, Context *ctx);
 
 #ifdef __cplusplus
 }

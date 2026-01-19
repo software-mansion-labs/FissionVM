@@ -249,6 +249,100 @@ EtsMultimapStatus ets_multimap_remove(
     return EtsMultimapOk;
 }
 
+EtsMultimapStatus ets_multimap_remove_tuple(
+    EtsMultimap *multimap,
+    term tuple,
+    GlobalContext *global)
+{
+    assert(term_is_tuple(tuple));
+
+    if (multimap->key_index >= (size_t) term_get_tuple_arity(tuple)) {
+        return EtsMultimapBadTuple;
+    }
+
+    term key = term_get_tuple_element(tuple, multimap->key_index);
+
+    EtsMultimapNode *node;
+    if (UNLIKELY(node_find(multimap, key, &node, global) == EtsMultimapAllocationError)) {
+        return EtsMultimapAllocationError;
+    }
+
+    if (node == NULL) {
+        return EtsMultimapOk;
+    }
+
+    assert(node->entries != NULL);
+
+    size_t capacity = 8;
+    size_t count = 0;
+
+    EtsMultimapEntry **to_remove = malloc(sizeof(EtsMultimapEntry *) * capacity);
+    if (IS_NULL_PTR(to_remove)) {
+        return EtsMultimapAllocationError;
+    }
+
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
+        TermCompareResult result = term_compare(tuple, iter->tuple, TermCompareExact, global);
+
+        if (result == TermCompareMemoryAllocFail) {
+            free(to_remove);
+            return EtsMultimapAllocationError;
+        }
+
+        if (result == TermEquals) {
+            if (count >= capacity) {
+                capacity *= 2;
+                EtsMultimapEntry **new_to_remove = realloc(to_remove, sizeof(EtsMultimapEntry *) * capacity);
+                if (IS_NULL_PTR(new_to_remove)) {
+                    free(to_remove);
+                    return EtsMultimapAllocationError;
+                }
+                to_remove = new_to_remove;
+            }
+            to_remove[count++] = iter;
+        }
+    }
+
+    EtsMultimapEntry *prev = NULL;
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; prev = iter, iter = iter->next) {
+        for (size_t i = 0; i < count; i++) {
+            if (iter == to_remove[i]) {
+                if (prev == NULL) {
+                    node->entries = iter->next;
+                } else {
+                    prev->next = iter->next;
+                }
+            }
+        }
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        entry_delete(to_remove[i], global);
+    }
+
+    if (node->entries == NULL) {
+        uint32_t idx = hash_term(key, global) % NUM_BUCKETS;
+
+        EtsMultimapNode *prev = NULL;
+        for (EtsMultimapNode *iter = multimap->buckets[idx]; iter != NULL; prev = iter, iter = iter->next) {
+            if (iter == node) {
+                if (prev == NULL) {
+                    multimap->buckets[idx] = iter->next;
+                } else {
+                    prev->next = iter->next;
+                }
+                break;
+            }
+        }
+
+        node_delete(node, global);
+    }
+
+    free(to_remove);
+
+    return EtsMultimapOk;
+}
+
 static EtsMultimapStatus node_find(
     EtsMultimap *multimap,
     term key,
