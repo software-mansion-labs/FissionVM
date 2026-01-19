@@ -228,6 +228,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
     Popcorn2EtsStatus result = lookup_project(table, key, ETS_WHOLE_TUPLE, ret, ctx);
 
     SMP_UNLOCK(table);
+
     return result;
 }
 
@@ -248,6 +249,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup_element(term name_or_ref, term key, size_t
     Popcorn2EtsStatus result = lookup_project(table, key, index, ret, ctx);
 
     SMP_UNLOCK(table);
+
     return result;
 }
 
@@ -264,9 +266,62 @@ Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx)
     }
 
     (void) ets_multimap_remove(table->multimap, key, ctx->global);
+
     SMP_UNLOCK(table);
 
     return Popcorn2EtsOk;
+}
+
+Popcorn2EtsStatus popcorn2_ets_delete_table(term name_or_ref, Context *ctx)
+{
+    struct Popcorn2EtsTable *table = get_table(
+        &ctx->global->popcorn2_ets,
+        name_or_ref,
+        ctx->process_id,
+        TableAccessWrite);
+
+    if (table == NULL) {
+        return Popcorn2EtsBadAccess;
+    }
+
+    synclist_wrlock(&ctx->global->popcorn2_ets.ets_tables);
+
+    list_remove(&table->head);
+
+    SMP_UNLOCK(table);
+    table_destroy(table, ctx->global);
+
+    synclist_unlock(&ctx->global->popcorn2_ets.ets_tables);
+
+    return Popcorn2EtsOk;
+}
+
+Popcorn2EtsStatus popcorn2_ets_delete_object(term name_or_ref, term tuple, Context *ctx)
+{
+    struct Popcorn2EtsTable *table = get_table(
+        &ctx->global->popcorn2_ets,
+        name_or_ref,
+        ctx->process_id,
+        TableAccessWrite);
+
+    if (table == NULL) {
+        return Popcorn2EtsBadAccess;
+    }
+
+    EtsMultimapStatus result = ets_multimap_remove_tuple(table->multimap, tuple, ctx->global);
+
+    SMP_UNLOCK(table);
+
+    switch (result) {
+        case EtsMultimapOk:
+            return Popcorn2EtsOk;
+        case EtsMultimapBadTuple:
+            return Popcorn2EtsBadEntry;
+        case EtsMultimapAllocationError:
+            return Popcorn2EtsAllocationError;
+        default:
+            UNREACHABLE();
+    }
 }
 
 void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, GlobalContext *global)

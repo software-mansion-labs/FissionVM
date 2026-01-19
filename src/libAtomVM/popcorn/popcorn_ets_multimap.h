@@ -41,6 +41,7 @@ typedef enum EtsMultimapStatus
 {
     EtsMultimapOk,
     EtsMultimapKeyExists,
+    EtsMultimapBadTuple,
     EtsMultimapAllocationError
 } EtsMultimapStatus;
 
@@ -132,6 +133,19 @@ EtsMultimapStatus ets_multimap_lookup(
 EtsMultimapStatus ets_multimap_remove(
     EtsMultimap *multimap,
     term key,
+    GlobalContext *global);
+
+/**
+ * @brief Remove a given tuple from the multimap.
+ *
+ * @param multimap the multimap
+ * @param tuple the tuple to remove
+ * @param global the global context
+ * @return EtsMultimapOk on success, otherwise an error status
+ */
+EtsMultimapStatus ets_multimap_remove_tuple(
+    EtsMultimap *multimap,
+    term tuple,
     GlobalContext *global);
 
 #ifdef __cplusplus
