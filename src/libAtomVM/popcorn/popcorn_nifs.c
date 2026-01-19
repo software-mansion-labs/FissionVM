@@ -838,13 +838,10 @@ static term nif_ets_delete(Context *ctx, int argc, term argv[])
 
     Popcorn2EtsStatus result;
 
-    if (argc == 2) {
-        result = popcorn2_ets_delete(name_or_ref, argv[1], ctx);
+    if (argc == 1) {
+        result = popcorn2_ets_delete_table(name_or_ref, ctx);
     } else {
-        term ret = TRUE_ATOM;
-        result = Popcorn2EtsOk;
-        // TODO
-        // result = popcorn_ets_drop_table(name_or_ref, &ret, ctx);
+        result = popcorn2_ets_delete(name_or_ref, argv[1], ctx);
     }
 
     switch (result) {
@@ -860,25 +857,26 @@ static term nif_ets_delete(Context *ctx, int argc, term argv[])
 
 static term nif_ets_delete_object(Context *ctx, int argc, term argv[])
 {
-    UNUSED(argc);
+    assert(argc == 2);
 
-    term ref = argv[0];
-    VALIDATE_VALUE(ref, is_ets_table_id);
-
+    term name_or_ref = argv[0];
     term tuple = argv[1];
+
+    VALIDATE_VALUE(name_or_ref, is_ets_table_id);
     VALIDATE_VALUE(tuple, term_is_tuple);
 
-    term ret = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_delete_object(ref, tuple, &ret, ctx);
+    Popcorn2EtsStatus result = popcorn2_ets_delete_object(name_or_ref, tuple, ctx);
+
     switch (result) {
-        case PopcornEtsOk:
-            return ret;
-        case PopcornEtsBadAccess:
-        case PopcornEtsBadPosition:
+        case Popcorn2EtsOk:
+            return TRUE_ATOM;
+        case Popcorn2EtsBadAccess:
+        case Popcorn2EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
-        case PopcornEtsAllocationFailure:
+        case Popcorn2EtsAllocationError:
             RAISE_ERROR(MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
