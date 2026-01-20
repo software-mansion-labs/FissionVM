@@ -24,6 +24,9 @@
 #include "popcorn_ets_multimap.h"
 #include "popcorn_ets_multimap_hash.h"
 
+#define DYNARRAY_INITIAL_CAPACITY 8
+#define DYNARRAY_GROWTH_FACTOR 2
+
 static EtsMultimapEntry *entry_new(term tuple);
 static void entry_delete(EtsMultimapEntry *entry, GlobalContext *global);
 static EtsMultimapNode *node_new(EtsMultimapNode *next, EtsMultimapEntry *entries);
@@ -273,7 +276,7 @@ EtsMultimapStatus ets_multimap_remove_tuple(
 
     assert(node->entries != NULL);
 
-    size_t capacity = 8;
+    size_t capacity = DYNARRAY_INITIAL_CAPACITY;
     size_t count = 0;
 
     EtsMultimapEntry **to_remove = malloc(sizeof(EtsMultimapEntry *) * capacity);
@@ -284,14 +287,14 @@ EtsMultimapStatus ets_multimap_remove_tuple(
     for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
         TermCompareResult result = term_compare(tuple, iter->tuple, TermCompareExact, global);
 
-        if (result == TermCompareMemoryAllocFail) {
+        if (UNLIKELY(result == TermCompareMemoryAllocFail)) {
             free(to_remove);
             return EtsMultimapAllocationError;
         }
 
         if (result == TermEquals) {
             if (count >= capacity) {
-                capacity *= 2;
+                capacity *= DYNARRAY_GROWTH_FACTOR;
                 EtsMultimapEntry **new_to_remove = realloc(to_remove, sizeof(EtsMultimapEntry *) * capacity);
                 if (IS_NULL_PTR(new_to_remove)) {
                     free(to_remove);
