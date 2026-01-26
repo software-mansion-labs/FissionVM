@@ -522,6 +522,7 @@ bool context_get_process_info(Context *ctx, term *out, size_t *term_size, term a
         case MESSAGE_QUEUE_LEN_ATOM:
         case REGISTERED_NAME_ATOM:
         case MEMORY_ATOM:
+        case TRAP_EXIT_ATOM:
             ret_size = TUPLE_SIZE(2);
             break;
         case LINKS_ATOM: {
@@ -624,6 +625,13 @@ bool context_get_process_info(Context *ctx, term *out, size_t *term_size, term a
             term_put_tuple_element(ret, 0, MEMORY_ATOM);
             unsigned long value = context_size(ctx);
             term_put_tuple_element(ret, 1, term_from_int(value));
+            break;
+        }
+
+        // true if a process traps exits, otherwise false
+        case TRAP_EXIT_ATOM: {
+            term_put_tuple_element(ret, 0, TRAP_EXIT_ATOM);
+            term_put_tuple_element(ret, 1, ctx->trap_exit ? TRUE_ATOM : FALSE_ATOM);
             break;
         }
 
