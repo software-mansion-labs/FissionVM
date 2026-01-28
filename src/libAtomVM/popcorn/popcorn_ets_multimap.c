@@ -246,7 +246,7 @@ EtsMultimapStatus ets_multimap_update(
             return EtsMultimapAllocationError;
         }
 
-        term_put_tuple_element(entry->tuple, (uint32_t)multimap->key_index, key);
+        term_put_tuple_element(entry->tuple, (uint32_t) multimap->key_index, key);
     } else {
         assert(node->entries != NULL);
 
@@ -284,9 +284,10 @@ EtsMultimapStatus ets_multimap_update(
             return EtsMultimapBadTuple;
         }
 
-        term_put_tuple_element(entry->tuple, (uint32_t)index, value);
+        term_put_tuple_element(entry->tuple, (uint32_t) index, value);
     }
 
+    // Allocate a new entry to enforce that all tuple elements live on the ETS heap.
     EtsMultimapEntry *to_insert = entry_new(entry->tuple);
     if (IS_NULL_PTR(to_insert)) {
         entry_delete(entry, global);
