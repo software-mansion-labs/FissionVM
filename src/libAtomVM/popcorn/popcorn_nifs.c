@@ -761,21 +761,29 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
 
 static term nif_ets_update_element(Context *ctx, int argc, term argv[])
 {
-    UNUSED(argc);
-    term ref = argv[0];
-    VALIDATE_VALUE(ref, is_ets_table_id);
+    assert(argc == 3 || argc == 4);
 
+    term name_or_ref = argv[0];
     term key = argv[1];
     term element_spec = argv[2];
-    term ret = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_update_element(ref, key, element_spec, &ret, ctx);
+   
+    term default_tuple = term_invalid_term();
+    if (argc == 4) {
+        default_tuple = argv[3];
+        VALIDATE_VALUE(default_tuple, term_is_tuple);
+    }
+
+    Popcorn2EtsStatus result = popcorn2_ets_update_element(name_or_ref, key, element_spec, default_tuple, ctx);
+
     switch (result) {
-        case PopcornEtsOk:
-            return ret;
-        case PopcornEtsBadAccess:
-        case PopcornEtsBadEntry:
+        case Popcorn2EtsOk:
+            return TRUE_ATOM;
+        case Popcorn2EtsTupleNotExists:
+            return FALSE_ATOM;
+        case Popcorn2EtsBadAccess:
+        case Popcorn2EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
-        case PopcornEtsAllocationFailure:
+        case Popcorn2EtsAllocationError:
             RAISE_ERROR(MEMORY_ATOM);
         default:
             AVM_ABORT();
@@ -809,6 +817,7 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
 
     switch (result) {
         case Popcorn2EtsOk:
+            // TODO: fix me
             if (!term_is_nil(ret)) {
                 return ret;
             }
