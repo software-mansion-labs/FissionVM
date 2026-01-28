@@ -675,6 +675,8 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
     switch (result) {
         case Popcorn2EtsOk:
             return ret;
+        case Popcorn2EtsTupleNotExists:
+            return term_nil();
         case Popcorn2EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsAllocationError:
@@ -817,15 +819,11 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
 
     switch (result) {
         case Popcorn2EtsOk:
-            // TODO: fix me
-            if (!term_is_nil(ret)) {
-                return ret;
-            }
-
+            return ret;
+        case Popcorn2EtsTupleNotExists:
             if (!term_is_invalid_term(default_value)) {
                 return default_value;
             }
-
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsBadAccess:
         case Popcorn2EtsBadIndex:

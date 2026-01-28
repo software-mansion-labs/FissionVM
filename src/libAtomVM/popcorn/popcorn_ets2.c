@@ -676,8 +676,7 @@ static Popcorn2EtsStatus lookup_select(
     }
 
     if (count == 0) {
-        // TODO: return TupleNotFound?
-        return Popcorn2EtsOk;
+        return Popcorn2EtsTupleNotExists;
     }
 
     assert(tuples != NULL);
