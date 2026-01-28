@@ -18,6 +18,8 @@
  * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
 
+#include <assert.h>
+
 #include "../globalcontext.h"
 #include "../term.h"
 
@@ -77,6 +79,57 @@ void ets_multimap_delete(EtsMultimap *multimap, GlobalContext *global)
         }
     }
     free(multimap);
+}
+
+EtsMultimapStatus ets_multimap_lookup(
+    EtsMultimap *multimap,
+    term key,
+    term **tuples,
+    size_t *count,
+    GlobalContext *global)
+{
+    assert(count != NULL);
+
+    *count = 0;
+
+    EtsMultimapNode *node;
+    EtsMultimapStatus result = node_find(multimap, key, &node, global);
+    if (UNLIKELY(result == EtsMultimapAllocationError)) {
+        return result;
+    }
+
+    if (node == NULL) {
+        return EtsMultimapOk;
+    }
+
+    assert(node->entries != NULL);
+
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
+        (*count)++;
+    }
+
+    if (tuples == NULL) {
+        // only return number of tuples found
+        return EtsMultimapOk;
+    }
+
+    if (*count == 0) {
+        *tuples = NULL;
+        return EtsMultimapOk;
+    }
+
+    *tuples = malloc(sizeof(term) * (*count));
+    if (IS_NULL_PTR(*tuples)) {
+        return EtsMultimapAllocationError;
+    }
+
+    size_t i = 0;
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next, i++) {
+        assert(i < *count);
+        (*tuples)[i] = iter->tuple;
+    }
+
+    return EtsMultimapOk;
 }
 
 EtsMultimapStatus ets_multimap_insert(
@@ -162,53 +215,105 @@ EtsMultimapStatus ets_multimap_insert(
     return status;
 }
 
-EtsMultimapStatus ets_multimap_lookup(
+EtsMultimapStatus ets_multimap_update(
     EtsMultimap *multimap,
     term key,
-    term **tuples,
-    size_t *count,
+    term *element_specs,
+    size_t count,
+    term default_tuple,
     GlobalContext *global)
 {
-    assert(count != NULL);
-
-    *count = 0;
+    assert(multimap->type == EtsMultimapTypeSingle);
 
     EtsMultimapNode *node;
-    EtsMultimapStatus result = node_find(multimap, key, &node, global);
-    if (UNLIKELY(result == EtsMultimapAllocationError)) {
-        return result;
-    }
-
-    if (node == NULL) {
-        return EtsMultimapOk;
-    }
-
-    assert(node->entries != NULL);
-
-    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
-        (*count)++;
-    }
-
-    if (tuples == NULL) {
-        // only return number of tuples found
-        return EtsMultimapOk;
-    }
-
-    if (*count == 0) {
-        *tuples = NULL;
-        return EtsMultimapOk;
-    }
-
-    *tuples = malloc(sizeof(term) * (*count));
-    if (IS_NULL_PTR(*tuples)) {
+    if (UNLIKELY(node_find(multimap, key, &node, global) == EtsMultimapAllocationError)) {
         return EtsMultimapAllocationError;
     }
 
-    size_t i = 0;
-    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next, i++) {
-        assert(i < *count);
-        (*tuples)[i] = iter->tuple;
+    if (node == NULL && term_is_invalid_term(default_tuple)) {
+        return EtsMultimapTupleNotExists;
     }
+
+    EtsMultimapEntry *entry = NULL;
+
+    if (node == NULL) {
+        if (term_get_tuple_arity(default_tuple) <= multimap->key_index) {
+            return EtsMultimapBadTuple;
+        }
+
+        entry = entry_new(default_tuple);
+        if (IS_NULL_PTR(entry)) {
+            return EtsMultimapAllocationError;
+        }
+
+        term_put_tuple_element(entry->tuple, (uint32_t)multimap->key_index, key);
+    } else {
+        assert(node->entries != NULL);
+
+        entry = entry_new(node->entries->tuple);
+        if (IS_NULL_PTR(entry)) {
+            return EtsMultimapAllocationError;
+        }
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        term spec = element_specs[i];
+
+        if (!term_is_tuple(spec) || term_get_tuple_arity(spec) != 2) {
+            entry_delete(entry, global);
+            return EtsMultimapBadTuple;
+        }
+
+        term pos = term_get_tuple_element(spec, 0);
+        term value = term_get_tuple_element(spec, 1);
+
+        if (!term_is_integer(pos)) {
+            entry_delete(entry, global);
+            return EtsMultimapBadTuple;
+        }
+
+        avm_int_t index = term_to_int(pos) - 1;
+
+        if (index < 0 || (size_t) index >= term_get_tuple_arity(entry->tuple)) {
+            entry_delete(entry, global);
+            return EtsMultimapBadTuple;
+        }
+
+        if ((size_t) index == multimap->key_index) {
+            entry_delete(entry, global);
+            return EtsMultimapBadTuple;
+        }
+
+        term_put_tuple_element(entry->tuple, (uint32_t)index, value);
+    }
+
+    EtsMultimapEntry *to_insert = entry_new(entry->tuple);
+    if (IS_NULL_PTR(to_insert)) {
+        entry_delete(entry, global);
+        return EtsMultimapAllocationError;
+    }
+
+    entry_delete(entry, global);
+
+    if (node == NULL) {
+        EtsMultimapNode *new_node = node_new(NULL, to_insert);
+        if (IS_NULL_PTR(new_node)) {
+            entry_delete(to_insert, global);
+            return EtsMultimapAllocationError;
+        }
+
+        assert(new_node->entries != NULL);
+
+        uint32_t idx = hash_term(key, global) % NUM_BUCKETS;
+        new_node->next = multimap->buckets[idx];
+        multimap->buckets[idx] = new_node;
+    } else {
+        assert(node->entries != NULL);
+        to_insert->next = node->entries;
+        node->entries = to_insert;
+    }
+
+    multimap_to_single(multimap, global);
 
     return EtsMultimapOk;
 }
