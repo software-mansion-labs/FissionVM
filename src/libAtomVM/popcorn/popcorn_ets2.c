@@ -310,12 +310,24 @@ Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx)
         return Popcorn2EtsBadAccess;
     }
 
-    // TODO: handle status! in case of memory error
-    (void) ets_multimap_remove(table->multimap, key, ctx->global);
+    Popcorn2EtsStatus result = Popcorn2EtsOk;
+
+    EtsMultimapStatus status = ets_multimap_remove(table->multimap, key, ctx->global);
+
+    switch (status) {
+        case EtsMultimapOk:
+            result = Popcorn2EtsOk;
+            break;
+        case EtsMultimapAllocationError:
+            result = Popcorn2EtsAllocationError;
+            break;
+        default:
+            UNREACHABLE();
+    }
 
     SMP_UNLOCK(table);
 
-    return Popcorn2EtsOk;
+    return result;
 }
 
 Popcorn2EtsStatus popcorn2_ets_delete_table(term name_or_ref, Context *ctx)
