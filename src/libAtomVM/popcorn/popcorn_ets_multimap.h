@@ -124,28 +124,6 @@ EtsMultimapStatus ets_multimap_insert(
     GlobalContext *global);
 
 /**
- * @brief Update elements of a tuple with the given key. If no tuple with the key exists,
- *        a new tuple is created using the provided default tuple.
- * 
- * @param multimap the multimap
- * @param key the key to lookup
- * @param element_specs array of {Index, Value} tuples specifying the elements to update
- * @param count the number of element specs
- * @param default_tuple the default tuple to use if no tuple with the key exists
- * @param global the global context
- * @return EtsMultimapOk on success, otherwise an error status
- * 
- * @note Only MultimapTypeSingle is supported.
- */
-EtsMultimapStatus ets_multimap_update(
-    EtsMultimap *multimap,
-    term key,
-    term *element_specs,
-    size_t count,
-    term default_tuple,
-    GlobalContext *global);
-
-/**
  * @brief Remove all tuples with the given key.
  *
  * @param multimap the multimap
