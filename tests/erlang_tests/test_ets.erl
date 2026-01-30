@@ -500,60 +500,73 @@ test_lookup_element() ->
     ok.
 
 test_update_element() ->
-    S = ets:new(test, [set, {keypos, 1}]),
-    true = ets:insert(S, [{key, value1, value2}]),
+    TableWithTuples = 
+        fun (Type, Tuples) ->
+            T = ets:new(test, [Type]),
+            true = ets:insert(T, Tuples),
+            T
+        end,
 
-    true = ets:update_element(S, key, {2, value3}),
-    [{key, value3, value2}] = ets:lookup(S, key),
+    S1 = TableWithTuples(set, {key, value1, value2}),
+    true = ets:update_element(S1, key, {2, new_value1}),
+    [{key, new_value1, value2}] = ets:lookup(S1, key),
 
-    false = ets:update_element(S, key_not_exist, {3, value4}),
-    [{key, value3, value2}] = ets:lookup(S, key),
+    S2 = TableWithTuples(set, {key, value1, value2}),
+    false = ets:update_element(S2, key_not_exist, {2, new_value1}),
+    [{key, value1, value2}] = ets:lookup(S2, key), 
 
-    true = ets:update_element(S, key, {3, value4}),
-    [{key, value3, value4}] = ets:lookup(S, key),
+    S3 = TableWithTuples(set, {key, value1, value2}),
+    true = ets:update_element(S3, key, {3, new_value2}),
+    [{key, value1, new_value2}] = ets:lookup(S3, key),
 
-    true = ets:update_element(S, key, [{3, value6}, {2, value5}, {3, value7}]),
-    [{key, value5, value7}] = ets:lookup(S, key),
+    S4 = TableWithTuples(set, {key, value1, value2}),
+    true = ets:update_element(S4, key, [{3, new_value2}, {2, new_value1}, {3, new_last_value2}]),
+    [{key, new_value1, new_last_value2}] = ets:lookup(S4, key),
 
-    true = ets:update_element(S, key_not_exist, {2, value4}, {value1, value2, value3}),
-    [{key_not_exist, value4, value3}] = ets:lookup(S, key_not_exist),
+    S5 = TableWithTuples(set, {key, value1, value2}),
+    true = ets:update_element(S5, key_not_exist, {2, new_value1}, {key, value1, value2}),
+    [{key_not_exist, new_value1, value2}] = ets:lookup(S5, key_not_exist),
 
-    true = ets:update_element(S, key_not_exist2,
-        [{2, value4}, {3, value5}, {3, value6}], {value1, value2, value3}),
-    [{key_not_exist2, value4, value6}] = ets:lookup(S, key_not_exist2),
+    S6 = TableWithTuples(set, {key, value1, value2}),
+    true = ets:update_element(S6, key_not_exist,
+        [{2, new_value1}, {3, new_value2}, {3, new_last_value2}], {key, value1, value2}),
+    [{key_not_exist, new_value1, new_last_value2}] = ets:lookup(S6, key_not_exist),
 
     % badargs
     TErr = ets:new(test, [set, {keypos, 3}]),
     true = ets:insert(TErr, {value1, value2, key}),
 
-    BadTableTypeBag = ets:new(test, [bag]),
-    BadTableTypeDuplicateBag = ets:new(test, [duplicate_bag]),
-    assert_badarg(fun() -> ets:update_element(BadTableTypeBag, key, {1, value}) end),
-    assert_badarg(fun() -> ets:update_element(BadTableTypeDuplicateBag, key, {1, value}) end),
+    OkDefault = {value, value, value},
+
+    % incompatible table types
+    TErrBag = ets:new(test, [bag]),
+    TErrDuplBag = ets:new(test, [duplicate_bag]),
+    assert_badarg(fun() -> ets:update_element(TErrBag, key, {1, value}) end),
+    assert_badarg(fun() -> ets:update_element(TErrDuplBag, key, {1, value}) end),
 
     % Pos < 1
-    assert_badarg(fun() -> ets:update_element(TErr, key, {-1, value}) end),
-    assert_badarg(fun() -> ets:update_element(TErr, key, {0, value}) end),
-    assert_badarg(fun() -> ets:update_element(TErr, key, [{1, value}, {0, value}]) end),
+    assert_badarg(fun() -> ets:update_element(TErr, key, {-1, pos_neg}) end),
+    assert_badarg(fun() -> ets:update_element(TErr, key, {0, pos_zero}) end),
+    assert_badarg(fun() -> ets:update_element(TErr, key, [{1, pos_ok}, {0, pos_zero}]) end),
     assert_badarg(fun() -> ets:update_element(
-        TErr, key_not_exist, [{1, value}, {0, value}], {value, value, value}) end),
+        TErr, key_not_exist, [{1, pos_ok}, {0, pos_zero}], OkDefault) end),
 
     % Pos = KeyPos
-    assert_badarg(fun() -> ets:update_element(TErr, key, {3, value}) end),
-    assert_badarg(fun() -> ets:update_element(TErr, key, [{1, value}, {3, value}]) end),
+    assert_badarg(fun() -> ets:update_element(TErr, key, {3, pos_key}) end),
+    assert_badarg(fun() -> ets:update_element(TErr, key, [{1, pos_ok}, {3, pos_key}]) end),
     assert_badarg(fun() -> ets:update_element(
-        TErr, key_not_exist, [{1, value}, {3, value}], {value, value, value}) end),
+        TErr, key_not_exist, [{1, pos_ok}, {3, pos_key}], OkDefault) end),
 
     % Pos > TupleArity
-    assert_badarg(fun() -> ets:update_element(TErr, key, {4, value}) end),
-    assert_badarg(fun() -> ets:update_element(TErr, key, [{1, value}, {4, value}]) end),
+    assert_badarg(fun() -> ets:update_element(TErr, key, {4, pos_past}) end),
+    assert_badarg(fun() -> ets:update_element(TErr, key, [{1, pos_ok}, {4, pos_past}]) end),
     assert_badarg(fun() -> ets:update_element(
-        TErr, key_not_exist, [{1, value}, {4, value}], {value, value, value}) end),
+        TErr, key_not_exist, [{1, pos_ok}, {4, pos_past}], OkDefault) end),
 
     % Default object arity < KeyPos
-    assert_badarg(fun() -> ets:update_element(TErr, key_not_exist, {1, value2}, {value}) end),
+    assert_badarg(fun() -> ets:update_element(TErr, key_not_exist, {1, pos_ok}, {value}) end),
     assert_badarg(fun() -> ets:update_element(
-        TErr, key_not_exist, [{1, value2}, {2, value2}], {value, value}) end),
+        TErr, key_not_exist, [{1, pos_ok}, {2, pos_ok}], {value, value}) end),
 
     [{value1, value2, key}] = ets:lookup(TErr, key),
     [] = ets:lookup(TErr, key_not_exist),
