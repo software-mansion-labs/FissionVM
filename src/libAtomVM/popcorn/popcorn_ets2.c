@@ -634,7 +634,6 @@ static Popcorn2EtsStatus update_many(
     }
 
     for (size_t i = 0; !term_is_nil(specs); specs = term_get_list_tail(specs), i++) {
-        assert(term_is_list(specs));
         to_update[i] = term_get_list_head(specs);
     }
 
