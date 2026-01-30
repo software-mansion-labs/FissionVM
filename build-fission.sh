@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 usage() {
-    echo "Usage: $0 [--clean] <build_mode>"
+    echo "Usage: $0 [--clean] [-j N] <build_mode>"
     echo ""
     echo "Runs cmake and builds AtomVM for specified platform and mode. Copies artifacts to out/ directory."
     echo "Wasm artifacts are additionally compressed."
@@ -16,6 +16,7 @@ usage() {
     echo ""
     echo "Options:"
     echo "  --clean       - Run ninja clean before building"
+    echo "  -j N          - Number of parallel jobs for ninja (default: auto)"
     echo "Build modes:"
     echo "  debug-unix    - Debug build for Unix platforms"
     echo "  debug-wasm    - Debug build for WebAssembly"
@@ -27,6 +28,8 @@ usage() {
     echo "  ./build-fission debug-unix"
     echo "Run wasm debug build from scratch:"
     echo "  ./build-fission debug-wasm --clean"
+    echo "Run single-threaded build (useful for memory-constrained environments):"
+    echo "  ./build-fission -j 1 debug-wasm"
     echo "Pass additional flags to build:"
     echo "  AVM_CMAKE_OPTS='-DAVM_ENABLE_TRACE_RAISE=1' ./build-fission debug-wasm"
     exit 1
@@ -76,6 +79,7 @@ check_tools() {
 build_unix() {
     local build_type=$1
     local clean_flag=$2
+    local jobs_flag=$3
     local repo_root="$(pwd)"
 
     local build_dir="${repo_root}/out/cmake-unix"
@@ -95,8 +99,8 @@ build_unix() {
     local cmake_out="$(cmake ${repo_root} ${cmake_args} 2>&1)"
     [[ $? -ne 0 ]] && error "cmake failed:\n${cmake_out}"
 
-    [ "${clean_flag}" ] && ninja clean
-    ninja AtomVM
+    [ "${clean_flag}" ] && ninja ${jobs_flag} clean
+    ninja ${jobs_flag} AtomVM
     popd >/dev/null
 
     cp "${build_dir}/src/AtomVM" out/
@@ -105,6 +109,7 @@ build_unix() {
 build_wasm() {
     local build_type=$1
     local clean_flag=$2
+    local jobs_flag=$3
     local repo_root="$(pwd)"
 
     local build_dir="${repo_root}/out/cmake-wasm"
@@ -123,9 +128,9 @@ build_wasm() {
     local cmake_out="$(emcmake cmake ${repo_root}/src/platforms/emscripten ${cmake_args} 2>&1)"
     [[ $? -ne 0 ]] && error "emcmake failed:\n${cmake_out}"
 
-    [ "${clean_flag}" ] && ninja clean
-    log "Running 'ninja AtomVM'."
-    emmake ninja AtomVM
+    [ "${clean_flag}" ] && ninja ${jobs_flag} clean
+    log "Running 'ninja ${jobs_flag} AtomVM'."
+    emmake ninja ${jobs_flag} AtomVM
     popd >/dev/null
 
     log "Compressing."
@@ -139,6 +144,7 @@ build_wasm() {
 main() {
     local CLEAN_FLAG=""
     local BUILD_MODE=""
+    local JOBS_FLAG=""
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -146,6 +152,13 @@ main() {
             --clean)
                 CLEAN_FLAG="true"
                 shift
+                ;;
+            -j)
+                if [[ -z "$2" || "$2" == -* ]]; then
+                    error "-j requires a number argument"
+                fi
+                JOBS_FLAG="-j$2"
+                shift 2
                 ;;
             *)
                 if [[ -z "${BUILD_MODE}" ]]; then
@@ -167,16 +180,16 @@ main() {
     check_tools
     case ${BUILD_MODE} in
         debug-unix)
-            build_unix "debug" "${CLEAN_FLAG}"
+            build_unix "debug" "${CLEAN_FLAG}" "${JOBS_FLAG}"
             ;;
         release-unix)
-            build_unix "release" "${CLEAN_FLAG}"
+            build_unix "release" "${CLEAN_FLAG}" "${JOBS_FLAG}"
             ;;
         debug-wasm)
-            build_wasm "debug" "${CLEAN_FLAG}"
+            build_wasm "debug" "${CLEAN_FLAG}" "${JOBS_FLAG}"
             ;;
         release-wasm)
-            build_wasm "release" "${CLEAN_FLAG}"
+            build_wasm "release" "${CLEAN_FLAG}" "${JOBS_FLAG}"
             ;;
         *)
             usage
