@@ -96,18 +96,7 @@ static Popcorn2EtsStatus lookup_select(
     size_t index,
     term *ret,
     Context *ctx);
-static Popcorn2EtsStatus update_one(
-    struct Popcorn2EtsTable *table,
-    term key,
-    term spec,
-    term default_tuple,
-    Context *ctx);
-static Popcorn2EtsStatus update_many(
-    struct Popcorn2EtsTable *table,
-    term key,
-    term specs,
-    term default_tuple,
-    Context *ctx);
+static bool apply_spec(term tuple, term spec, size_t key_index);
 
 void popcorn2_ets_init(Popcorn2Ets *ets)
 {
@@ -285,17 +274,71 @@ Popcorn2EtsStatus popcorn2_ets_update_element(
         return Popcorn2EtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = Popcorn2EtsBadEntry;
+    term *tuple = NULL;
+    size_t count;
+    EtsMultimapStatus status = ets_multimap_lookup(table->multimap, key, &tuple, &count, ctx->global);
+
+    bool insert_default = (count == 0);
+
+    if (insert_default && term_is_invalid_term(default_tuple)) {
+        SMP_UNLOCK(table);
+        return Popcorn2EtsTupleNotExists;
+    }
+
+    if (insert_default) {
+        if (term_get_tuple_arity(default_tuple) <= table->key_index) {
+            SMP_UNLOCK(table);
+            return Popcorn2EtsBadEntry;
+        }
+        tuple = &default_tuple;
+    }
+
+    size_t tuple_size = memory_estimate_usage(*tuple);
+
+    if (UNLIKELY(memory_ensure_free_opt(ctx, tuple_size, MEMORY_NO_GC) != MEMORY_GC_OK)) {
+        SMP_UNLOCK(table);
+        return Popcorn2EtsAllocationError;
+    }
+
+    term to_insert = memory_copy_term_tree(&ctx->heap, *tuple);
+
+    if (insert_default) {
+        term_put_tuple_element(to_insert, (uint32_t) table->key_index, key);
+    }
 
     if (term_is_tuple(element_spec)) {
-        result = update_one(table, key, element_spec, default_tuple, ctx);
+        if (!apply_spec(to_insert, element_spec, table->key_index)) {
+            SMP_UNLOCK(table);
+            return Popcorn2EtsBadEntry;
+        }
     } else if (term_is_list(element_spec)) {
-        result = update_many(table, key, element_spec, default_tuple, ctx);
+        for (term iter = element_spec; !term_is_nil(iter); iter = term_get_list_tail(iter)) {
+            if (!term_is_list(iter)) {
+                SMP_UNLOCK(table);
+                return Popcorn2EtsBadEntry;
+            }
+
+            term spec = term_get_list_head(iter);
+
+            if (!apply_spec(to_insert, spec, table->key_index)) {
+                SMP_UNLOCK(table);
+                return Popcorn2EtsBadEntry;
+            }
+        }
     }
+
+    status = ets_multimap_insert(table->multimap, &to_insert, 1, ctx->global);
 
     SMP_UNLOCK(table);
 
-    return result;
+    switch (status) {
+        case EtsMultimapOk:
+            return Popcorn2EtsOk;
+        case EtsMultimapAllocationError:
+            return Popcorn2EtsAllocationError;
+        default:
+            UNREACHABLE();
+    }
 }
 
 Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx)
@@ -579,82 +622,6 @@ static Popcorn2EtsStatus insert_many(
     }
 }
 
-static Popcorn2EtsStatus update_one(
-    struct Popcorn2EtsTable *table,
-    term key,
-    term spec,
-    term default_tuple,
-    Context *ctx)
-{
-    assert(term_is_tuple(spec));
-
-    EtsMultimapStatus result = ets_multimap_update(table->multimap, key, &spec, 1, default_tuple, ctx->global);
-
-    switch (result) {
-        case EtsMultimapOk:
-            return Popcorn2EtsOk;
-        case EtsMultimapTupleNotExists:
-            return Popcorn2EtsTupleNotExists;
-        case EtsMultimapBadTuple:
-            return Popcorn2EtsBadEntry;
-        case EtsMultimapAllocationError:
-            return Popcorn2EtsAllocationError;
-        default:
-            UNREACHABLE();
-    }
-}
-
-static Popcorn2EtsStatus update_many(
-    struct Popcorn2EtsTable *table,
-    term key,
-    term specs,
-    term default_tuple,
-    Context *ctx)
-{
-    assert(term_is_list(specs));
-
-    EtsMultimapStatus result = EtsMultimapOk;
-
-    size_t count = 0;
-    for (term iter = specs; !term_is_nil(iter); iter = term_get_list_tail(iter), count++) {
-        if (!term_is_list(iter)) {
-            return Popcorn2EtsBadEntry;
-        }
-
-        term tuple = term_get_list_head(iter);
-
-        if (!term_is_tuple(tuple)) {
-            return Popcorn2EtsBadEntry;
-        }
-    }
-
-    term *to_update = malloc(sizeof(term) * count);
-    if (IS_NULL_PTR(to_update)) {
-        return Popcorn2EtsAllocationError;
-    }
-
-    for (size_t i = 0; !term_is_nil(specs); specs = term_get_list_tail(specs), i++) {
-        to_update[i] = term_get_list_head(specs);
-    }
-
-    result = ets_multimap_update(table->multimap, key, to_update, count, default_tuple, ctx->global);
-
-    free(to_update);
-
-    switch (result) {
-        case EtsMultimapOk:
-            return Popcorn2EtsOk;
-        case EtsMultimapTupleNotExists:
-            return Popcorn2EtsTupleNotExists;
-        case EtsMultimapBadTuple:
-            return Popcorn2EtsBadEntry;
-        case EtsMultimapAllocationError:
-            return Popcorn2EtsAllocationError;
-        default:
-            UNREACHABLE();
-    }
-}
-
 static Popcorn2EtsStatus lookup_select(
     struct Popcorn2EtsTable *table,
     term key,
@@ -738,4 +705,31 @@ static Popcorn2EtsStatus lookup_select(
     free(tuples);
 
     return Popcorn2EtsOk;
+}
+
+static bool apply_spec(term tuple, term spec, size_t key_index)
+{
+    if (!term_is_tuple(spec) || term_get_tuple_arity(spec) != 2) {
+        return false;
+    }
+
+    term pos = term_get_tuple_element(spec, 0);
+    term value = term_get_tuple_element(spec, 1);
+
+    if (!term_is_integer(pos)) {
+        return false;
+    }
+
+    avm_int_t index = term_to_int(pos) - 1;
+
+    if (index < 0 || (size_t) index >= term_get_tuple_arity(tuple)) {
+        return false;
+    }
+
+    if ((size_t) index == key_index) {
+        return false;
+    }
+
+    term_put_tuple_element(tuple, (uint32_t) index, value);
+    return true;
 }
