@@ -196,7 +196,7 @@ static uint32_t hash_term_incr(term t, int32_t h, GlobalContext *global)
         }
         return h * LARGE_PRIME_TUPLE;
     } else if (term_is_list(t)) {
-        while (!term_is_nonempty_list(t)) {
+        while (term_is_nonempty_list(t)) {
             term elt = term_get_list_head(t);
             h = h * LARGE_PRIME_LIST + hash_term_incr(elt, h, global);
             t = term_get_list_tail(t);
