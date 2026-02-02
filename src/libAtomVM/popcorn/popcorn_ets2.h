@@ -87,6 +87,7 @@ Popcorn2EtsStatus popcorn2_ets_update_element(term name_or_ref, term key, term e
 Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_delete_table(term name_or_ref, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_delete_object(term name_or_ref, term tuple, Context *ctx);
+Popcorn2EtsStatus popcorn2_ets_take(term name_or_ref, term key, term *ret, Context *ctx);
 
 #ifdef __cplusplus
 }

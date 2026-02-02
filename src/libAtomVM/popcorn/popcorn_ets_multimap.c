@@ -33,7 +33,7 @@ static EtsMultimapEntry *entry_new(term tuple);
 static void entry_delete(EtsMultimapEntry *entry, GlobalContext *global);
 static EtsMultimapNode *node_new(EtsMultimapNode *next, EtsMultimapEntry *entries);
 static void node_delete(EtsMultimapNode *node, GlobalContext *global);
-static EtsMultimapStatus node_find(
+static Popcorn2EtsStatus node_find(
     EtsMultimap *multimap,
     term key,
     EtsMultimapNode **out_node,
@@ -45,7 +45,7 @@ static void insert_revert(
     EtsMultimapEntry **entries,
     size_t count,
     GlobalContext *global);
-static EtsMultimapStatus tuple_exists(
+static Popcorn2EtsStatus tuple_exists(
     EtsMultimapNode *node,
     term tuple,
     bool *exists,
@@ -81,7 +81,7 @@ void ets_multimap_delete(EtsMultimap *multimap, GlobalContext *global)
     free(multimap);
 }
 
-EtsMultimapStatus ets_multimap_lookup(
+Popcorn2EtsStatus ets_multimap_lookup(
     EtsMultimap *multimap,
     term key,
     term **tuples,
@@ -93,13 +93,13 @@ EtsMultimapStatus ets_multimap_lookup(
     *count = 0;
 
     EtsMultimapNode *node;
-    EtsMultimapStatus result = node_find(multimap, key, &node, global);
-    if (UNLIKELY(result == EtsMultimapAllocationError)) {
+    Popcorn2EtsStatus result = node_find(multimap, key, &node, global);
+    if (UNLIKELY(result == Popcorn2EtsAllocationError)) {
         return result;
     }
 
     if (node == NULL) {
-        return EtsMultimapOk;
+        return Popcorn2EtsOk;
     }
 
     assert(node->entries != NULL);
@@ -110,17 +110,17 @@ EtsMultimapStatus ets_multimap_lookup(
 
     if (tuples == NULL) {
         // only return number of tuples found
-        return EtsMultimapOk;
+        return Popcorn2EtsOk;
     }
 
     if (*count == 0) {
         *tuples = NULL;
-        return EtsMultimapOk;
+        return Popcorn2EtsOk;
     }
 
     *tuples = malloc(sizeof(term) * (*count));
     if (IS_NULL_PTR(*tuples)) {
-        return EtsMultimapAllocationError;
+        return Popcorn2EtsAllocationError;
     }
 
     size_t i = 0;
@@ -129,22 +129,22 @@ EtsMultimapStatus ets_multimap_lookup(
         (*tuples)[i] = iter->tuple;
     }
 
-    return EtsMultimapOk;
+    return Popcorn2EtsOk;
 }
 
-EtsMultimapStatus ets_multimap_insert(
+Popcorn2EtsStatus ets_multimap_insert(
     EtsMultimap *multimap,
     term *tuples,
     size_t count,
     GlobalContext *global)
 {
     if (tuples == NULL || count == 0) {
-        return EtsMultimapOk;
+        return Popcorn2EtsOk;
     }
 
     EtsMultimapEntry **entries = malloc(sizeof(EtsMultimapEntry *) * count);
     if (IS_NULL_PTR(entries)) {
-        return EtsMultimapAllocationError;
+        return Popcorn2EtsAllocationError;
     }
 
     for (size_t i = 0; i < count; i++) {
@@ -154,26 +154,26 @@ EtsMultimapStatus ets_multimap_insert(
                 entry_delete(entries[j], global);
             }
             free(entries);
-            return EtsMultimapAllocationError;
+            return Popcorn2EtsAllocationError;
         }
     }
 
-    EtsMultimapStatus status = EtsMultimapOk;
+    Popcorn2EtsStatus status = Popcorn2EtsOk;
 
     for (size_t i = 0; i < count; i++) {
         EtsMultimapEntry *entry = entries[i];
         term key = term_get_tuple_element(entry->tuple, multimap->key_index);
 
         EtsMultimapNode *node;
-        if (UNLIKELY(node_find(multimap, key, &node, global) == EtsMultimapAllocationError)) {
-            status = EtsMultimapAllocationError;
+        if (UNLIKELY(node_find(multimap, key, &node, global) == Popcorn2EtsAllocationError)) {
+            status = Popcorn2EtsAllocationError;
             break;
         }
 
         if (node == NULL) {
             EtsMultimapNode *new_node = node_new(NULL, entry);
             if (IS_NULL_PTR(new_node)) {
-                status = EtsMultimapAllocationError;
+                status = Popcorn2EtsAllocationError;
                 break;
             }
 
@@ -190,8 +190,8 @@ EtsMultimapStatus ets_multimap_insert(
         if (multimap->type == EtsMultimapTypeSet) {
             bool exists;
 
-            if (UNLIKELY(tuple_exists(node, entry->tuple, &exists, global) == EtsMultimapAllocationError)) {
-                status = EtsMultimapAllocationError;
+            if (UNLIKELY(tuple_exists(node, entry->tuple, &exists, global) == Popcorn2EtsAllocationError)) {
+                status = Popcorn2EtsAllocationError;
                 break;
             }
 
@@ -204,7 +204,7 @@ EtsMultimapStatus ets_multimap_insert(
         node->entries = entry;
     }
 
-    if (status != EtsMultimapOk) {
+    if (status != Popcorn2EtsOk) {
         insert_revert(multimap, entries, count, global);
     } else if (multimap->type == EtsMultimapTypeSingle) {
         multimap_to_single(multimap, global);
@@ -215,18 +215,18 @@ EtsMultimapStatus ets_multimap_insert(
     return status;
 }
 
-EtsMultimapStatus ets_multimap_remove(
+Popcorn2EtsStatus ets_multimap_remove(
     EtsMultimap *multimap,
     term key,
     GlobalContext *global)
 {
     EtsMultimapNode *node;
-    if (UNLIKELY(node_find(multimap, key, &node, global) == EtsMultimapAllocationError)) {
-        return EtsMultimapAllocationError;
+    if (UNLIKELY(node_find(multimap, key, &node, global) == Popcorn2EtsAllocationError)) {
+        return Popcorn2EtsAllocationError;
     }
 
     if (node == NULL) {
-        return EtsMultimapOk;
+        return Popcorn2EtsOk;
     }
 
     assert(node->entries != NULL);
@@ -251,10 +251,10 @@ EtsMultimapStatus ets_multimap_remove(
 
     node_delete(node, global);
 
-    return EtsMultimapOk;
+    return Popcorn2EtsOk;
 }
 
-EtsMultimapStatus ets_multimap_remove_tuple(
+Popcorn2EtsStatus ets_multimap_remove_tuple(
     EtsMultimap *multimap,
     term tuple,
     GlobalContext *global)
@@ -262,18 +262,18 @@ EtsMultimapStatus ets_multimap_remove_tuple(
     assert(term_is_tuple(tuple));
 
     if (multimap->key_index >= (size_t) term_get_tuple_arity(tuple)) {
-        return EtsMultimapBadTuple;
+        return Popcorn2EtsBadEntry;
     }
 
     term key = term_get_tuple_element(tuple, multimap->key_index);
 
     EtsMultimapNode *node;
-    if (UNLIKELY(node_find(multimap, key, &node, global) == EtsMultimapAllocationError)) {
-        return EtsMultimapAllocationError;
+    if (UNLIKELY(node_find(multimap, key, &node, global) == Popcorn2EtsAllocationError)) {
+        return Popcorn2EtsAllocationError;
     }
 
     if (node == NULL) {
-        return EtsMultimapOk;
+        return Popcorn2EtsOk;
     }
 
     assert(node->entries != NULL);
@@ -283,7 +283,7 @@ EtsMultimapStatus ets_multimap_remove_tuple(
 
     EtsMultimapEntry **to_remove = malloc(sizeof(EtsMultimapEntry *) * capacity);
     if (IS_NULL_PTR(to_remove)) {
-        return EtsMultimapAllocationError;
+        return Popcorn2EtsAllocationError;
     }
 
     for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
@@ -291,7 +291,7 @@ EtsMultimapStatus ets_multimap_remove_tuple(
 
         if (UNLIKELY(result == TermCompareMemoryAllocFail)) {
             free(to_remove);
-            return EtsMultimapAllocationError;
+            return Popcorn2EtsAllocationError;
         }
 
         if (result == TermEquals) {
@@ -300,7 +300,7 @@ EtsMultimapStatus ets_multimap_remove_tuple(
                 EtsMultimapEntry **new_to_remove = realloc(to_remove, sizeof(EtsMultimapEntry *) * capacity);
                 if (IS_NULL_PTR(new_to_remove)) {
                     free(to_remove);
-                    return EtsMultimapAllocationError;
+                    return Popcorn2EtsAllocationError;
                 }
                 to_remove = new_to_remove;
             }
@@ -345,10 +345,10 @@ EtsMultimapStatus ets_multimap_remove_tuple(
 
     free(to_remove);
 
-    return EtsMultimapOk;
+    return Popcorn2EtsOk;
 }
 
-static EtsMultimapStatus node_find(
+static Popcorn2EtsStatus node_find(
     EtsMultimap *multimap,
     term key,
     EtsMultimapNode **out_node,
@@ -362,25 +362,25 @@ static EtsMultimapStatus node_find(
     EtsMultimapNode *node = multimap->buckets[idx];
 
     if (node == NULL) {
-        return EtsMultimapOk;
+        return Popcorn2EtsOk;
     }
 
     while (node) {
         TermCompareResult result = term_compare(key, node_key(multimap, node), TermCompareExact, global);
 
         if (UNLIKELY(result == TermCompareMemoryAllocFail)) {
-            return EtsMultimapAllocationError;
+            return Popcorn2EtsAllocationError;
         }
 
         if (result == TermEquals) {
             *out_node = node;
-            return EtsMultimapOk;
+            return Popcorn2EtsOk;
         }
 
         node = node->next;
     }
 
-    return EtsMultimapOk;
+    return Popcorn2EtsOk;
 }
 
 static void insert_revert(
@@ -442,7 +442,7 @@ static void multimap_to_single(EtsMultimap *multimap, GlobalContext *global)
     }
 }
 
-static EtsMultimapStatus tuple_exists(
+static Popcorn2EtsStatus tuple_exists(
     EtsMultimapNode *node,
     term tuple,
     bool *exists,
@@ -452,17 +452,17 @@ static EtsMultimapStatus tuple_exists(
         TermCompareResult result = term_compare(tuple, iter->tuple, TermCompareExact, global);
 
         if (UNLIKELY(result == TermCompareMemoryAllocFail)) {
-            return EtsMultimapAllocationError;
+            return Popcorn2EtsAllocationError;
         }
 
         if (result == TermEquals) {
             *exists = true;
-            return EtsMultimapOk;
+            return Popcorn2EtsOk;
         }
     }
 
     *exists = false;
-    return EtsMultimapOk;
+    return Popcorn2EtsOk;
 }
 
 static term node_key(EtsMultimap *multimap, EtsMultimapNode *node)
