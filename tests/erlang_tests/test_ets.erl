@@ -37,6 +37,7 @@ start() ->
     ok = isolated(fun test_delete_object/0),
     ok = isolated(fun test_lookup_element/0),
     ok = isolated(fun test_update_element/0),
+    ok = isolated(fun test_take/0),
     % ok = isolated(fun test_update_counter/0),
     0.
 
@@ -131,6 +132,7 @@ test_keys() ->
     ok = assert_stored_key(T, <<"bin">>),
     ok = assert_stored_key(T, <<"">>),
     ok = assert_stored_key(T, {ok, 1}),
+    ok = assert_stored_key(T, []),
     ok = assert_stored_key(T, [x, self(), 1.0]),
     ok = assert_stored_key(T, [improper | list]),
     ok = assert_stored_key(T, #{
@@ -570,6 +572,36 @@ test_update_element() ->
 
     [{value1, value2, key}] = ets:lookup(TErr, key),
     [] = ets:lookup(TErr, key_not_exist),
+
+    ok.
+
+test_take() ->
+    % set
+    S = ets:new(test, [set]),
+    [] = ets:take(S, key_not_exist),
+    true = ets:insert(S, [{key, value}, {key2, value2}]),
+    [{key, value}] = ets:take(S, key),
+    [] = ets:lookup(S, key),
+    [{key2, value2}] = ets:take(S, key2),
+    [] = ets:lookup(S, key2),
+
+    % bag
+    B = ets:new(test, [bag]),
+    [] = ets:take(B, key_not_exist),
+    true = ets:insert(B, [{key, value}, {key, value2}, {key2, value3}]),
+    [{key, value}, {key, value2}] = ets:take(B, key),
+    [] = ets:lookup(B, key),
+    [{key2, value3}] = ets:take(B, key2),
+    [] = ets:lookup(B, key2), 
+
+    % duplicate_bag
+    DB = ets:new(test, [duplicate_bag]),
+    [] = ets:take(DB, key_not_exist),
+    true = ets:insert(DB, [{key, value}, {key, value}, {key2, value2}]),
+    [{key, value}, {key, value}] = ets:take(DB, key),
+    [] = ets:lookup(DB, key),
+    [{key2, value2}] = ets:take(DB, key2),
+    [] = ets:lookup(DB, key2), 
 
     ok.
 
