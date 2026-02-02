@@ -276,7 +276,7 @@ Popcorn2EtsStatus popcorn2_ets_update_element(
 
     term *tuple = NULL;
     size_t count;
-    EtsMultimapStatus status = ets_multimap_lookup(table->multimap, key, &tuple, &count, ctx->global);
+    Popcorn2EtsStatus status = ets_multimap_lookup(table->multimap, key, &tuple, &count, ctx->global);
 
     bool insert_default = (count == 0);
 
@@ -331,14 +331,7 @@ Popcorn2EtsStatus popcorn2_ets_update_element(
 
     SMP_UNLOCK(table);
 
-    switch (status) {
-        case EtsMultimapOk:
-            return Popcorn2EtsOk;
-        case EtsMultimapAllocationError:
-            return Popcorn2EtsAllocationError;
-        default:
-            UNREACHABLE();
-    }
+    return status;
 }
 
 Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx)
@@ -353,20 +346,7 @@ Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx)
         return Popcorn2EtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = Popcorn2EtsOk;
-
-    EtsMultimapStatus status = ets_multimap_remove(table->multimap, key, ctx->global);
-
-    switch (status) {
-        case EtsMultimapOk:
-            result = Popcorn2EtsOk;
-            break;
-        case EtsMultimapAllocationError:
-            result = Popcorn2EtsAllocationError;
-            break;
-        default:
-            UNREACHABLE();
-    }
+    Popcorn2EtsStatus result = ets_multimap_remove(table->multimap, key, ctx->global);
 
     SMP_UNLOCK(table);
 
@@ -409,20 +389,11 @@ Popcorn2EtsStatus popcorn2_ets_delete_object(term name_or_ref, term tuple, Conte
         return Popcorn2EtsBadAccess;
     }
 
-    EtsMultimapStatus result = ets_multimap_remove_tuple(table->multimap, tuple, ctx->global);
+    Popcorn2EtsStatus result = ets_multimap_remove_tuple(table->multimap, tuple, ctx->global);
 
     SMP_UNLOCK(table);
 
-    switch (result) {
-        case EtsMultimapOk:
-            return Popcorn2EtsOk;
-        case EtsMultimapBadTuple:
-            return Popcorn2EtsBadEntry;
-        case EtsMultimapAllocationError:
-            return Popcorn2EtsAllocationError;
-        default:
-            UNREACHABLE();
-    }
+    return result;
 }
 
 void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, GlobalContext *global)
@@ -529,7 +500,7 @@ static Popcorn2EtsStatus insert_one(
 {
     assert(term_is_tuple(tuple));
 
-    EtsMultimapStatus result = EtsMultimapOk;
+    Popcorn2EtsStatus result = Popcorn2EtsOk;
 
     if (table->key_index >= (size_t) term_get_tuple_arity(tuple)) {
         return Popcorn2EtsBadEntry;
@@ -539,7 +510,7 @@ static Popcorn2EtsStatus insert_one(
         term key = term_get_tuple_element(tuple, table->key_index);
         size_t existing = 0;
         result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
-        if (UNLIKELY(result == EtsMultimapAllocationError)) {
+        if (UNLIKELY(result == Popcorn2EtsAllocationError)) {
             return Popcorn2EtsAllocationError;
         }
         if (existing > 0) {
@@ -549,16 +520,7 @@ static Popcorn2EtsStatus insert_one(
 
     result = ets_multimap_insert(table->multimap, &tuple, 1, ctx->global);
 
-    switch (result) {
-        case EtsMultimapOk:
-            return Popcorn2EtsOk;
-        case EtsMultimapAllocationError:
-            return Popcorn2EtsAllocationError;
-        case EtsMultimapKeyExists:
-            return Popcorn2EtsKeyExists;
-        default:
-            UNREACHABLE();
-    }
+    return result;
 }
 
 static Popcorn2EtsStatus insert_many(
@@ -569,7 +531,7 @@ static Popcorn2EtsStatus insert_many(
 {
     assert(term_is_list(tuples));
 
-    EtsMultimapStatus result = EtsMultimapOk;
+    Popcorn2EtsStatus result = Popcorn2EtsOk;
 
     size_t count = 0;
     for (term iter = tuples; !term_is_nil(iter); iter = term_get_list_tail(iter), count++) {
@@ -587,7 +549,7 @@ static Popcorn2EtsStatus insert_many(
             term key = term_get_tuple_element(tuple, table->key_index);
             size_t existing = 0;
             result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
-            if (UNLIKELY(result == EtsMultimapAllocationError)) {
+            if (UNLIKELY(result == Popcorn2EtsAllocationError)) {
                 return Popcorn2EtsAllocationError;
             }
             if (existing > 0) {
@@ -610,16 +572,7 @@ static Popcorn2EtsStatus insert_many(
 
     free(to_insert);
 
-    switch (result) {
-        case EtsMultimapOk:
-            return Popcorn2EtsOk;
-        case EtsMultimapAllocationError:
-            return Popcorn2EtsAllocationError;
-        case EtsMultimapKeyExists:
-            return Popcorn2EtsKeyExists;
-        default:
-            UNREACHABLE();
-    }
+    return result;
 }
 
 static Popcorn2EtsStatus lookup_select(
@@ -636,8 +589,8 @@ static Popcorn2EtsStatus lookup_select(
     term *tuples = NULL;
 
     size_t count;
-    EtsMultimapStatus result = ets_multimap_lookup(table->multimap, key, &tuples, &count, ctx->global);
-    if (UNLIKELY(result == EtsMultimapAllocationError)) {
+    Popcorn2EtsStatus result = ets_multimap_lookup(table->multimap, key, &tuples, &count, ctx->global);
+    if (UNLIKELY(result == Popcorn2EtsAllocationError)) {
         return Popcorn2EtsAllocationError;
     }
 

@@ -37,15 +37,6 @@ typedef enum EtsMultimapType
     EtsMultimapTypeList // Allow duplicate values per key
 } EtsMultimapType;
 
-typedef enum EtsMultimapStatus
-{
-    EtsMultimapOk,
-    EtsMultimapKeyExists,
-    EtsMultimapTupleNotExists,
-    EtsMultimapBadTuple,
-    EtsMultimapAllocationError
-} EtsMultimapStatus;
-
 typedef struct EtsMultimap
 {
     EtsMultimapType type;
@@ -91,7 +82,7 @@ void ets_multimap_delete(EtsMultimap *multimap, GlobalContext *global);
  * @param[out] tuples the found tuples (or NULL to only get the count)
  * @param[out] count the number of found tuples; must not be NULL
  * @param global the global context
- * @return EtsMultimapOk on success, otherwise an error status
+ * @return EtsOk on success, otherwise an error status
  *
  * @note Terms returned by this function come from the ETS heap and should be copied
  *       to the process heap if needed.
@@ -100,7 +91,7 @@ void ets_multimap_delete(EtsMultimap *multimap, GlobalContext *global);
  * @warning The caller is responsible for freeing the memory pointed to by `tuples`
  *          using `free()`. When count is zero, memory is not allocated and `tuples` is set to NULL.
  */
-EtsMultimapStatus ets_multimap_lookup(
+Popcorn2EtsStatus ets_multimap_lookup(
     EtsMultimap *multimap,
     term key,
     term **tuples,
@@ -113,11 +104,11 @@ EtsMultimapStatus ets_multimap_lookup(
  * @param multimap the multimap
  * @param tuples the tuples to insert
  * @param count the number of tuples to insert
- * @return EtsMultimapOk on success, otherwise an error status
+ * @return EtsOk on success, otherwise an error status
  *
  * @note Terms passed to this function will be copied to the ETS heap.
  */
-EtsMultimapStatus ets_multimap_insert(
+Popcorn2EtsStatus ets_multimap_insert(
     EtsMultimap *multimap,
     term *tuples,
     size_t count,
@@ -129,9 +120,9 @@ EtsMultimapStatus ets_multimap_insert(
  * @param multimap the multimap
  * @param key the key to lookup
  * @param global the global context
- * @return EtsMultimapOk on success, otherwise an error status
+ * @return EtsOk on success, otherwise an error status
  */
-EtsMultimapStatus ets_multimap_remove(
+Popcorn2EtsStatus ets_multimap_remove(
     EtsMultimap *multimap,
     term key,
     GlobalContext *global);
@@ -142,9 +133,9 @@ EtsMultimapStatus ets_multimap_remove(
  * @param multimap the multimap
  * @param tuple the tuple to remove
  * @param global the global context
- * @return EtsMultimapOk on success, otherwise an error status
+ * @return EtsOk on success, otherwise an error status
  */
-EtsMultimapStatus ets_multimap_remove_tuple(
+Popcorn2EtsStatus ets_multimap_remove_tuple(
     EtsMultimap *multimap,
     term tuple,
     GlobalContext *global);
