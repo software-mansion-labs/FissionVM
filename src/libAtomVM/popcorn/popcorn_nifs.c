@@ -712,23 +712,28 @@ static term nif_ets_member(Context *ctx, int argc, term argv[])
 
 static term nif_ets_take(Context *ctx, int argc, term argv[])
 {
-    UNUSED(argc);
+    assert(argc == 2);
 
-    term ref = argv[0];
-    VALIDATE_VALUE(ref, is_ets_table_id);
-
+    term name_or_ref = argv[0];
     term key = argv[1];
 
+    VALIDATE_VALUE(name_or_ref, is_ets_table_id);
+
     term ret = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_take(ref, key, &ret, ctx);
+
+    Popcorn2EtsStatus result = popcorn2_ets_take(name_or_ref, key, &ret, ctx);
+
     switch (result) {
-        case PopcornEtsOk:
+        case Popcorn2EtsOk:
             return ret;
-        case PopcornEtsBadAccess:
+        case Popcorn2EtsTupleNotExists:
+            return term_nil();
+        case Popcorn2EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
-        case PopcornEtsAllocationFailure:
+        case Popcorn2EtsAllocationError:
             RAISE_ERROR(MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
