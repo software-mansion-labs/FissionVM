@@ -334,6 +334,29 @@ Popcorn2EtsStatus popcorn2_ets_update_element(
     return status;
 }
 
+Popcorn2EtsStatus popcorn2_ets_take(term name_or_ref, term key, term *ret, Context *ctx)
+{
+    struct Popcorn2EtsTable *table = get_table(
+        &ctx->global->popcorn2_ets,
+        name_or_ref,
+        ctx->process_id,
+        TableAccessWrite);
+
+    if (table == NULL) {
+        return Popcorn2EtsBadAccess;
+    }
+
+    Popcorn2EtsStatus result = lookup_select(table, key, ETS_WHOLE_TUPLE, ret, ctx);
+
+    if (result == Popcorn2EtsOk) {
+        result = ets_multimap_remove(table->multimap, key, ctx->global);
+    }
+
+    SMP_UNLOCK(table);
+
+    return result;
+}
+
 Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx)
 {
     struct Popcorn2EtsTable *table = get_table(
