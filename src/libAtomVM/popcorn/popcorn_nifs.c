@@ -595,7 +595,7 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
         case Popcorn2EtsTableNameExists:
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsAllocationError:
-            RAISE_ERROR(MEMORY_ATOM);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
             AVM_ABORT();
@@ -704,7 +704,7 @@ static term nif_ets_member(Context *ctx, int argc, term argv[])
         case PopcornEtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
         case PopcornEtsAllocationFailure:
-            RAISE_ERROR(MEMORY_ATOM);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             AVM_ABORT();
     }
@@ -731,7 +731,7 @@ static term nif_ets_take(Context *ctx, int argc, term argv[])
         case Popcorn2EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsAllocationError:
-            RAISE_ERROR(MEMORY_ATOM);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
             AVM_ABORT();
@@ -760,7 +760,7 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
         case PopcornEtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case PopcornEtsAllocationFailure:
-            RAISE_ERROR(MEMORY_ATOM);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             AVM_ABORT();
     }
@@ -791,7 +791,7 @@ static term nif_ets_update_element(Context *ctx, int argc, term argv[])
         case Popcorn2EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsAllocationError:
-            RAISE_ERROR(MEMORY_ATOM);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             AVM_ABORT();
     }
@@ -834,7 +834,7 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
         case Popcorn2EtsBadIndex:
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsAllocationError:
-            RAISE_ERROR(MEMORY_ATOM);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             AVM_ABORT();
     }
@@ -886,7 +886,7 @@ static term nif_ets_delete_object(Context *ctx, int argc, term argv[])
         case Popcorn2EtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsAllocationError:
-            RAISE_ERROR(MEMORY_ATOM);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
             AVM_ABORT();
