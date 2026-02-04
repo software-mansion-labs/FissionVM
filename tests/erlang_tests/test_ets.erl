@@ -576,32 +576,39 @@ test_update_element() ->
     ok.
 
 test_take() ->
+    TableWithTuples =
+        fun (Type, Tuples) ->
+            T = ets:new(test, [Type]),
+            true = ets:insert(T, Tuples),
+            T
+        end,
+
     % set
-    S = ets:new(test, [set]),
-    [] = ets:take(S, key_not_exist),
-    true = ets:insert(S, [{key, value}, {key2, value2}]),
-    [{key, value}] = ets:take(S, key),
-    [] = ets:lookup(S, key),
-    [{key2, value2}] = ets:take(S, key2),
-    [] = ets:lookup(S, key2),
+    S1 = TableWithTuples(set, []),
+    [] = ets:take(S1, key_not_exist),
+
+    S2 = TableWithTuples(set, [{key, value}, {key2, value2}]),
+    [{key, value}] = ets:take(S2, key),
+    [] = ets:lookup(S2, key),
+    [{key2, value2}] = ets:lookup(S2, key2),
 
     % bag
-    B = ets:new(test, [bag]),
-    [] = ets:take(B, key_not_exist),
-    true = ets:insert(B, [{key, value}, {key, value2}, {key2, value3}]),
-    [{key, value}, {key, value2}] = ets:take(B, key),
-    [] = ets:lookup(B, key),
-    [{key2, value3}] = ets:take(B, key2),
-    [] = ets:lookup(B, key2), 
+    B1 = TableWithTuples(bag, []),
+    [] = ets:take(B1, key_not_exist),
+
+    B2 = TableWithTuples(bag, [{key, value}, {key, value2}, {key2, value3}]),
+    [{key, value}, {key, value2}] = ets:take(B2, key),
+    [] = ets:lookup(B2, key),
+    [{key2, value3}] = ets:lookup(B2, key2),
 
     % duplicate_bag
-    DB = ets:new(test, [duplicate_bag]),
-    [] = ets:take(DB, key_not_exist),
-    true = ets:insert(DB, [{key, value}, {key, value}, {key2, value2}]),
-    [{key, value}, {key, value}] = ets:take(DB, key),
-    [] = ets:lookup(DB, key),
-    [{key2, value2}] = ets:take(DB, key2),
-    [] = ets:lookup(DB, key2), 
+    DB1 = TableWithTuples(duplicate_bag, []),
+    [] = ets:take(DB1, key_not_exist),
+
+    DB2 = TableWithTuples(duplicate_bag, [{key, value}, {key, value}, {key2, value2}]),
+    [{key, value}, {key, value}] = ets:take(DB2, key),
+    [] = ets:lookup(DB2, key),
+    [{key2, value2}] = ets:lookup(DB2, key2),
 
     ok.
 
