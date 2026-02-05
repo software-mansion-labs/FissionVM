@@ -37,8 +37,8 @@ start() ->
     ok = isolated(fun test_delete_object/0),
     ok = isolated(fun test_lookup_element/0),
     ok = isolated(fun test_update_element/0),
+    ok = isolated(fun test_update_counter/0),
     ok = isolated(fun test_take/0),
-    % ok = isolated(fun test_update_counter/0),
     0.
 
 test_ets_new() ->
@@ -613,36 +613,126 @@ test_take() ->
     ok.
 
 test_update_counter() ->
-    T = ets:new(test, []),
-    true = ets:insert(T, {key, 10, 20, 30}),
-    % Increment
-    15 = ets:update_counter(T, key, 5),
-    10 = ets:update_counter(T, key, -5),
-    % {Position, Increment}
-    25 = ets:update_counter(T, key, {3, 5}),
-    20 = ets:update_counter(T, key, {3, -5}),
-    % {Position, Increment, Threshold, SetValue}
-    31 = ets:update_counter(T, key, {4, 10, 39, 31}),
-    30 = ets:update_counter(T, key, {4, -10, 30, 30}),
+    TableWithTuples =
+        fun (Keypos, Tuples) ->
+            T = ets:new(test, [set, {keypos, Keypos}]),
+            true = ets:insert(T, Tuples),
+            T
+        end,
 
-    TErr = ets:new(test, []),
-    true = ets:insert(TErr, {key, 0, not_number}),
-    true = ets:insert(TErr, {not_number, ok}),
-    assert_badarg(fun() -> ets:update_counter(TErr, none, 10) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, not_number, 10) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, not_number, {1, 10}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, not_number, {1, 10, 100, 0}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, key, {0, 10}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, key, {-1, 10}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, key, {1, 10}) end),
+    % Increment
+    S1 = TableWithTuples(1, {key, 10, not_number, 30}),
+    15 = ets:update_counter(S1, key, 5),
+    [{key, 15, not_number, 30}] = ets:lookup(S1, key),
+
+    S2 = TableWithTuples(3, {not_number, 20, key, 30}),
+    -5 = ets:update_counter(S2, key, -35),
+    [{not_number, 20, key, -5}] = ets:lookup(S2, key),
+
+    % {Position, Increment}
+    S3 = TableWithTuples(1, {key, 10, 20, not_number}),
+    25 = ets:update_counter(S3, key, {3, 5}),
+    [{key, 10, 25, not_number}] = ets:lookup(S3, key),
+
+    S4 = TableWithTuples(1, {key, 10, not_number, 30}),
+    0 = ets:update_counter(S4, key, {2, -10}),
+    [{key, 0, not_number, 30}] = ets:lookup(S4, key),
+
+    % []
+    S5 = TableWithTuples(1, {key, 10, not_number, 30}),
+    [] = ets:update_counter(S5, key, []),
+    [{key, 10, not_number, 30}] = ets:lookup(S5, key),
+
+    % [{Position, Increment}, ...]
+    S6 = TableWithTuples(1, {key, 10, 20, not_number}),
+    [0, 5, 30] = ets:update_counter(S6, key, [{2, -10}, {2, 5}, {3, 10}]),
+    [{key, 5, 30, not_number}] = ets:lookup(S6, key),
+
+    % {Position, Increment, Threshold, SetValue}
+    S7 = TableWithTuples(1, {key, not_number, 20, 30}),
+    31 = ets:update_counter(S7, key, {4, 10, 39, 31}),
+    [{key, not_number, 20, 31}] = ets:lookup(S7, key),
+
+    S8 = TableWithTuples(1, {key, 10, not_number, 30}),
+    29 = ets:update_counter(S8, key, {4, -10, 21, 29}),
+    [{key, 10, not_number, 29}] = ets:lookup(S8, key),
+
+    % [{Position, Increment, Threshold, SetValue}, ...]
+    S9 = TableWithTuples(1, {key, 10, 20, not_number}),
+    [20, 31, 26] = ets:update_counter(S9, key,
+        [{2, 10, 20, 21}, {2, 10, 29, 31}, {3, 5, 24, 26}]),
+    [{key, 31, 26, not_number}] = ets:lookup(S9, key),
+
+    % Default object
+    S10 = TableWithTuples(1, {key, 10, 20, not_number}),
+    15 = ets:update_counter(S10, key_not_exist, {2, 5}, {key, 10, 20, 30}),
+    [{key, 10, 20, not_number}] = ets:lookup(S10, key),
+    [{key_not_exist, 15, 20, 30}] = ets:lookup(S10, key_not_exist),
+
+    % Badargs
+
+    % The table type is not set
+    TErrBag = ets:new(test, [bag]),
+    TErrDuplBag = ets:new(test, [duplicate_bag]),
+    assert_badarg(fun() -> ets:update_counter(TErrBag, key, 10) end),
+    assert_badarg(fun() -> ets:update_counter(TErrDuplBag, key, 10) end),
+
+    TErr = TableWithTuples(2, {0, key, not_number}),
+
+    % Pos > KeyPos
+    TErrLastKey = TableWithTuples(2, {0, key}),
+    assert_badarg(fun() -> ets:update_counter(TErrLastKey, key, 10) end),
+
+    % No object with the correct key exists and no default object was supplied
+    assert_badarg(fun() -> ets:update_counter(TErr, key_not_exist, 10) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key_not_exist, {1, 10}) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key_not_exist, {1, 10, 20, 30}) end),
+
+    % The object has the wrong arity
+    % Pos > TupleArity
+    assert_badarg(fun() -> ets:update_counter(TErr, key, {4, 10}) end),
+
+    % Default object arity < KeyPos
+    % NOTE: This fails on OTP, see https://github.com/erlang/otp/issues/10603
+    assert_badarg(fun() -> ets:update_counter(TErr, key_not_exist, [{1, 10}], {10}) end),
+
+    % Any field from the default object that is updated is not an integer
+    assert_badarg(fun() -> ets:update_counter(
+        TErr, key_not_exist, {2, 10}, {0, key, not_number}) end),
+    assert_badarg(fun() -> ets:update_counter(
+        TErr, key_not_exist, {3, 10}, {0, key, not_number}) end),
+
+    % The element to update is not an integer
+    assert_badarg(fun() -> ets:update_counter(TErr, key, 10) end),
     assert_badarg(fun() -> ets:update_counter(TErr, key, {3, 10}) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10}, {3, 10}]) end),
+
+    % The element to update is also the key
+    assert_badarg(fun() -> ets:update_counter(TErr, key, {2, 10}) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10}, {2, 10}]) end),
+
+    TErrIntKey = TableWithTuples(2, {10, 0}),
+    assert_badarg(fun() -> ets:update_counter(TErrIntKey, 0, {2, 10}) end),
+    assert_badarg(fun() -> ets:update_counter(TErrIntKey, 0, [{1, 10}, {2, 10}]) end),
+    [{10, 0}] = ets:lookup(TErrIntKey, 0),
+
+    Key = 10,
+    assert_badarg(fun() -> ets:update_counter(
+        TErr, key_not_exist, {2, 10}, {0, Key, not_number}) end),
+
+    % Any of Pos, Incr, Threshold, or SetValue is not an integer
     assert_badarg(fun() -> ets:update_counter(TErr, key, not_number) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, {1, not_number}) end),
     assert_badarg(fun() -> ets:update_counter(TErr, key, {not_number, 10}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, key, {2, not_number}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, key, {not_number, 10, 100, 0}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, key, {2, not_number, 100, 0}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, key, {2, 10, not_number, 0}) end),
-    assert_badarg(fun() -> ets:update_counter(TErr, key, {2, 10, 100, not_number}) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10}, {1, not_number}]) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10}, {not_number, 10}]) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, {1, 10, not_number, 30}) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, {1, 10, 20, not_number}) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10, 20, 30}, {1, 10, not_number, 30}]) end),
+    assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10, 20, 30}, {1, 10, 20, not_number}]) end),
+
+    [{0, key, not_number}] = ets:lookup(TErr, key),
+
     ok.
 
 %%-----------------------------------------------------------------------------
