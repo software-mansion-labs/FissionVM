@@ -740,26 +740,30 @@ static term nif_ets_take(Context *ctx, int argc, term argv[])
 
 static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
 {
-    term ref = argv[0];
-    VALIDATE_VALUE(ref, is_ets_table_id);
+    assert(argc == 3 || argc == 4);
 
+    term name_or_ref = argv[0];
     term key = argv[1];
     term operation = argv[2];
-    term default_value = term_invalid_term();
+   
+    term default_tuple = term_invalid_term();
     if (argc == 4) {
-        default_value = argv[3];
-        VALIDATE_VALUE(default_value, term_is_tuple);
-        term_put_tuple_element(default_value, 0, key);
+        default_tuple = argv[3];
+        VALIDATE_VALUE(default_tuple, term_is_tuple);
     }
+
     term ret = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_update_counter(ref, key, operation, default_value, &ret, ctx);
+
+    Popcorn2EtsStatus result = popcorn2_ets_update_counter(name_or_ref, key, operation, default_tuple, &ret, ctx);
+
     switch (result) {
-        case PopcornEtsOk:
+        case Popcorn2EtsOk:
             return ret;
-        case PopcornEtsBadAccess:
-        case PopcornEtsBadEntry:
+        case Popcorn2EtsBadAccess:
+        case Popcorn2EtsBadEntry:
+        case Popcorn2EtsTupleNotExists:
             RAISE_ERROR(BADARG_ATOM);
-        case PopcornEtsAllocationFailure:
+        case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             AVM_ABORT();
