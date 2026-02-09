@@ -355,15 +355,16 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
     term to_insert;
     Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &to_insert, ctx);
     if (result != Popcorn2EtsOk) {
-        goto cleanup;
+        SMP_UNLOCK(table);
+        return result;
     }
 
     if (term_is_integer(operation)) {
         term value = term_get_tuple_element(to_insert, (uint32_t) table->key_index + 1);
 
         if (!term_is_integer(value)) {
-            result = Popcorn2EtsBadEntry;
-            goto cleanup;
+            SMP_UNLOCK(table);
+            return Popcorn2EtsBadEntry;
         }
 
         avm_int_t current = term_to_int(value);
@@ -376,35 +377,35 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
     } else if (term_is_tuple(operation)) {
         avm_int_t value;
         if (!apply_opt(to_insert, operation, &value, table->key_index)) {
-            result = Popcorn2EtsBadEntry;
-            goto cleanup;
+            SMP_UNLOCK(table);
+            return Popcorn2EtsBadEntry;
         }
         *ret = term_from_int(value);
     } else if (term_is_list(operation)) {
         size_t num_ops = 0;
         for (term iter = operation; !term_is_nil(iter); iter = term_get_list_tail(iter)) {
             if (!term_is_list(iter)) {
-                result = Popcorn2EtsBadEntry;
-                goto cleanup;
+                SMP_UNLOCK(table);
+                return Popcorn2EtsBadEntry;
             }
             num_ops++;
         }
 
         if (num_ops == 0) {
             *ret = term_nil();
-            result = Popcorn2EtsOk;
-            goto cleanup;
+            SMP_UNLOCK(table);
+            return Popcorn2EtsOk;
         }
 
         if (UNLIKELY(memory_ensure_free_opt(ctx, num_ops * CONS_SIZE, MEMORY_NO_GC) != MEMORY_GC_OK)) {
-            result = Popcorn2EtsAllocationError;
-            goto cleanup;
+            SMP_UNLOCK(table);
+            return Popcorn2EtsAllocationError;
         }
 
         avm_int_t *values = malloc(sizeof(avm_int_t) * num_ops);
         if (IS_NULL_PTR(values)) {
-            result = Popcorn2EtsAllocationError;
-            goto cleanup;
+            SMP_UNLOCK(table);
+            return Popcorn2EtsAllocationError;
         }
 
         size_t i = 0;
@@ -412,8 +413,8 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
             term spec = term_get_list_head(iter);
             if (!apply_opt(to_insert, spec, &values[i], table->key_index)) {
                 free(values);
-                result = Popcorn2EtsBadEntry;
-                goto cleanup;
+                SMP_UNLOCK(table);
+                return Popcorn2EtsBadEntry;
             }
         }
 
@@ -425,14 +426,14 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
 
         *ret = list;
     } else {
-        result = Popcorn2EtsBadEntry;
-        goto cleanup;
+        SMP_UNLOCK(table);
+        return Popcorn2EtsBadEntry;
     }
 
     result = ets_multimap_insert(table->multimap, &to_insert, 1, ctx->global);
 
-cleanup:
     SMP_UNLOCK(table);
+
     return result;
 }
 
