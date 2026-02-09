@@ -96,7 +96,7 @@ static Popcorn2EtsStatus lookup_select(
     size_t index,
     term *ret,
     Context *ctx);
-static Popcorn2EtsStatus prepare_update(
+static Popcorn2EtsStatus lookup_or_default(
     struct Popcorn2EtsTable *table,
     term key,
     term default_tuple,
@@ -383,7 +383,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
     }
 
     term to_insert;
-    Popcorn2EtsStatus result = prepare_update(table, key, default_tuple, &to_insert, ctx);
+    Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &to_insert, ctx);
     if (result != Popcorn2EtsOk) {
         goto cleanup;
     }
@@ -792,7 +792,7 @@ static Popcorn2EtsStatus lookup_select(
     return Popcorn2EtsOk;
 }
 
-static Popcorn2EtsStatus prepare_update(
+static Popcorn2EtsStatus lookup_or_default(
     struct Popcorn2EtsTable *table,
     term key,
     term default_tuple,
