@@ -509,22 +509,25 @@ test_update_element() ->
             T
         end,
 
+    % {Position, Value}
     S1 = TableWithTuples(set, {key, value1, value2}),
     true = ets:update_element(S1, key, {2, new_value1}),
     [{key, new_value1, value2}] = ets:lookup(S1, key),
 
     S2 = TableWithTuples(set, {key, value1, value2}),
-    false = ets:update_element(S2, key_not_exist, {2, new_value1}),
-    [{key, value1, value2}] = ets:lookup(S2, key), 
+    true = ets:update_element(S2, key, {3, new_value2}),
+    [{key, value1, new_value2}] = ets:lookup(S2, key),
 
     S3 = TableWithTuples(set, {key, value1, value2}),
-    true = ets:update_element(S3, key, {3, new_value2}),
-    [{key, value1, new_value2}] = ets:lookup(S3, key),
+    false = ets:update_element(S3, key_not_exist, {2, new_value1}),
+    [{key, value1, value2}] = ets:lookup(S3, key),
 
+    % [{Position, Value}, ...]
     S4 = TableWithTuples(set, {key, value1, value2}),
     true = ets:update_element(S4, key, [{3, new_value2}, {2, new_value1}, {3, new_last_value2}]),
     [{key, new_value1, new_last_value2}] = ets:lookup(S4, key),
 
+    % Default object
     S5 = TableWithTuples(set, {key, value1, value2}),
     true = ets:update_element(S5, key_not_exist, {2, new_value1}, {key, value1, value2}),
     [{key_not_exist, new_value1, value2}] = ets:lookup(S5, key_not_exist),
@@ -534,13 +537,14 @@ test_update_element() ->
         [{2, new_value1}, {3, new_value2}, {3, new_last_value2}], {key, value1, value2}),
     [{key_not_exist, new_value1, new_last_value2}] = ets:lookup(S6, key_not_exist),
 
-    % badargs
+    % Badargs
+
     TErr = ets:new(test, [set, {keypos, 3}]),
     true = ets:insert(TErr, {value1, value2, key}),
 
     OkDefault = {value, value, value},
 
-    % incompatible table types
+    % The table type is not set
     TErrBag = ets:new(test, [bag]),
     TErrDuplBag = ets:new(test, [duplicate_bag]),
     assert_badarg(fun() -> ets:update_element(TErrBag, key, {1, value}) end),
@@ -566,49 +570,13 @@ test_update_element() ->
         TErr, key_not_exist, [{1, pos_ok}, {4, pos_past}], OkDefault) end),
 
     % Default object arity < KeyPos
+    % NOTE: This fails on OTP, see https://github.com/erlang/otp/issues/10603
     assert_badarg(fun() -> ets:update_element(TErr, key_not_exist, {1, pos_ok}, {value}) end),
     assert_badarg(fun() -> ets:update_element(
         TErr, key_not_exist, [{1, pos_ok}, {2, pos_ok}], {value, value}) end),
 
     [{value1, value2, key}] = ets:lookup(TErr, key),
     [] = ets:lookup(TErr, key_not_exist),
-
-    ok.
-
-test_take() ->
-    TableWithTuples =
-        fun (Type, Tuples) ->
-            T = ets:new(test, [Type]),
-            true = ets:insert(T, Tuples),
-            T
-        end,
-
-    % set
-    S1 = TableWithTuples(set, []),
-    [] = ets:take(S1, key_not_exist),
-
-    S2 = TableWithTuples(set, [{key, value}, {key2, value2}]),
-    [{key, value}] = ets:take(S2, key),
-    [] = ets:lookup(S2, key),
-    [{key2, value2}] = ets:lookup(S2, key2),
-
-    % bag
-    B1 = TableWithTuples(bag, []),
-    [] = ets:take(B1, key_not_exist),
-
-    B2 = TableWithTuples(bag, [{key, value}, {key, value2}, {key2, value3}]),
-    [{key, value}, {key, value2}] = ets:take(B2, key),
-    [] = ets:lookup(B2, key),
-    [{key2, value3}] = ets:lookup(B2, key2),
-
-    % duplicate_bag
-    DB1 = TableWithTuples(duplicate_bag, []),
-    [] = ets:take(DB1, key_not_exist),
-
-    DB2 = TableWithTuples(duplicate_bag, [{key, value}, {key, value}, {key2, value2}]),
-    [{key, value}, {key, value}] = ets:take(DB2, key),
-    [] = ets:lookup(DB2, key),
-    [{key2, value2}] = ets:lookup(DB2, key2),
 
     ok.
 
@@ -732,6 +700,43 @@ test_update_counter() ->
     assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10, 20, 30}, {1, 10, 20, not_number}]) end),
 
     [{0, key, not_number}] = ets:lookup(TErr, key),
+
+    ok.
+
+test_take() ->
+    TableWithTuples =
+        fun (Type, Tuples) ->
+            T = ets:new(test, [Type]),
+            true = ets:insert(T, Tuples),
+            T
+        end,
+
+    % set
+    S1 = TableWithTuples(set, []),
+    [] = ets:take(S1, key_not_exist),
+
+    S2 = TableWithTuples(set, [{key, value}, {key2, value2}]),
+    [{key, value}] = ets:take(S2, key),
+    [] = ets:lookup(S2, key),
+    [{key2, value2}] = ets:lookup(S2, key2),
+
+    % bag
+    B1 = TableWithTuples(bag, []),
+    [] = ets:take(B1, key_not_exist),
+
+    B2 = TableWithTuples(bag, [{key, value}, {key, value2}, {key2, value3}]),
+    [{key, value}, {key, value2}] = ets:take(B2, key),
+    [] = ets:lookup(B2, key),
+    [{key2, value3}] = ets:lookup(B2, key2),
+
+    % duplicate_bag
+    DB1 = TableWithTuples(duplicate_bag, []),
+    [] = ets:take(DB1, key_not_exist),
+
+    DB2 = TableWithTuples(duplicate_bag, [{key, value}, {key, value}, {key2, value2}]),
+    [{key, value}, {key, value}] = ets:take(DB2, key),
+    [] = ets:lookup(DB2, key),
+    [{key2, value2}] = ets:lookup(DB2, key2),
 
     ok.
 
