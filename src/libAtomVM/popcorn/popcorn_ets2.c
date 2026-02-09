@@ -276,41 +276,11 @@ Popcorn2EtsStatus popcorn2_ets_update_element(
         return Popcorn2EtsBadAccess;
     }
 
-    if (table->type != Popcorn2EtsTableSet) {
+    term to_insert;
+    Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &to_insert, ctx);
+    if (result != Popcorn2EtsOk) {
         SMP_UNLOCK(table);
-        return Popcorn2EtsBadAccess;
-    }
-
-    term *tuple = NULL;
-    size_t count;
-    Popcorn2EtsStatus status = ets_multimap_lookup(table->multimap, key, &tuple, &count, ctx->global);
-
-    bool insert_default = (count == 0);
-
-    if (insert_default && term_is_invalid_term(default_tuple)) {
-        SMP_UNLOCK(table);
-        return Popcorn2EtsTupleNotExists;
-    }
-
-    if (insert_default) {
-        if (term_get_tuple_arity(default_tuple) <= table->key_index) {
-            SMP_UNLOCK(table);
-            return Popcorn2EtsBadEntry;
-        }
-        tuple = &default_tuple;
-    }
-
-    size_t tuple_size = memory_estimate_usage(*tuple);
-
-    if (UNLIKELY(memory_ensure_free_opt(ctx, tuple_size, MEMORY_NO_GC) != MEMORY_GC_OK)) {
-        SMP_UNLOCK(table);
-        return Popcorn2EtsAllocationError;
-    }
-
-    term to_insert = memory_copy_term_tree(&ctx->heap, *tuple);
-
-    if (insert_default) {
-        term_put_tuple_element(to_insert, (uint32_t) table->key_index, key);
+        return result;
     }
 
     if (term_is_tuple(element_spec)) {
@@ -334,11 +304,11 @@ Popcorn2EtsStatus popcorn2_ets_update_element(
         }
     }
 
-    status = ets_multimap_insert(table->multimap, &to_insert, 1, ctx->global);
+    result = ets_multimap_insert(table->multimap, &to_insert, 1, ctx->global);
 
     SMP_UNLOCK(table);
 
-    return status;
+    return result;
 }
 
 Popcorn2EtsStatus popcorn2_ets_take(term name_or_ref, term key, term *ret, Context *ctx)
