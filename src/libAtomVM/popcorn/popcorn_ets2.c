@@ -103,7 +103,7 @@ static Popcorn2EtsStatus lookup_or_default(
     term *to_insert,
     Context *ctx);
 static bool apply_spec(term tuple, term spec, size_t key_index);
-static bool apply_opt(term tuple, term opt, avm_int_t *ret, size_t key_index);
+static bool apply_op(term tuple, term opt, avm_int_t *ret, size_t key_index);
 
 void popcorn2_ets_init(Popcorn2Ets *ets)
 {
@@ -337,7 +337,7 @@ Popcorn2EtsStatus popcorn2_ets_take(term name_or_ref, term key, term *ret, Conte
 Popcorn2EtsStatus popcorn2_ets_update_counter(
     term name_or_ref,
     term key,
-    term operation,
+    term op,
     term default_tuple,
     term *ret,
     Context *ctx)
@@ -359,7 +359,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
         return result;
     }
 
-    if (term_is_integer(operation)) {
+    if (term_is_integer(op)) {
         term value = term_get_tuple_element(to_insert, (uint32_t) table->key_index + 1);
 
         if (!term_is_integer(value)) {
@@ -368,22 +368,22 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
         }
 
         avm_int_t current = term_to_int(value);
-        avm_int_t delta = term_to_int(operation);
+        avm_int_t delta = term_to_int(op);
         term new_value = term_from_int(current + delta);
 
         term_put_tuple_element(to_insert, (uint32_t) table->key_index + 1, new_value);
 
         *ret = new_value;
-    } else if (term_is_tuple(operation)) {
+    } else if (term_is_tuple(op)) {
         avm_int_t value;
-        if (!apply_opt(to_insert, operation, &value, table->key_index)) {
+        if (!apply_op(to_insert, op, &value, table->key_index)) {
             SMP_UNLOCK(table);
             return Popcorn2EtsBadEntry;
         }
         *ret = term_from_int(value);
-    } else if (term_is_list(operation)) {
+    } else if (term_is_list(op)) {
         size_t num_ops = 0;
-        for (term iter = operation; !term_is_nil(iter); iter = term_get_list_tail(iter)) {
+        for (term iter = op; !term_is_nil(iter); iter = term_get_list_tail(iter)) {
             if (!term_is_list(iter)) {
                 SMP_UNLOCK(table);
                 return Popcorn2EtsBadEntry;
@@ -409,9 +409,9 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
         }
 
         size_t i = 0;
-        for (term iter = operation; !term_is_nil(iter); iter = term_get_list_tail(iter), i++) {
+        for (term iter = op; !term_is_nil(iter); iter = term_get_list_tail(iter), i++) {
             term spec = term_get_list_head(iter);
-            if (!apply_opt(to_insert, spec, &values[i], table->key_index)) {
+            if (!apply_op(to_insert, spec, &values[i], table->key_index)) {
                 free(values);
                 SMP_UNLOCK(table);
                 return Popcorn2EtsBadEntry;
@@ -833,20 +833,18 @@ static bool apply_spec(term tuple, term spec, size_t key_index)
     return true;
 }
 
-static bool apply_opt(term tuple, term opt, avm_int_t *ret, size_t key_index)
+static bool apply_op(term tuple, term op, avm_int_t *ret, size_t key_index)
 {
-    if (!term_is_tuple(opt)) {
-        return false;
-    }
+    assert(term_is_tuple(op));
 
-    int arity = term_get_tuple_arity(opt);
+    int arity = term_get_tuple_arity(op);
 
     if (arity != 2 && arity != 4) {
         return false;
     }
 
-    term pos = term_get_tuple_element(opt, 0);
-    term incr = term_get_tuple_element(opt, 1);
+    term pos = term_get_tuple_element(op, 0);
+    term incr = term_get_tuple_element(op, 1);
 
     if (!term_is_integer(pos) || !term_is_integer(incr)) {
         return false;
@@ -868,8 +866,8 @@ static bool apply_opt(term tuple, term opt, avm_int_t *ret, size_t key_index)
     avm_int_t new_value = current + delta;
 
     if (arity == 4) {
-        term threshold = term_get_tuple_element(opt, 2);
-        term setvalue = term_get_tuple_element(opt, 3);
+        term threshold = term_get_tuple_element(op, 2);
+        term setvalue = term_get_tuple_element(op, 3);
 
         if (!term_is_integer(threshold) || !term_is_integer(setvalue)) {
             return false;
