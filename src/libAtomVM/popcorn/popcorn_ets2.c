@@ -426,6 +426,8 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
         }
 
         term list = term_nil();
+
+        assert(num_ops >= 1);
         for (size_t j = num_ops; j > 0; j--) {
             list = term_list_prepend(term_from_int(values[j - 1]), list, &ctx->heap);
         }
