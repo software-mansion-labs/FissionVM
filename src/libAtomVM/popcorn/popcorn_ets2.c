@@ -360,7 +360,14 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
     }
 
     if (term_is_integer(op)) {
-        term value = term_get_tuple_element(to_insert, (uint32_t) table->key_index + 1);
+        avm_int_t index = (avm_int_t) table->key_index + 1;
+
+        if (term_get_tuple_arity(to_insert) <= index) {
+            SMP_UNLOCK(table);
+            return Popcorn2EtsBadEntry;
+        }
+
+        term value = term_get_tuple_element(to_insert, (uint32_t) index);
 
         if (!term_is_integer(value)) {
             SMP_UNLOCK(table);
@@ -371,7 +378,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
         avm_int_t delta = term_to_int(op);
         term new_value = term_from_int(current + delta);
 
-        term_put_tuple_element(to_insert, (uint32_t) table->key_index + 1, new_value);
+        term_put_tuple_element(to_insert, (uint32_t) index, new_value);
 
         *ret = new_value;
     } else if (term_is_tuple(op)) {
