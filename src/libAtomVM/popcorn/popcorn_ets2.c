@@ -784,6 +784,9 @@ static Popcorn2EtsStatus lookup_or_default(
     term *tuple = NULL;
     size_t count;
     Popcorn2EtsStatus result = ets_multimap_lookup(table->multimap, key, &tuple, &count, ctx->global);
+    if (result != Popcorn2EtsOk) {
+        return result;
+    }
 
     bool insert_default = (count == 0);
 
@@ -792,7 +795,7 @@ static Popcorn2EtsStatus lookup_or_default(
     }
 
     if (insert_default) {
-        if (term_get_tuple_arity(default_tuple) <= table->key_index) {
+        if ((size_t) term_get_tuple_arity(default_tuple) <= table->key_index) {
             return Popcorn2EtsBadEntry;
         }
         tuple = &default_tuple;
@@ -828,7 +831,7 @@ static bool apply_spec(term tuple, term spec, size_t key_index)
 
     avm_int_t index = term_to_int(pos) - 1;
 
-    if (index < 0 || (size_t) index >= term_get_tuple_arity(tuple)) {
+    if (index < 0 || index >= term_get_tuple_arity(tuple)) {
         return false;
     }
 
@@ -858,7 +861,11 @@ static bool apply_op(term tuple, term op, avm_int_t *ret, size_t key_index)
     }
 
     avm_int_t index = term_to_int(pos) - 1;
-    if (index < 0 || (size_t) index >= term_get_tuple_arity(tuple) || (size_t) index == key_index) {
+    if (index < 0 || index >= term_get_tuple_arity(tuple)) {
+        return false;
+    }
+
+    if ((size_t) index == key_index) {
         return false;
     }
 
