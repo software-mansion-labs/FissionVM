@@ -411,7 +411,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
             goto cleanup;
         }
 
-        if (UNLIKELY(memory_ensure_free_opt(ctx, num_ops * CONS_SIZE, MEMORY_NO_GC) != MEMORY_GC_OK)) {
+        if (UNLIKELY(memory_ensure_free_with_roots(ctx, num_ops * CONS_SIZE, 1, &op, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
             result = Popcorn2EtsAllocationError;
             goto cleanup;
         }
