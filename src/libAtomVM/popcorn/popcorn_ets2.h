@@ -59,7 +59,8 @@ typedef enum Popcorn2EtsStatus
     Popcorn2EtsBadEntry,
     Popcorn2EtsBadAccess,
     Popcorn2EtsBadIndex,
-    Popcorn2EtsAllocationError
+    Popcorn2EtsAllocationError,
+    Popcorn2EtsOverflow
 } Popcorn2EtsStatus;
 
 typedef struct Popcorn2Ets

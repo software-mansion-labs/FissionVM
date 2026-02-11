@@ -765,6 +765,8 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
             RAISE_ERROR(BADARG_ATOM);
         case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        case Popcorn2EtsOverflow:
+            RAISE_ERROR(OVERFLOW_ATOM);
         default:
             AVM_ABORT();
     }
