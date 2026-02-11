@@ -25,6 +25,7 @@
 #include "../defaultatoms.h"
 #include "../list.h"
 #include "../memory.h"
+#include "../overflow_helpers.h"
 #include "../term.h"
 #include "../utils.h"
 
@@ -100,10 +101,11 @@ static Popcorn2EtsStatus lookup_or_default(
     struct Popcorn2EtsTable *table,
     term key,
     term default_tuple,
-    term *to_insert,
+    Heap *ret_heap,
+    term *ret,
     Context *ctx);
-static bool apply_spec(term tuple, term spec, size_t key_index);
-static bool apply_op(term tuple, term opt, avm_int_t *ret, size_t key_index);
+static Popcorn2EtsStatus apply_spec(term tuple, term spec, size_t key_index);
+static Popcorn2EtsStatus apply_op(term tuple, term opt, avm_int_t *ret, size_t key_index);
 
 void popcorn2_ets_init(Popcorn2Ets *ets)
 {
@@ -276,38 +278,40 @@ Popcorn2EtsStatus popcorn2_ets_update_element(
         return Popcorn2EtsBadAccess;
     }
 
-    term to_insert;
-    Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &to_insert, ctx);
+    Heap insert_heap;
+    term insert_tuple;
+    Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &insert_heap, &insert_tuple, ctx);
     if (result != Popcorn2EtsOk) {
         SMP_UNLOCK(table);
         return result;
     }
 
     if (term_is_tuple(element_spec)) {
-        if (!apply_spec(to_insert, element_spec, table->key_index)) {
-            SMP_UNLOCK(table);
-            return Popcorn2EtsBadEntry;
+        result = apply_spec(insert_tuple, element_spec, table->key_index);
+        if (result != Popcorn2EtsOk) {
+            goto cleanup;
         }
     } else if (term_is_list(element_spec)) {
         for (term iter = element_spec; !term_is_nil(iter); iter = term_get_list_tail(iter)) {
             if (!term_is_list(iter)) {
-                SMP_UNLOCK(table);
-                return Popcorn2EtsBadEntry;
+                result = Popcorn2EtsBadEntry;
+                goto cleanup;
             }
 
             term spec = term_get_list_head(iter);
 
-            if (!apply_spec(to_insert, spec, table->key_index)) {
-                SMP_UNLOCK(table);
-                return Popcorn2EtsBadEntry;
+            result = apply_spec(insert_tuple, spec, table->key_index);
+            if (result != Popcorn2EtsOk) {
+                goto cleanup;
             }
         }
     }
 
-    result = ets_multimap_insert(table->multimap, &to_insert, 1, ctx->global);
+    result = ets_multimap_insert(table->multimap, &insert_tuple, 1, ctx->global);
 
+cleanup:
+    memory_destroy_heap(&insert_heap, ctx->global);
     SMP_UNLOCK(table);
-
     return result;
 }
 
@@ -352,8 +356,9 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
         return Popcorn2EtsBadAccess;
     }
 
-    term to_insert;
-    Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &to_insert, ctx);
+    Heap insert_heap;
+    term insert_tuple;
+    Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &insert_heap, &insert_tuple, ctx);
     if (result != Popcorn2EtsOk) {
         SMP_UNLOCK(table);
         return result;
@@ -362,66 +367,68 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
     if (term_is_integer(op)) {
         avm_int_t index = (avm_int_t) table->key_index + 1;
 
-        if (term_get_tuple_arity(to_insert) <= index) {
-            SMP_UNLOCK(table);
-            return Popcorn2EtsBadEntry;
+        if (index >= term_get_tuple_arity(insert_tuple)) {
+            result = Popcorn2EtsBadEntry;
+            goto cleanup;
         }
 
-        term value = term_get_tuple_element(to_insert, (uint32_t) index);
-
+        term value = term_get_tuple_element(insert_tuple, (uint32_t) index);
         if (!term_is_integer(value)) {
-            SMP_UNLOCK(table);
-            return Popcorn2EtsBadEntry;
+            result = Popcorn2EtsBadEntry;
+            goto cleanup;
         }
 
-        avm_int_t current = term_to_int(value);
-        avm_int_t delta = term_to_int(op);
-        term new_value = term_from_int(current + delta);
+        avm_int_t new_value;
+        if (BUILTIN_ADD_OVERFLOW_INT(term_to_int(value), term_to_int(op), &new_value)) {
+            result = Popcorn2EtsOverflow;
+            goto cleanup;
+        }
 
-        term_put_tuple_element(to_insert, (uint32_t) index, new_value);
+        term_put_tuple_element(insert_tuple, (uint32_t) index, term_from_int(new_value));
 
-        *ret = new_value;
+        *ret = term_from_int(new_value);
     } else if (term_is_tuple(op)) {
         avm_int_t value;
-        if (!apply_op(to_insert, op, &value, table->key_index)) {
-            SMP_UNLOCK(table);
-            return Popcorn2EtsBadEntry;
+
+        result = apply_op(insert_tuple, op, &value, table->key_index);
+        if (result != Popcorn2EtsOk) {
+            goto cleanup;
         }
+
         *ret = term_from_int(value);
     } else if (term_is_list(op)) {
         size_t num_ops = 0;
         for (term iter = op; !term_is_nil(iter); iter = term_get_list_tail(iter)) {
             if (!term_is_list(iter)) {
-                SMP_UNLOCK(table);
-                return Popcorn2EtsBadEntry;
+                result = Popcorn2EtsBadEntry;
+                goto cleanup;
             }
             num_ops++;
         }
 
         if (num_ops == 0) {
             *ret = term_nil();
-            SMP_UNLOCK(table);
-            return Popcorn2EtsOk;
+            goto cleanup;
         }
 
         if (UNLIKELY(memory_ensure_free_opt(ctx, num_ops * CONS_SIZE, MEMORY_NO_GC) != MEMORY_GC_OK)) {
-            SMP_UNLOCK(table);
-            return Popcorn2EtsAllocationError;
+            result = Popcorn2EtsAllocationError;
+            goto cleanup;
         }
 
         avm_int_t *values = malloc(sizeof(avm_int_t) * num_ops);
         if (IS_NULL_PTR(values)) {
-            SMP_UNLOCK(table);
-            return Popcorn2EtsAllocationError;
+            result = Popcorn2EtsAllocationError;
+            goto cleanup;
         }
 
         size_t i = 0;
         for (term iter = op; !term_is_nil(iter); iter = term_get_list_tail(iter), i++) {
-            term spec = term_get_list_head(iter);
-            if (!apply_op(to_insert, spec, &values[i], table->key_index)) {
+            term entry = term_get_list_head(iter);
+            result = apply_op(insert_tuple, entry, &values[i], table->key_index);
+            if (result != Popcorn2EtsOk) {
                 free(values);
-                SMP_UNLOCK(table);
-                return Popcorn2EtsBadEntry;
+                goto cleanup;
             }
         }
 
@@ -435,14 +442,15 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
 
         *ret = list;
     } else {
-        SMP_UNLOCK(table);
-        return Popcorn2EtsBadEntry;
+        result = Popcorn2EtsBadEntry;
+        goto cleanup;
     }
 
-    result = ets_multimap_insert(table->multimap, &to_insert, 1, ctx->global);
+    result = ets_multimap_insert(table->multimap, &insert_tuple, 1, ctx->global);
 
+cleanup:
+    memory_destroy_heap(&insert_heap, ctx->global);
     SMP_UNLOCK(table);
-
     return result;
 }
 
@@ -776,7 +784,8 @@ static Popcorn2EtsStatus lookup_or_default(
     struct Popcorn2EtsTable *table,
     term key,
     term default_tuple,
-    term *to_insert,
+    Heap *ret_heap,
+    term *ret,
     Context *ctx)
 {
     if (table->type != Popcorn2EtsTableSet) {
@@ -805,88 +814,91 @@ static Popcorn2EtsStatus lookup_or_default(
 
     size_t tuple_size = memory_estimate_usage(*tuple);
 
-    if (UNLIKELY(memory_ensure_free_opt(ctx, tuple_size, MEMORY_NO_GC) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_init_heap(ret_heap, tuple_size) != MEMORY_GC_OK)) {
         return Popcorn2EtsAllocationError;
     }
 
-    *to_insert = memory_copy_term_tree(&ctx->heap, *tuple);
+    *ret = memory_copy_term_tree(ret_heap, *tuple);
 
     if (insert_default) {
-        term_put_tuple_element(*to_insert, (uint32_t) table->key_index, key);
+        term_put_tuple_element(*ret, (uint32_t) table->key_index, key);
     }
 
     return Popcorn2EtsOk;
 }
 
-static bool apply_spec(term tuple, term spec, size_t key_index)
+static Popcorn2EtsStatus apply_spec(term tuple, term spec, size_t key_index)
 {
     if (!term_is_tuple(spec) || term_get_tuple_arity(spec) != 2) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     term pos = term_get_tuple_element(spec, 0);
     term value = term_get_tuple_element(spec, 1);
 
     if (!term_is_integer(pos)) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     avm_int_t index = term_to_int(pos) - 1;
 
     if (index < 0 || index >= term_get_tuple_arity(tuple)) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     if ((size_t) index == key_index) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     term_put_tuple_element(tuple, (uint32_t) index, value);
-    return true;
+    return Popcorn2EtsOk;
 }
 
-static bool apply_op(term tuple, term op, avm_int_t *ret, size_t key_index)
+static Popcorn2EtsStatus apply_op(term tuple, term op, avm_int_t *ret, size_t key_index)
 {
     assert(term_is_tuple(op));
 
     int arity = term_get_tuple_arity(op);
 
     if (arity != 2 && arity != 4) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     term pos = term_get_tuple_element(op, 0);
     term incr = term_get_tuple_element(op, 1);
 
     if (!term_is_integer(pos) || !term_is_integer(incr)) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     avm_int_t index = term_to_int(pos) - 1;
     if (index < 0 || index >= term_get_tuple_arity(tuple)) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     if ((size_t) index == key_index) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     term value = term_get_tuple_element(tuple, (uint32_t) index);
 
     if (!term_is_integer(value)) {
-        return false;
+        return Popcorn2EtsBadEntry;
     }
 
     avm_int_t current = term_to_int(value);
     avm_int_t delta = term_to_int(incr);
-    avm_int_t new_value = current + delta;
+    avm_int_t new_value;
+    if (BUILTIN_ADD_OVERFLOW_INT(current, delta, &new_value)) {
+        return Popcorn2EtsOverflow;
+    }
 
     if (arity == 4) {
         term threshold = term_get_tuple_element(op, 2);
         term setvalue = term_get_tuple_element(op, 3);
 
         if (!term_is_integer(threshold) || !term_is_integer(setvalue)) {
-            return false;
+            return Popcorn2EtsBadEntry;
         }
 
         avm_int_t thresh = term_to_int(threshold);
@@ -900,5 +912,5 @@ static bool apply_op(term tuple, term op, avm_int_t *ret, size_t key_index)
     term_put_tuple_element(tuple, index, term_from_int(new_value));
     *ret = new_value;
 
-    return true;
+    return Popcorn2EtsOk;
 }
