@@ -38,6 +38,7 @@ start() ->
     ok = isolated(fun test_lookup_element/0),
     ok = isolated(fun test_update_element/0),
     ok = isolated(fun test_update_counter/0),
+    ok = isolated(fun test_member/0),
     ok = isolated(fun test_take/0),
     0.
 
@@ -700,6 +701,31 @@ test_update_counter() ->
     assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10, 20, 30}, {1, 10, 20, not_number}]) end),
 
     [{0, key, not_number}] = ets:lookup(TErr, key),
+
+    ok.
+
+test_member() ->
+    TableWithTuples =
+        fun (Type, Tuples) ->
+            T = ets:new(test, [Type]),
+            true = ets:insert(T, Tuples),
+            T
+        end,
+
+    % set
+    S = TableWithTuples(set, [{key, value}]),
+    true = ets:member(S, key),
+    false = ets:member(S, key_not_exist),
+
+    % bag
+    B = TableWithTuples(bag, [{key, value}, {key, value2}]),
+    true = ets:member(B, key),
+    false = ets:member(B, key_not_exist),
+
+    % duplicate_bag
+    DB = TableWithTuples(duplicate_bag, [{key, value}, {key, value}]),
+    true = ets:member(DB, key),
+    false = ets:member(DB, key_not_exist),
 
     ok.
 
