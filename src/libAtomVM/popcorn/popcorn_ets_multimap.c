@@ -309,7 +309,8 @@ Popcorn2EtsStatus ets_multimap_remove_tuple(
     }
 
     EtsMultimapEntry *prev = NULL;
-    for (EtsMultimapEntry *iter = node->entries; iter != NULL; prev = iter, iter = iter->next) {
+    for (EtsMultimapEntry *iter = node->entries; iter != NULL; iter = iter->next) {
+        bool removed = false;
         for (size_t i = 0; i < count; i++) {
             if (iter == to_remove[i]) {
                 if (prev == NULL) {
@@ -317,7 +318,12 @@ Popcorn2EtsStatus ets_multimap_remove_tuple(
                 } else {
                     prev->next = iter->next;
                 }
+                removed = true;
+                break;
             }
+        }
+        if (!removed) {
+            prev = iter;
         }
     }
 
