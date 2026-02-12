@@ -689,21 +689,25 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
 
 static term nif_ets_member(Context *ctx, int argc, term argv[])
 {
-    UNUSED(argc);
+    assert(argc == 2);
 
-    term ref = argv[0];
-    VALIDATE_VALUE(ref, is_ets_table_id);
-
+    term name_or_ref = argv[0];
     term key = argv[1];
 
+    VALIDATE_VALUE(name_or_ref, is_ets_table_id);
+
     term ret = term_invalid_term();
-    PopcornEtsErrorCode result = popcorn_ets_lookup(ref, key, &ret, ctx);
+
+    Popcorn2EtsStatus result = popcorn2_ets_lookup(name_or_ref, key, &ret, ctx);
+
     switch (result) {
-        case PopcornEtsOk:
-            return term_is_nil(ret) ? FALSE_ATOM : TRUE_ATOM;
-        case PopcornEtsBadAccess:
+        case Popcorn2EtsOk:
+            return TRUE_ATOM;
+        case Popcorn2EtsTupleNotExists:
+            return FALSE_ATOM;
+        case Popcorn2EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
-        case PopcornEtsAllocationFailure:
+        case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             AVM_ABORT();
