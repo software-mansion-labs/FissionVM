@@ -503,37 +503,30 @@ test_lookup_element() ->
     ok.
 
 test_update_element() ->
-    TableWithTuples = 
-        fun (Type, Tuples) ->
-            T = ets:new(test, [Type]),
-            true = ets:insert(T, Tuples),
-            T
-        end,
-
     % {Position, Value}
-    S1 = TableWithTuples(set, {key, value1, value2}),
+    S1 = new_table({key, value1, value2}),
     true = ets:update_element(S1, key, {2, new_value1}),
     [{key, new_value1, value2}] = ets:lookup(S1, key),
 
-    S2 = TableWithTuples(set, {key, value1, value2}),
+    S2 = new_table({key, value1, value2}),
     true = ets:update_element(S2, key, {3, new_value2}),
     [{key, value1, new_value2}] = ets:lookup(S2, key),
 
-    S3 = TableWithTuples(set, {key, value1, value2}),
+    S3 = new_table({key, value1, value2}),
     false = ets:update_element(S3, key_not_exist, {2, new_value1}),
     [{key, value1, value2}] = ets:lookup(S3, key),
 
     % [{Position, Value}, ...]
-    S4 = TableWithTuples(set, {key, value1, value2}),
+    S4 = new_table({key, value1, value2}),
     true = ets:update_element(S4, key, [{3, new_value2}, {2, new_value1}, {3, new_last_value2}]),
     [{key, new_value1, new_last_value2}] = ets:lookup(S4, key),
 
     % Default object
-    S5 = TableWithTuples(set, {key, value1, value2}),
+    S5 = new_table({key, value1, value2}),
     true = ets:update_element(S5, key_not_exist, {2, new_value1}, {key, value1, value2}),
     [{key_not_exist, new_value1, value2}] = ets:lookup(S5, key_not_exist),
 
-    S6 = TableWithTuples(set, {key, value1, value2}),
+    S6 = new_table({key, value1, value2}),
     true = ets:update_element(S6, key_not_exist,
         [{2, new_value1}, {3, new_value2}, {3, new_last_value2}], {key, value1, value2}),
     [{key_not_exist, new_value1, new_last_value2}] = ets:lookup(S6, key_not_exist),
@@ -582,58 +575,51 @@ test_update_element() ->
     ok.
 
 test_update_counter() ->
-    TableWithTuples =
-        fun (Keypos, Tuples) ->
-            T = ets:new(test, [set, {keypos, Keypos}]),
-            true = ets:insert(T, Tuples),
-            T
-        end,
-
     % Increment
-    S1 = TableWithTuples(1, {key, 10, not_number, 30}),
+    S1 = new_table({key, 10, not_number, 30}),
     15 = ets:update_counter(S1, key, 5),
     [{key, 15, not_number, 30}] = ets:lookup(S1, key),
 
-    S2 = TableWithTuples(3, {not_number, 20, key, 30}),
+    S2 = new_table(3, {not_number, 20, key, 30}),
     -5 = ets:update_counter(S2, key, -35),
     [{not_number, 20, key, -5}] = ets:lookup(S2, key),
 
     % {Position, Increment}
-    S3 = TableWithTuples(1, {key, 10, 20, not_number}),
+    S3 = new_table({key, 10, 20, not_number}),
     25 = ets:update_counter(S3, key, {3, 5}),
     [{key, 10, 25, not_number}] = ets:lookup(S3, key),
 
-    S4 = TableWithTuples(1, {key, 10, not_number, 30}),
+    S4 = new_table({key, 10, not_number, 30}),
     0 = ets:update_counter(S4, key, {2, -10}),
     [{key, 0, not_number, 30}] = ets:lookup(S4, key),
 
     % []
-    S5 = TableWithTuples(1, {key, 10, not_number, 30}),
+    S5 = new_table({key, 10, not_number, 30}),
     [] = ets:update_counter(S5, key, []),
     [{key, 10, not_number, 30}] = ets:lookup(S5, key),
 
     % [{Position, Increment}, ...]
-    S6 = TableWithTuples(1, {key, 10, 20, not_number}),
+    S6 = new_table({key, 10, 20, not_number}),
     [0, 5, 30] = ets:update_counter(S6, key, [{2, -10}, {2, 5}, {3, 10}]),
     [{key, 5, 30, not_number}] = ets:lookup(S6, key),
 
     % {Position, Increment, Threshold, SetValue}
-    S7 = TableWithTuples(1, {key, not_number, 20, 30}),
+    S7 = new_table({key, not_number, 20, 30}),
     31 = ets:update_counter(S7, key, {4, 10, 39, 31}),
     [{key, not_number, 20, 31}] = ets:lookup(S7, key),
 
-    S8 = TableWithTuples(1, {key, 10, not_number, 30}),
+    S8 = new_table({key, 10, not_number, 30}),
     29 = ets:update_counter(S8, key, {4, -10, 21, 29}),
     [{key, 10, not_number, 29}] = ets:lookup(S8, key),
 
     % [{Position, Increment, Threshold, SetValue}, ...]
-    S9 = TableWithTuples(1, {key, 10, 20, not_number}),
+    S9 = new_table({key, 10, 20, not_number}),
     [20, 31, 26] = ets:update_counter(S9, key,
         [{2, 10, 20, 21}, {2, 10, 29, 31}, {3, 5, 24, 26}]),
     [{key, 31, 26, not_number}] = ets:lookup(S9, key),
 
     % Default object
-    S10 = TableWithTuples(1, {key, 10, 20, not_number}),
+    S10 = new_table({key, 10, 20, not_number}),
     15 = ets:update_counter(S10, key_not_exist, {2, 5}, {key, 10, 20, 30}),
     [{key, 10, 20, not_number}] = ets:lookup(S10, key),
     [{key_not_exist, 15, 20, 30}] = ets:lookup(S10, key_not_exist),
@@ -646,10 +632,10 @@ test_update_counter() ->
     assert_badarg(fun() -> ets:update_counter(TErrBag, key, 10) end),
     assert_badarg(fun() -> ets:update_counter(TErrDuplBag, key, 10) end),
 
-    TErr = TableWithTuples(2, {0, key, not_number}),
+    TErr = new_table(2, {0, key, not_number}),
 
     % Pos > KeyPos
-    TErrLastKey = TableWithTuples(2, {0, key}),
+    TErrLastKey = new_table(2, {0, key}),
     assert_badarg(fun() -> ets:update_counter(TErrLastKey, key, 10) end),
 
     % No object with the correct key exists and no default object was supplied
@@ -680,7 +666,7 @@ test_update_counter() ->
     assert_badarg(fun() -> ets:update_counter(TErr, key, {2, 10}) end),
     assert_badarg(fun() -> ets:update_counter(TErr, key, [{1, 10}, {2, 10}]) end),
 
-    TErrIntKey = TableWithTuples(2, {10, 0}),
+    TErrIntKey = new_table(2, {10, 0}),
     assert_badarg(fun() -> ets:update_counter(TErrIntKey, 0, {2, 10}) end),
     assert_badarg(fun() -> ets:update_counter(TErrIntKey, 0, [{1, 10}, {2, 10}]) end),
     [{10, 0}] = ets:lookup(TErrIntKey, 0),
@@ -705,61 +691,47 @@ test_update_counter() ->
     ok.
 
 test_member() ->
-    TableWithTuples =
-        fun (Type, Tuples) ->
-            T = ets:new(test, [Type]),
-            true = ets:insert(T, Tuples),
-            T
-        end,
-
     % set
-    S = TableWithTuples(set, [{key, value}]),
+    S = new_table([{key, value}]),
     true = ets:member(S, key),
     false = ets:member(S, key_not_exist),
 
     % bag
-    B = TableWithTuples(bag, [{key, value}, {key, value2}]),
+    B = new_table(bag, [{key, value}, {key, value2}]),
     true = ets:member(B, key),
     false = ets:member(B, key_not_exist),
 
     % duplicate_bag
-    DB = TableWithTuples(duplicate_bag, [{key, value}, {key, value}]),
+    DB = new_table(duplicate_bag, [{key, value}, {key, value}]),
     true = ets:member(DB, key),
     false = ets:member(DB, key_not_exist),
 
     ok.
 
 test_take() ->
-    TableWithTuples =
-        fun (Type, Tuples) ->
-            T = ets:new(test, [Type]),
-            true = ets:insert(T, Tuples),
-            T
-        end,
-
     % set
-    S1 = TableWithTuples(set, []),
+    S1 = new_table([]),
     [] = ets:take(S1, key_not_exist),
 
-    S2 = TableWithTuples(set, [{key, value}, {key2, value2}]),
+    S2 = new_table([{key, value}, {key2, value2}]),
     [{key, value}] = ets:take(S2, key),
     [] = ets:lookup(S2, key),
     [{key2, value2}] = ets:lookup(S2, key2),
 
     % bag
-    B1 = TableWithTuples(bag, []),
+    B1 = new_table(bag, []),
     [] = ets:take(B1, key_not_exist),
 
-    B2 = TableWithTuples(bag, [{key, value}, {key, value2}, {key2, value3}]),
+    B2 = new_table(bag, [{key, value}, {key, value2}, {key2, value3}]),
     [{key, value}, {key, value2}] = ets:take(B2, key),
     [] = ets:lookup(B2, key),
     [{key2, value3}] = ets:lookup(B2, key2),
 
     % duplicate_bag
-    DB1 = TableWithTuples(duplicate_bag, []),
+    DB1 = new_table(duplicate_bag, []),
     [] = ets:take(DB1, key_not_exist),
 
-    DB2 = TableWithTuples(duplicate_bag, [{key, value}, {key, value}, {key2, value2}]),
+    DB2 = new_table(duplicate_bag, [{key, value}, {key, value}, {key2, value2}]),
     [{key, value}, {key, value}] = ets:take(DB2, key),
     [] = ets:lookup(DB2, key),
     [{key2, value2}] = ets:lookup(DB2, key2),
@@ -792,6 +764,18 @@ assert_stored_key(T, Key) ->
     true = ets:insert(T, {Key, value}),
     [{Key, value}] = ets:lookup(T, Key),
     ok.
+
+new_table(Tuples) ->
+    new_table([], Tuples).
+
+new_table(Type, Tuples) when is_atom(Type) ->
+    new_table([Type], Tuples);
+new_table(Keypos, Tuples) when is_integer(Keypos) ->
+    new_table([{keypos, Keypos}], Tuples);
+new_table(Opts, Tuples) when is_list(Opts) ->
+    T = ets:new(test, Opts),
+    true = ets:insert(T, Tuples),
+    T.
 
 isolated(Fun) ->
     Ref = make_ref(),
