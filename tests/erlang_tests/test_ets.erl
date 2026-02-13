@@ -338,10 +338,9 @@ test_insert_new_duplicate_bag() ->
     ok.
 
 test_delete() ->
-    % set
-    S = ets:new(test, [set]),
+    % Set
+    S = new_table([{key, value}, {key2, value2}]),
     true = ets:delete(S, key_not_exist),
-    true = ets:insert(S, [{key, value}, {key2, value2}]),
 
     true = ets:delete(S, key),
     [] = ets:lookup(S, key),
@@ -349,14 +348,13 @@ test_delete() ->
 
     true = ets:delete(S, key2),
     [] = ets:lookup(S, key2),
-    true = ets:delete(S, key2),
 
+    true = ets:delete(S, key2),
     true = ets:delete(S),
 
-    % bag
-    B = ets:new(test, [bag]),
+    % Bag
+    B = new_table(bag, [{key, value}, {key, value2}, {key2, value3}]),
     true = ets:delete(B, key_not_exist),
-    true = ets:insert(B, [{key, value}, {key, value2}, {key2, value3}]),
 
     true = ets:delete(B, key),
     [] = ets:lookup(B, key),
@@ -364,14 +362,13 @@ test_delete() ->
 
     true = ets:delete(B, key2),
     [] = ets:lookup(B, key2),
-    true = ets:delete(B, key2),
 
+    true = ets:delete(B, key2),
     true = ets:delete(B),
 
-    % duplicate_bag
-    DB = ets:new(test, [duplicate_bag]),
+    % Duplicate bag
+    DB = new_table(duplicate_bag, [{key, value}, {key, value}, {key2, value2}]),
     true = ets:delete(DB, key_not_exist),
-    true = ets:insert(DB, [{key, value}, {key, value}, {key2, value2}]),
 
     true = ets:delete(DB, key),
     [] = ets:lookup(DB, key),
@@ -379,12 +376,12 @@ test_delete() ->
 
     true = ets:delete(DB, key2),
     [] = ets:lookup(DB, key2),
-    true = ets:delete(DB, key2),
 
+    true = ets:delete(DB, key2),
     true = ets:delete(DB),
 
-    % badargs
-    TErr = ets:new(test, [{keypos, 2}]),
+    % Badargs
+    TErr = new_table(2, []),
     true = ets:delete(TErr),
     assert_badarg(fun() -> ets:lookup(TErr, key) end),
     assert_badarg(fun() -> ets:delete(TErr) end),
@@ -392,56 +389,50 @@ test_delete() ->
     ok.
 
 test_delete_object() ->
-    % set
-    S = ets:new(test, [set]),
-    true = ets:insert(S, [{key, value}, {key2, value2}]),
-
+    % Set
+    S = new_table([{key, value}, {key2, value2}]),
     true = ets:delete_object(S, {key_not_exist, value_not_exist}),
+
+    true = ets:delete_object(S, {key, value_not_exist}),
     [{key, value}] = ets:lookup(S, key),
-    [{key2, value2}] = ets:lookup(S, key2),
 
     true = ets:delete_object(S, {key, value}),
     [] = ets:lookup(S, key),
-    [{key2, value2}] = ets:lookup(S, key2),
-
-    true = ets:delete_object(S, {key2, value_not_exist}),
-    [{key2, value2}] = ets:lookup(S, key2),
 
     true = ets:delete_object(S, {key2, value2}),
     [] = ets:lookup(S, key2),
 
-    % bag
-    B = ets:new(test, [bag]),
-    true = ets:insert(B, [{key, value}, {key, value2}, {key2, value2}]),
-
-    true = ets:delete_object(B, {key, value2}),
-    [{key, value}] = ets:lookup(B, key),
+    % Bag
+    B = new_table(bag, [{key, value}, {key, value2}, {key2, value2}]),
+    true = ets:delete_object(B, {key_not_exist, value_not_exist}),
 
     true = ets:delete_object(B, {key, value_not_exist}),
-    [{key, value}] = ets:lookup(B, key),
+    [{key, value}, {key, value2}] = ets:lookup(B, key),
 
     true = ets:delete_object(B, {key, value}),
+    [{key, value2}] = ets:lookup(B, key),
+
+    true = ets:delete_object(B, {key, value2}),
     [] = ets:lookup(B, key),
 
-    [{key2, value2}] = ets:lookup(B, key2),
     true = ets:delete_object(B, {key2, value2}),
     [] = ets:lookup(B, key2),
 
-    % duplicate_bag
-    DB = ets:new(test, [duplicate_bag]),
-    true = ets:insert(DB, [{key, value}, {key, value2}, {key, value}]),
+    % Duplicate bag
+    DB = new_table(duplicate_bag, [{key, value}, {key, value}, {key, value2}]),
+    true = ets:delete_object(DB, {key_not_exist, value_not_exist}),
+
+    true = ets:delete_object(DB, {key, value_not_exist}),
+    [{key, value}, {key, value}, {key, value2}] = ets:lookup(DB, key),
 
     true = ets:delete_object(DB, {key, value}),
     [{key, value2}] = ets:lookup(DB, key),
 
-    true = ets:delete_object(DB, {key, value_not_exist}),
-    [{key, value2}] = ets:lookup(DB, key),
-
     true = ets:delete_object(DB, {key, value2}),
-    [] = ets:lookup(DB, key2),
+    [] = ets:lookup(DB, key),
 
-    % badargs
-    TErr = ets:new(test, [{keypos, 2}]),
+    % Badargs
+    TErr = new_table(2, []),
     assert_badarg(fun() -> ets:delete_object(TErr, not_a_tuple) end),
     assert_badarg(fun() -> ets:delete_object(TErr, [{key, value}, {key, value2}]) end),
     assert_badarg(fun() -> ets:delete_object(TErr, {}) end),
@@ -691,17 +682,17 @@ test_update_counter() ->
     ok.
 
 test_member() ->
-    % set
+    % Set
     S = new_table([{key, value}]),
     true = ets:member(S, key),
     false = ets:member(S, key_not_exist),
 
-    % bag
+    % Bag
     B = new_table(bag, [{key, value}, {key, value2}]),
     true = ets:member(B, key),
     false = ets:member(B, key_not_exist),
 
-    % duplicate_bag
+    % Duplicate bag
     DB = new_table(duplicate_bag, [{key, value}, {key, value}]),
     true = ets:member(DB, key),
     false = ets:member(DB, key_not_exist),
@@ -709,7 +700,7 @@ test_member() ->
     ok.
 
 test_take() ->
-    % set
+    % Set
     S1 = new_table([]),
     [] = ets:take(S1, key_not_exist),
 
@@ -718,7 +709,7 @@ test_take() ->
     [] = ets:lookup(S2, key),
     [{key2, value2}] = ets:lookup(S2, key2),
 
-    % bag
+    % Bag
     B1 = new_table(bag, []),
     [] = ets:take(B1, key_not_exist),
 
@@ -727,7 +718,7 @@ test_take() ->
     [] = ets:lookup(B2, key),
     [{key2, value3}] = ets:lookup(B2, key2),
 
-    % duplicate_bag
+    % Duplicate bag
     DB1 = new_table(duplicate_bag, []),
     [] = ets:take(DB1, key_not_exist),
 
