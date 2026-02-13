@@ -154,6 +154,78 @@ test_keypos() ->
     assert_badarg(fun() -> ets:insert(T, {value}) end),
     ok.
 
+test_lookup_element() ->
+    PosKey = 1,
+    PosValue = 2,
+
+    AssertBadArgs =
+        fun(Tab) ->
+            PosPastBounds = 3,
+            PosZero = 0,
+            PosNegative = -1,
+
+            assert_badarg(fun() -> ets:lookup_element(Tab, key_not_exist, PosKey) end),
+            assert_badarg(fun() -> ets:lookup_element(Tab, key, PosZero) end),
+            assert_badarg(fun() -> ets:lookup_element(Tab, key, PosPastBounds) end),
+            assert_badarg(fun() -> ets:lookup_element(Tab, key, PosNegative) end),
+            assert_badarg(fun() -> ets:lookup_element(Tab, key, PosNegative, default) end)
+        end,
+
+    % Set
+    S = new_table([{key, value}]),
+    key = ets:lookup_element(S, key, PosKey),
+    value = ets:lookup_element(S, key, PosValue),
+    default = ets:lookup_element(S, key_not_exist, PosKey, default),
+
+    % Bag
+    B = new_table(bag, [{key, value}, {key, value2}]),
+    [key, key] = ets:lookup_element(B, key, PosKey),
+    [value, value2] = ets:lookup_element(B, key, PosValue),
+    default = ets:lookup_element(B, key_not_exist, PosKey, default),
+
+    true = ets:insert(B, {key, value3}),
+    [key, key, key] = ets:lookup_element(B, key, PosKey),
+    [value, value2, value3] = ets:lookup_element(B, key, PosValue),
+
+    % Duplicate bag
+    DB = new_table(duplicate_bag, [{key, value}, {key, value}]),
+    [key, key] = ets:lookup_element(DB, key, PosKey),
+    [value, value] = ets:lookup_element(DB, key, PosValue),
+    default = ets:lookup_element(DB, key_not_exist, PosKey, default),
+
+    true = ets:insert(DB, {key, value2}),
+    [key, key, key] = ets:lookup_element(DB, key, PosKey),
+    [value, value, value2] = ets:lookup_element(DB, key, PosValue),
+
+    true = ets:insert(DB, {key2, value2}),
+    [key2] = ets:lookup_element(DB, key2, PosKey),
+    [value2] = ets:lookup_element(DB, key2, PosValue),
+
+    % Badargs
+    AssertBadArgs(ets:new(test, [set])),
+    AssertBadArgs(ets:new(test, [bag])),
+    AssertBadArgs(ets:new(test, [duplicate_bag])),
+
+    ok.
+
+test_member() ->
+    % Set
+    S = new_table([{key, value}]),
+    true = ets:member(S, key),
+    false = ets:member(S, key_not_exist),
+
+    % Bag
+    B = new_table(bag, [{key, value}, {key, value2}]),
+    true = ets:member(B, key),
+    false = ets:member(B, key_not_exist),
+
+    % Duplicate bag
+    DB = new_table(duplicate_bag, [{key, value}, {key, value}]),
+    true = ets:member(DB, key),
+    false = ets:member(DB, key_not_exist),
+
+    ok.
+
 test_insert() ->
     % Set
     S1 = ets:new(test, []),
@@ -291,165 +363,6 @@ test_insert_new() ->
     assert_insert_badargs(ets:new(test, []), fun ets:insert_new/2),
     assert_insert_badargs(ets:new(test, [bag]), fun ets:insert_new/2),
     assert_insert_badargs(ets:new(test, [duplicate_bag]), fun ets:insert_new/2),
-
-    ok.
-
-test_delete() ->
-    % Set
-    S = new_table([{key, value}, {key2, value2}]),
-    true = ets:delete(S, key_not_exist),
-
-    true = ets:delete(S, key),
-    [] = ets:lookup(S, key),
-    [{key2, value2}] = ets:lookup(S, key2),
-
-    true = ets:delete(S, key2),
-    [] = ets:lookup(S, key2),
-
-    true = ets:delete(S, key2),
-    true = ets:delete(S),
-
-    % Bag
-    B = new_table(bag, [{key, value}, {key, value2}, {key2, value3}]),
-    true = ets:delete(B, key_not_exist),
-
-    true = ets:delete(B, key),
-    [] = ets:lookup(B, key),
-    [{key2, value3}] = ets:lookup(B, key2),
-
-    true = ets:delete(B, key2),
-    [] = ets:lookup(B, key2),
-
-    true = ets:delete(B, key2),
-    true = ets:delete(B),
-
-    % Duplicate bag
-    DB = new_table(duplicate_bag, [{key, value}, {key, value}, {key2, value2}]),
-    true = ets:delete(DB, key_not_exist),
-
-    true = ets:delete(DB, key),
-    [] = ets:lookup(DB, key),
-    [{key2, value2}] = ets:lookup(DB, key2),
-
-    true = ets:delete(DB, key2),
-    [] = ets:lookup(DB, key2),
-
-    true = ets:delete(DB, key2),
-    true = ets:delete(DB),
-
-    % Badargs
-    TErr = new_table(2, []),
-    true = ets:delete(TErr),
-    assert_badarg(fun() -> ets:lookup(TErr, key) end),
-    assert_badarg(fun() -> ets:delete(TErr) end),
-    assert_badarg(fun() -> ets:delete(bad_table) end),
-
-    ok.
-
-test_delete_object() ->
-    % Set
-    S = new_table([{key, value}, {key2, value2}]),
-    true = ets:delete_object(S, {key_not_exist, value_not_exist}),
-
-    true = ets:delete_object(S, {key, value_not_exist}),
-    [{key, value}] = ets:lookup(S, key),
-
-    true = ets:delete_object(S, {key, value}),
-    [] = ets:lookup(S, key),
-
-    true = ets:delete_object(S, {key2, value2}),
-    [] = ets:lookup(S, key2),
-
-    % Bag
-    B = new_table(bag, [{key, value}, {key, value2}, {key2, value2}]),
-    true = ets:delete_object(B, {key_not_exist, value_not_exist}),
-
-    true = ets:delete_object(B, {key, value_not_exist}),
-    [{key, value}, {key, value2}] = ets:lookup(B, key),
-
-    true = ets:delete_object(B, {key, value}),
-    [{key, value2}] = ets:lookup(B, key),
-
-    true = ets:delete_object(B, {key, value2}),
-    [] = ets:lookup(B, key),
-
-    true = ets:delete_object(B, {key2, value2}),
-    [] = ets:lookup(B, key2),
-
-    % Duplicate bag
-    DB = new_table(duplicate_bag, [{key, value}, {key, value}, {key, value2}]),
-    true = ets:delete_object(DB, {key_not_exist, value_not_exist}),
-
-    true = ets:delete_object(DB, {key, value_not_exist}),
-    [{key, value}, {key, value}, {key, value2}] = ets:lookup(DB, key),
-
-    true = ets:delete_object(DB, {key, value}),
-    [{key, value2}] = ets:lookup(DB, key),
-
-    true = ets:delete_object(DB, {key, value2}),
-    [] = ets:lookup(DB, key),
-
-    % Badargs
-    TErr = new_table(2, []),
-    assert_badarg(fun() -> ets:delete_object(TErr, not_a_tuple) end),
-    assert_badarg(fun() -> ets:delete_object(TErr, [{key, value}, {key, value2}]) end),
-    assert_badarg(fun() -> ets:delete_object(TErr, {}) end),
-    assert_badarg(fun() -> ets:delete_object(TErr, {bad_keypos}) end),
-    assert_badarg(fun() -> ets:delete_object(bad_table, {key, value}) end),
-
-    ok.
-
-test_lookup_element() ->
-    PosKey = 1,
-    PosValue = 2,
-
-    AssertBadArgs =
-        fun(Tab) ->
-            PosPastBounds = 3,
-            PosZero = 0,
-            PosNegative = -1,
-
-            assert_badarg(fun() -> ets:lookup_element(Tab, key_not_exist, PosKey) end),
-            assert_badarg(fun() -> ets:lookup_element(Tab, key, PosZero) end),
-            assert_badarg(fun() -> ets:lookup_element(Tab, key, PosPastBounds) end),
-            assert_badarg(fun() -> ets:lookup_element(Tab, key, PosNegative) end),
-            assert_badarg(fun() -> ets:lookup_element(Tab, key, PosNegative, default) end)
-        end,
-
-    % Set
-    S = new_table([{key, value}]),
-    key = ets:lookup_element(S, key, PosKey),
-    value = ets:lookup_element(S, key, PosValue),
-    default = ets:lookup_element(S, key_not_exist, PosKey, default),
-
-    % Bag
-    B = new_table(bag, [{key, value}, {key, value2}]),
-    [key, key] = ets:lookup_element(B, key, PosKey),
-    [value, value2] = ets:lookup_element(B, key, PosValue),
-    default = ets:lookup_element(B, key_not_exist, PosKey, default),
-
-    true = ets:insert(B, {key, value3}),
-    [key, key, key] = ets:lookup_element(B, key, PosKey),
-    [value, value2, value3] = ets:lookup_element(B, key, PosValue),
-
-    % Duplicate bag
-    DB = new_table(duplicate_bag, [{key, value}, {key, value}]),
-    [key, key] = ets:lookup_element(DB, key, PosKey),
-    [value, value] = ets:lookup_element(DB, key, PosValue),
-    default = ets:lookup_element(DB, key_not_exist, PosKey, default),
-
-    true = ets:insert(DB, {key, value2}),
-    [key, key, key] = ets:lookup_element(DB, key, PosKey),
-    [value, value, value2] = ets:lookup_element(DB, key, PosValue),
-
-    true = ets:insert(DB, {key2, value2}),
-    [key2] = ets:lookup_element(DB, key2, PosKey),
-    [value2] = ets:lookup_element(DB, key2, PosValue),
-
-    % Badargs
-    AssertBadArgs(ets:new(test, [set])),
-    AssertBadArgs(ets:new(test, [bag])),
-    AssertBadArgs(ets:new(test, [duplicate_bag])),
 
     ok.
 
@@ -641,24 +554,6 @@ test_update_counter() ->
 
     ok.
 
-test_member() ->
-    % Set
-    S = new_table([{key, value}]),
-    true = ets:member(S, key),
-    false = ets:member(S, key_not_exist),
-
-    % Bag
-    B = new_table(bag, [{key, value}, {key, value2}]),
-    true = ets:member(B, key),
-    false = ets:member(B, key_not_exist),
-
-    % Duplicate bag
-    DB = new_table(duplicate_bag, [{key, value}, {key, value}]),
-    true = ets:member(DB, key),
-    false = ets:member(DB, key_not_exist),
-
-    ok.
-
 test_take() ->
     % Set
     S1 = new_table([]),
@@ -686,6 +581,111 @@ test_take() ->
     [{key, value}, {key, value}] = ets:take(DB2, key),
     [] = ets:lookup(DB2, key),
     [{key2, value2}] = ets:lookup(DB2, key2),
+
+    ok.
+
+test_delete() ->
+    % Set
+    S = new_table([{key, value}, {key2, value2}]),
+    true = ets:delete(S, key_not_exist),
+
+    true = ets:delete(S, key),
+    [] = ets:lookup(S, key),
+    [{key2, value2}] = ets:lookup(S, key2),
+
+    true = ets:delete(S, key2),
+    [] = ets:lookup(S, key2),
+
+    true = ets:delete(S, key2),
+    true = ets:delete(S),
+
+    % Bag
+    B = new_table(bag, [{key, value}, {key, value2}, {key2, value3}]),
+    true = ets:delete(B, key_not_exist),
+
+    true = ets:delete(B, key),
+    [] = ets:lookup(B, key),
+    [{key2, value3}] = ets:lookup(B, key2),
+
+    true = ets:delete(B, key2),
+    [] = ets:lookup(B, key2),
+
+    true = ets:delete(B, key2),
+    true = ets:delete(B),
+
+    % Duplicate bag
+    DB = new_table(duplicate_bag, [{key, value}, {key, value}, {key2, value2}]),
+    true = ets:delete(DB, key_not_exist),
+
+    true = ets:delete(DB, key),
+    [] = ets:lookup(DB, key),
+    [{key2, value2}] = ets:lookup(DB, key2),
+
+    true = ets:delete(DB, key2),
+    [] = ets:lookup(DB, key2),
+
+    true = ets:delete(DB, key2),
+    true = ets:delete(DB),
+
+    % Badargs
+    TErr = new_table(2, []),
+    true = ets:delete(TErr),
+    assert_badarg(fun() -> ets:lookup(TErr, key) end),
+    assert_badarg(fun() -> ets:delete(TErr) end),
+    assert_badarg(fun() -> ets:delete(bad_table) end),
+
+    ok.
+
+test_delete_object() ->
+    % Set
+    S = new_table([{key, value}, {key2, value2}]),
+    true = ets:delete_object(S, {key_not_exist, value_not_exist}),
+
+    true = ets:delete_object(S, {key, value_not_exist}),
+    [{key, value}] = ets:lookup(S, key),
+
+    true = ets:delete_object(S, {key, value}),
+    [] = ets:lookup(S, key),
+
+    true = ets:delete_object(S, {key2, value2}),
+    [] = ets:lookup(S, key2),
+
+    % Bag
+    B = new_table(bag, [{key, value}, {key, value2}, {key2, value2}]),
+    true = ets:delete_object(B, {key_not_exist, value_not_exist}),
+
+    true = ets:delete_object(B, {key, value_not_exist}),
+    [{key, value}, {key, value2}] = ets:lookup(B, key),
+
+    true = ets:delete_object(B, {key, value}),
+    [{key, value2}] = ets:lookup(B, key),
+
+    true = ets:delete_object(B, {key, value2}),
+    [] = ets:lookup(B, key),
+
+    true = ets:delete_object(B, {key2, value2}),
+    [] = ets:lookup(B, key2),
+
+    % Duplicate bag
+    DB = new_table(duplicate_bag, [{key, value}, {key, value}, {key, value2}]),
+    true = ets:delete_object(DB, {key_not_exist, value_not_exist}),
+
+    true = ets:delete_object(DB, {key, value_not_exist}),
+    [{key, value}, {key, value}, {key, value2}] = ets:lookup(DB, key),
+
+    true = ets:delete_object(DB, {key, value}),
+    [{key, value2}] = ets:lookup(DB, key),
+
+    true = ets:delete_object(DB, {key, value2}),
+    [] = ets:lookup(DB, key),
+
+    % Badargs
+    TErr = new_table(2, []),
+    assert_badarg(fun() -> ets:delete_object(TErr, not_a_tuple) end),
+    assert_badarg(fun() -> ets:delete_object(TErr, [{key, value}, {key, value2}]) end),
+    assert_badarg(fun() -> ets:delete_object(TErr, {}) end),
+    assert_badarg(fun() -> ets:delete_object(TErr, {bad_keypos}) end),
+    assert_badarg(fun() -> ets:delete_object(bad_table, {key, value}) end),
 
     ok.
 
