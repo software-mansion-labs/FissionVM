@@ -196,6 +196,8 @@ Popcorn2EtsStatus ets_multimap_insert(
             }
 
             if (exists) {
+                entry_delete(entry, global);
+                entries[i] = NULL;
                 continue;
             }
         }
@@ -426,7 +428,9 @@ static void insert_revert(
     }
 
     for (size_t i = 0; i < count; i++) {
-        entry_delete(entries[i], global);
+        if (entries[i] != NULL) {
+            entry_delete(entries[i], global);
+        }
     }
 }
 
@@ -534,5 +538,6 @@ static void node_delete(EtsMultimapNode *node, GlobalContext *global)
 static void entry_delete(EtsMultimapEntry *entry, GlobalContext *global)
 {
     memory_destroy_heap(entry->heap, global);
+    free(entry->heap);
     free(entry);
 }
