@@ -815,6 +815,9 @@ static Popcorn2EtsStatus lookup_or_default(
     size_t tuple_size = memory_estimate_usage(*tuple);
 
     if (UNLIKELY(memory_init_heap(ret_heap, tuple_size) != MEMORY_GC_OK)) {
+        if (!insert_default) {
+            free(tuple);
+        }
         return Popcorn2EtsAllocationError;
     }
 
@@ -822,6 +825,8 @@ static Popcorn2EtsStatus lookup_or_default(
 
     if (insert_default) {
         term_put_tuple_element(*ret, (uint32_t) table->key_index, key);
+    } else {
+        free(tuple);
     }
 
     return Popcorn2EtsOk;
@@ -851,6 +856,7 @@ static Popcorn2EtsStatus apply_spec(term tuple, term spec, size_t key_index)
     }
 
     term_put_tuple_element(tuple, (uint32_t) index, value);
+
     return Popcorn2EtsOk;
 }
 
