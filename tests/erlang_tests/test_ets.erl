@@ -27,15 +27,15 @@ start() ->
     ok = isolated(fun test_permissions/0),
     ok = isolated(fun test_keys/0),
     ok = isolated(fun test_keypos/0),
+    ok = isolated(fun test_lookup_element/0),
+    ok = isolated(fun test_member/0),
     ok = isolated(fun test_insert/0),
     ok = isolated(fun test_insert_new/0),
-    ok = isolated(fun test_delete/0),
-    ok = isolated(fun test_delete_object/0),
-    ok = isolated(fun test_lookup_element/0),
     ok = isolated(fun test_update_element/0),
     ok = isolated(fun test_update_counter/0),
-    ok = isolated(fun test_member/0),
     ok = isolated(fun test_take/0),
+    ok = isolated(fun test_delete/0),
+    ok = isolated(fun test_delete_object/0),
     0.
 
 test_ets_new() ->
@@ -416,40 +416,41 @@ test_lookup_element() ->
             assert_badarg(fun() -> ets:lookup_element(Tab, key, PosNegative, default) end)
         end,
 
-    % set
-    S = ets:new(test, []),
-    true = ets:insert(S, {key, value}),
+    % Set
+    S = new_table([{key, value}]),
     key = ets:lookup_element(S, key, PosKey),
     value = ets:lookup_element(S, key, PosValue),
     default = ets:lookup_element(S, key_not_exist, PosKey, default),
-    AssertBadArgs(S),
 
-    % bag
-    B = ets:new(test, [bag]),
-    true = ets:insert(B, {key, value}),
-    true = ets:insert(B, {key, value2}),
+    % Bag
+    B = new_table(bag, [{key, value}, {key, value2}]),
     [key, key] = ets:lookup_element(B, key, PosKey),
     [value, value2] = ets:lookup_element(B, key, PosValue),
     default = ets:lookup_element(B, key_not_exist, PosKey, default),
+
     true = ets:insert(B, {key, value3}),
     [key, key, key] = ets:lookup_element(B, key, PosKey),
     [value, value2, value3] = ets:lookup_element(B, key, PosValue),
-    AssertBadArgs(B),
 
-    % duplicate_bag
-    DB = ets:new(test, [duplicate_bag]),
-    true = ets:insert(DB, {key, value}),
-    true = ets:insert(DB, {key, value}),
+    % Duplicate bag
+    DB = new_table(duplicate_bag, [{key, value}, {key, value}]),
     [key, key] = ets:lookup_element(DB, key, PosKey),
     [value, value] = ets:lookup_element(DB, key, PosValue),
     default = ets:lookup_element(DB, key_not_exist, PosKey, default),
+
     true = ets:insert(DB, {key, value2}),
     [key, key, key] = ets:lookup_element(DB, key, PosKey),
     [value, value, value2] = ets:lookup_element(DB, key, PosValue),
+
     true = ets:insert(DB, {key2, value2}),
     [key2] = ets:lookup_element(DB, key2, PosKey),
     [value2] = ets:lookup_element(DB, key2, PosValue),
-    AssertBadArgs(DB),
+
+    % Badargs
+    AssertBadArgs(ets:new(test, [set])),
+    AssertBadArgs(ets:new(test, [bag])),
+    AssertBadArgs(ets:new(test, [duplicate_bag])),
+
     ok.
 
 test_update_element() ->
