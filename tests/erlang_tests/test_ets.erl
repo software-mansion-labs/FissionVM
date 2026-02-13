@@ -450,7 +450,7 @@ test_lookup_element() ->
             PosZero = 0,
             PosNegative = -1,
 
-            assert_badarg(fun() -> ets:lookup_element(Tab, bad_key, PosKey) end),
+            assert_badarg(fun() -> ets:lookup_element(Tab, key_not_exist, PosKey) end),
             assert_badarg(fun() -> ets:lookup_element(Tab, key, PosZero) end),
             assert_badarg(fun() -> ets:lookup_element(Tab, key, PosPastBounds) end),
             assert_badarg(fun() -> ets:lookup_element(Tab, key, PosNegative) end),
@@ -462,7 +462,7 @@ test_lookup_element() ->
     true = ets:insert(S, {key, value}),
     key = ets:lookup_element(S, key, PosKey),
     value = ets:lookup_element(S, key, PosValue),
-    default = ets:lookup_element(S, bad_key, PosKey, default),
+    default = ets:lookup_element(S, key_not_exist, PosKey, default),
     AssertBadArgs(S),
 
     % bag
@@ -471,7 +471,7 @@ test_lookup_element() ->
     true = ets:insert(B, {key, value2}),
     [key, key] = ets:lookup_element(B, key, PosKey),
     [value, value2] = ets:lookup_element(B, key, PosValue),
-    default = ets:lookup_element(B, bad_key, PosKey, default),
+    default = ets:lookup_element(B, key_not_exist, PosKey, default),
     true = ets:insert(B, {key, value3}),
     [key, key, key] = ets:lookup_element(B, key, PosKey),
     [value, value2, value3] = ets:lookup_element(B, key, PosValue),
@@ -483,7 +483,7 @@ test_lookup_element() ->
     true = ets:insert(DB, {key, value}),
     [key, key] = ets:lookup_element(DB, key, PosKey),
     [value, value] = ets:lookup_element(DB, key, PosValue),
-    default = ets:lookup_element(DB, bad_key, PosKey, default),
+    default = ets:lookup_element(DB, key_not_exist, PosKey, default),
     true = ets:insert(DB, {key, value2}),
     [key, key, key] = ets:lookup_element(DB, key, PosKey),
     [value, value, value2] = ets:lookup_element(DB, key, PosValue),
