@@ -78,7 +78,7 @@ static uint32_t hash_float(term t, int32_t h, GlobalContext *global)
     UNUSED(global);
     avm_float_t f = term_to_float(t);
     uint8_t *data = (uint8_t *) &f;
-    size_t len = sizeof(float);
+    size_t len = sizeof(avm_float_t);
     for (size_t i = 0; i < len; ++i) {
         h = h * LARGE_PRIME_FLOAT + data[i];
     }
@@ -204,11 +204,11 @@ static uint32_t hash_term_incr(term t, int32_t h, GlobalContext *global)
                 h = h * LARGE_PRIME_LIST;
                 break;
             } else if (!term_is_list(t)) {
-                h = h * LARGE_PRIME_LIST + hash_term_incr(elt, h, global);
+                h = h * LARGE_PRIME_LIST + hash_term_incr(t, h, global);
                 break;
             }
         }
-        return h * LARGE_PRIME_TUPLE;
+        return h * LARGE_PRIME_LIST;
     } else if (term_is_map(t)) {
         size_t size = term_get_map_size(t);
         for (size_t i = 0; i < size; ++i) {
