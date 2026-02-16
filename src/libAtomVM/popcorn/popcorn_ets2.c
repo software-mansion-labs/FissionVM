@@ -816,9 +816,9 @@ static Popcorn2EtsStatus lookup_or_default(
         tuple = &default_tuple;
     }
 
-    size_t tuple_size = memory_estimate_usage(*tuple);
+    size_t size = memory_estimate_usage(*tuple) + memory_estimate_usage(key);
 
-    if (UNLIKELY(memory_init_heap(ret_heap, tuple_size) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_init_heap(ret_heap, size) != MEMORY_GC_OK)) {
         if (!insert_default) {
             free(tuple);
         }
@@ -828,6 +828,7 @@ static Popcorn2EtsStatus lookup_or_default(
     *ret = memory_copy_term_tree(ret_heap, *tuple);
 
     if (insert_default) {
+        key = memory_copy_term_tree(ret_heap, key);
         term_put_tuple_element(*ret, (uint32_t) table->key_index, key);
     } else {
         free(tuple);
