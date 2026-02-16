@@ -113,11 +113,6 @@ Popcorn2EtsStatus ets_multimap_lookup(
         return Popcorn2EtsOk;
     }
 
-    if (*count == 0) {
-        *tuples = NULL;
-        return Popcorn2EtsOk;
-    }
-
     *tuples = malloc(sizeof(term) * (*count));
     if (IS_NULL_PTR(*tuples)) {
         return Popcorn2EtsAllocationError;
@@ -368,10 +363,6 @@ static Popcorn2EtsStatus node_find(
 
     uint32_t idx = hash_term(key, global) % NUM_BUCKETS;
     EtsMultimapNode *node = multimap->buckets[idx];
-
-    if (node == NULL) {
-        return Popcorn2EtsOk;
-    }
 
     while (node) {
         TermCompareResult result = term_compare(key, node_key(multimap, node), TermCompareExact, global);
