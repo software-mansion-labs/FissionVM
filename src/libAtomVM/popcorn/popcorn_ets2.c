@@ -41,9 +41,9 @@
 #define SMP_WRLOCK(table) smp_rwlock_wrlock(table->lock)
 #define SMP_UNLOCK(table) smp_rwlock_unlock(table->lock)
 #else
-#define SMP_RDLOCK(htable) UNUSED(htable)
-#define SMP_WRLOCK(htable) UNUSED(htable)
-#define SMP_UNLOCK(htable) UNUSED(htable)
+#define SMP_RDLOCK(table) UNUSED(table)
+#define SMP_WRLOCK(table) UNUSED(table)
+#define SMP_UNLOCK(table) UNUSED(table)
 #endif
 
 struct Popcorn2EtsTable
@@ -367,7 +367,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter(
     if (term_is_integer(op)) {
         avm_int_t index = (avm_int_t) table->key_index + 1;
 
-        if (index >= term_get_tuple_arity(insert_tuple)) {
+        if (index < 0 || index >= term_get_tuple_arity(insert_tuple)) {
             result = Popcorn2EtsBadEntry;
             goto cleanup;
         }
