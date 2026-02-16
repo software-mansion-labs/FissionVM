@@ -120,7 +120,7 @@ void popcorn2_ets_destroy(Popcorn2Ets *ets, GlobalContext *global)
     synclist_destroy(&ets->ets_tables);
 }
 
-Popcorn2EtsStatus popcorn2_ets_create_table(
+Popcorn2EtsStatus popcorn2_ets_create_table_maybe_gc(
     term name,
     bool named,
     Popcorn2EtsTableType type,
@@ -196,7 +196,7 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     return Popcorn2EtsOk;
 }
 
-Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Context *ctx)
+Popcorn2EtsStatus popcorn2_ets_lookup_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx)
 {
     assert(ret != NULL);
 
@@ -217,7 +217,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_lookup_element(term name_or_ref, term key, size_t index, term *ret, Context *ctx)
+Popcorn2EtsStatus popcorn2_ets_lookup_element_maybe_gc(term name_or_ref, term key, size_t index, term *ret, Context *ctx)
 {
     assert(ret != NULL);
 
@@ -317,7 +317,7 @@ cleanup:
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_take(term name_or_ref, term key, term *ret, Context *ctx)
+Popcorn2EtsStatus popcorn2_ets_take_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx)
 {
     struct Popcorn2EtsTable *table = get_table(
         &ctx->global->popcorn2_ets,
@@ -340,7 +340,7 @@ Popcorn2EtsStatus popcorn2_ets_take(term name_or_ref, term key, term *ret, Conte
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_update_counter(
+Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
     term name_or_ref,
     term key,
     term op,
