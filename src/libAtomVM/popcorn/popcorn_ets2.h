@@ -71,7 +71,7 @@ typedef struct Popcorn2Ets
 void popcorn2_ets_init(Popcorn2Ets *ets);
 void popcorn2_ets_destroy(Popcorn2Ets *ets, GlobalContext *global);
 
-Popcorn2EtsStatus popcorn2_ets_create_table(
+Popcorn2EtsStatus popcorn2_ets_create_table_maybe_gc(
     term name,
     bool named,
     Popcorn2EtsTableType type,
@@ -81,12 +81,12 @@ Popcorn2EtsStatus popcorn2_ets_create_table(
     Context *ctx);
 void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, GlobalContext *global);
 
-Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Context *ctx);
-Popcorn2EtsStatus popcorn2_ets_lookup_element(term name_or_ref, term key, size_t index, term *ret, Context *ctx);
+Popcorn2EtsStatus popcorn2_ets_lookup_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx);
+Popcorn2EtsStatus popcorn2_ets_lookup_element_maybe_gc(term name_or_ref, term key, size_t index, term *ret, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool new, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_update_element(term name_or_ref, term key, term element_spec, term default_tuple, Context *ctx);
-Popcorn2EtsStatus popcorn2_ets_update_counter(term name_or_ref, term key, term op, term default_tuple, term *ret, Context *ctx);
-Popcorn2EtsStatus popcorn2_ets_take(term name_or_ref, term key, term *ret, Context *ctx);
+Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(term name_or_ref, term key, term op, term default_tuple, term *ret, Context *ctx);
+Popcorn2EtsStatus popcorn2_ets_take_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_delete_table(term name_or_ref, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_delete_object(term name_or_ref, term tuple, Context *ctx);

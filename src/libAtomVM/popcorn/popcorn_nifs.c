@@ -580,7 +580,7 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
 
     term table = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_create_table(
+    Popcorn2EtsStatus result = popcorn2_ets_create_table_maybe_gc(
         name,
         is_named == TRUE_ATOM,
         type,
@@ -670,7 +670,7 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_lookup(name_or_ref, key, &ret, ctx);
+    Popcorn2EtsStatus result = popcorn2_ets_lookup_maybe_gc(name_or_ref, key, &ret, ctx);
 
     switch (result) {
         case Popcorn2EtsOk:
@@ -698,7 +698,7 @@ static term nif_ets_member(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_lookup(name_or_ref, key, &ret, ctx);
+    Popcorn2EtsStatus result = popcorn2_ets_lookup_maybe_gc(name_or_ref, key, &ret, ctx);
 
     switch (result) {
         case Popcorn2EtsOk:
@@ -710,6 +710,7 @@ static term nif_ets_member(Context *ctx, int argc, term argv[])
         case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
@@ -725,7 +726,7 @@ static term nif_ets_take(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_take(name_or_ref, key, &ret, ctx);
+    Popcorn2EtsStatus result = popcorn2_ets_take_maybe_gc(name_or_ref, key, &ret, ctx);
 
     switch (result) {
         case Popcorn2EtsOk:
@@ -758,7 +759,7 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_update_counter(name_or_ref, key, operation, default_tuple, &ret, ctx);
+    Popcorn2EtsStatus result = popcorn2_ets_update_counter_maybe_gc(name_or_ref, key, operation, default_tuple, &ret, ctx);
 
     switch (result) {
         case Popcorn2EtsOk:
@@ -772,6 +773,7 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
         case Popcorn2EtsOverflow:
             RAISE_ERROR(OVERFLOW_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
@@ -803,6 +805,7 @@ static term nif_ets_update_element(Context *ctx, int argc, term argv[])
         case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
@@ -830,7 +833,7 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_lookup_element(name_or_ref, key, (size_t) index, &ret, ctx);
+    Popcorn2EtsStatus result = popcorn2_ets_lookup_element_maybe_gc(name_or_ref, key, (size_t) index, &ret, ctx);
 
     switch (result) {
         case Popcorn2EtsOk:
@@ -846,6 +849,7 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
         case Popcorn2EtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
+            // unreachable
             AVM_ABORT();
     }
 }
