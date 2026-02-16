@@ -91,10 +91,12 @@ static Popcorn2EtsStatus insert_many(
     term tuples,
     bool new,
     Context *ctx);
-static Popcorn2EtsStatus lookup_select(
+static Popcorn2EtsStatus lookup_select_maybe_gc(
     struct Popcorn2EtsTable *table,
     term key,
     size_t index,
+    size_t num_roots,
+    term *roots,
     term *ret,
     Context *ctx);
 static Popcorn2EtsStatus lookup_or_default(
@@ -208,7 +210,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup(term name_or_ref, term key, term *ret, Con
         return Popcorn2EtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = lookup_select(table, key, ETS_WHOLE_TUPLE, ret, ctx);
+    Popcorn2EtsStatus result = lookup_select_maybe_gc(table, key, ETS_WHOLE_TUPLE, 0, NULL, ret, ctx);
 
     SMP_UNLOCK(table);
 
@@ -229,7 +231,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup_element(term name_or_ref, term key, size_t
         return Popcorn2EtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = lookup_select(table, key, index, ret, ctx);
+    Popcorn2EtsStatus result = lookup_select_maybe_gc(table, key, index, 0, NULL, ret, ctx);
 
     SMP_UNLOCK(table);
 
@@ -327,7 +329,7 @@ Popcorn2EtsStatus popcorn2_ets_take(term name_or_ref, term key, term *ret, Conte
         return Popcorn2EtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = lookup_select(table, key, ETS_WHOLE_TUPLE, ret, ctx);
+    Popcorn2EtsStatus result = lookup_select_maybe_gc(table, key, ETS_WHOLE_TUPLE, 1, &key, ret, ctx);
 
     if (result == Popcorn2EtsOk) {
         result = ets_multimap_remove(table->multimap, key, ctx->global);
@@ -695,10 +697,12 @@ static Popcorn2EtsStatus insert_many(
     return result;
 }
 
-static Popcorn2EtsStatus lookup_select(
+static Popcorn2EtsStatus lookup_select_maybe_gc(
     struct Popcorn2EtsTable *table,
     term key,
     size_t index,
+    size_t num_roots,
+    term *roots,
     term *ret,
     Context *ctx)
 {
@@ -745,7 +749,7 @@ static Popcorn2EtsStatus lookup_select(
     }
 
     // Terms in `tuples` come from ETS heap, we need to copy them to process heap before returning.
-    if (UNLIKELY(memory_ensure_free_opt(ctx, elements_size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+    if (UNLIKELY(memory_ensure_free_with_roots(ctx, elements_size, num_roots, roots, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(tuples);
         return Popcorn2EtsAllocationError;
     }
