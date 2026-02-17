@@ -331,13 +331,13 @@ Popcorn2EtsStatus ets_multimap_remove_tuple(
     if (node->entries == NULL) {
         uint32_t idx = hash_term(key, global) % NUM_BUCKETS;
 
-        EtsMultimapNode *prev = NULL;
-        for (EtsMultimapNode *iter = multimap->buckets[idx]; iter != NULL; prev = iter, iter = iter->next) {
+        EtsMultimapNode *prev_node = NULL;
+        for (EtsMultimapNode *iter = multimap->buckets[idx]; iter != NULL; prev_node = iter, iter = iter->next) {
             if (iter == node) {
-                if (prev == NULL) {
+                if (prev_node == NULL) {
                     multimap->buckets[idx] = iter->next;
                 } else {
-                    prev->next = iter->next;
+                    prev_node->next = iter->next;
                 }
                 break;
             }

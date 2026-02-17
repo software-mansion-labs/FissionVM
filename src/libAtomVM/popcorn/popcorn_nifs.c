@@ -751,6 +751,8 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
     term key = argv[1];
     term operation = argv[2];
    
+    VALIDATE_VALUE(name_or_ref, is_ets_table_id);
+
     term default_tuple = term_invalid_term();
     if (argc == 4) {
         default_tuple = argv[3];
@@ -786,6 +788,8 @@ static term nif_ets_update_element(Context *ctx, int argc, term argv[])
     term key = argv[1];
     term element_spec = argv[2];
    
+    VALIDATE_VALUE(name_or_ref, is_ets_table_id);
+
     term default_tuple = term_invalid_term();
     if (argc == 4) {
         default_tuple = argv[3];
@@ -875,6 +879,8 @@ static term nif_ets_delete(Context *ctx, int argc, term argv[])
             return TRUE_ATOM;
         case Popcorn2EtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
+        case Popcorn2EtsAllocationError:
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
             AVM_ABORT();
