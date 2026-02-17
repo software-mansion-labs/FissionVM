@@ -84,12 +84,12 @@ static void table_destroy(struct Popcorn2EtsTable *table, GlobalContext *global)
 static Popcorn2EtsStatus insert_one(
     struct Popcorn2EtsTable *table,
     term tuple,
-    bool new,
+    bool as_new,
     Context *ctx);
 static Popcorn2EtsStatus insert_many(
     struct Popcorn2EtsTable *table,
     term tuples,
-    bool new,
+    bool as_new,
     Context *ctx);
 static Popcorn2EtsStatus lookup_select_maybe_gc(
     struct Popcorn2EtsTable *table,
@@ -238,7 +238,7 @@ Popcorn2EtsStatus popcorn2_ets_lookup_element_maybe_gc(term name_or_ref, term ke
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool new, Context *ctx)
+Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool as_new, Context *ctx)
 {
     struct Popcorn2EtsTable *table = get_table(
         &ctx->global->popcorn2_ets,
@@ -253,9 +253,9 @@ Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool new, Co
     Popcorn2EtsStatus result = Popcorn2EtsBadEntry;
 
     if (term_is_tuple(entry)) {
-        result = insert_one(table, entry, new, ctx);
+        result = insert_one(table, entry, as_new, ctx);
     } else if (term_is_list(entry)) {
-        result = insert_many(table, entry, new, ctx);
+        result = insert_many(table, entry, as_new, ctx);
     }
 
     SMP_UNLOCK(table);
@@ -620,7 +620,7 @@ static struct Popcorn2EtsTable *get_table(
 static Popcorn2EtsStatus insert_one(
     struct Popcorn2EtsTable *table,
     term tuple,
-    bool new,
+    bool as_new,
     Context *ctx)
 {
     assert(term_is_tuple(tuple));
@@ -631,7 +631,7 @@ static Popcorn2EtsStatus insert_one(
         return Popcorn2EtsBadEntry;
     }
 
-    if (new) {
+    if (as_new) {
         term key = term_get_tuple_element(tuple, table->key_index);
         size_t existing = 0;
         result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
@@ -651,7 +651,7 @@ static Popcorn2EtsStatus insert_one(
 static Popcorn2EtsStatus insert_many(
     struct Popcorn2EtsTable *table,
     term tuples,
-    bool new,
+    bool as_new,
     Context *ctx)
 {
     assert(term_is_list(tuples));
@@ -670,7 +670,7 @@ static Popcorn2EtsStatus insert_many(
             return Popcorn2EtsBadEntry;
         }
 
-        if (new) {
+        if (as_new) {
             term key = term_get_tuple_element(tuple, table->key_index);
             size_t existing = 0;
             result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);

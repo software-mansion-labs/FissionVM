@@ -18,8 +18,8 @@
  * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
 
-#ifndef _POPCORN_ETS_MULTIMAP_H_
-#define _POPCORN_ETS_MULTIMAP_H_
+#ifndef _POPCORN2_ETS_MULTIMAP_H_
+#define _POPCORN2_ETS_MULTIMAP_H_
 
 #include "../globalcontext.h"
 #include "../term.h"
@@ -89,7 +89,7 @@ void ets_multimap_delete(EtsMultimap *multimap, GlobalContext *global);
  * @note The returned tuples are ordered in reverse insertion order
  *       (most recently added elements first).
  * @warning The caller is responsible for freeing the memory pointed to by `tuples`
- *          using `free()`. When count is zero, memory is not allocated and `tuples` is set to NULL.
+ *          using `free()`. When count is zero, memory is not allocated.
  */
 Popcorn2EtsStatus ets_multimap_lookup(
     EtsMultimap *multimap,
@@ -144,4 +144,4 @@ Popcorn2EtsStatus ets_multimap_remove_tuple(
 }
 #endif
 
-#endif // _POPCORN_ETS_MULTIMAP_H_
+#endif // _POPCORN2_ETS_MULTIMAP_H_

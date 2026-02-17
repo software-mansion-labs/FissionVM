@@ -83,7 +83,7 @@ void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, Glob
 
 Popcorn2EtsStatus popcorn2_ets_lookup_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_lookup_element_maybe_gc(term name_or_ref, term key, size_t index, term *ret, Context *ctx);
-Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool new, Context *ctx);
+Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool as_new, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_update_element(term name_or_ref, term key, term element_spec, term default_tuple, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(term name_or_ref, term key, term op, term default_tuple, term *ret, Context *ctx);
 Popcorn2EtsStatus popcorn2_ets_take_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx);
