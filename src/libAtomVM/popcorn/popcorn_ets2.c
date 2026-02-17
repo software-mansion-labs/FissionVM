@@ -307,6 +307,9 @@ Popcorn2EtsStatus popcorn2_ets_update_element(
                 goto cleanup;
             }
         }
+    } else {
+        result = Popcorn2EtsBadEntry;
+        goto cleanup;
     }
 
     result = ets_multimap_insert(table->multimap, &insert_tuple, 1, ctx->global);
