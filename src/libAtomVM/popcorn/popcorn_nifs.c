@@ -696,9 +696,7 @@ static term nif_ets_member(Context *ctx, int argc, term argv[])
 
     VALIDATE_VALUE(name_or_ref, is_ets_table_id);
 
-    term ret = term_invalid_term();
-
-    Popcorn2EtsStatus result = popcorn2_ets_lookup_maybe_gc(name_or_ref, key, &ret, ctx);
+    Popcorn2EtsStatus result = popcorn2_ets_member(name_or_ref, key, ctx);
 
     switch (result) {
         case Popcorn2EtsOk:
