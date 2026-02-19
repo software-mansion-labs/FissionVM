@@ -1,7 +1,7 @@
 // See popcorn_nifs.gperf for status of each NIF
 
 #include "popcorn_nifs.h"
-#include "popcorn_ets.h"
+#include "popcorn_ets2.h"
 #include "popcorn_md5.h"
 
 #include "nifs.h"

@@ -30,7 +30,6 @@
 
 #include <stdint.h>
 
-#include "popcorn/popcorn_ets.h"
 #include "popcorn/popcorn_ets2.h"
 
 #include "atom.h"
@@ -124,7 +123,6 @@ struct GlobalContext
     struct SyncList select_events;
 
     struct Ets ets;
-    struct PopcornEts popcorn_ets;
     Popcorn2Ets popcorn2_ets;
 
     int32_t last_process_id;
