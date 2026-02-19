@@ -238,6 +238,30 @@ Popcorn2EtsStatus popcorn2_ets_lookup_element_maybe_gc(term name_or_ref, term ke
     return result;
 }
 
+Popcorn2EtsStatus popcorn2_ets_member(term name_or_ref, term key, Context *ctx)
+{
+    struct Popcorn2EtsTable *table = get_table(
+        &ctx->global->popcorn2_ets,
+        name_or_ref,
+        ctx->process_id,
+        TableAccessRead);
+
+    if (table == NULL) {
+        return Popcorn2EtsBadAccess;
+    }
+
+    size_t count;
+    Popcorn2EtsStatus result = ets_multimap_lookup(table->multimap, key, NULL, &count, ctx->global);
+
+    if (result == Popcorn2EtsOk && count == 0) {
+        result = Popcorn2EtsTupleNotExists;
+    }
+
+    SMP_UNLOCK(table);
+
+    return result;
+}
+
 Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool as_new, Context *ctx)
 {
     struct Popcorn2EtsTable *table = get_table(
