@@ -202,6 +202,7 @@ test_lookup_element() ->
     [value2] = ets:lookup_element(DB, key2, PosValue),
 
     % Badargs
+    assert_badarg(fun() -> ets:lookup_element(bad_table, key, 1) end),
     AssertBadArgs(ets:new(test, [set])),
     AssertBadArgs(ets:new(test, [bag])),
     AssertBadArgs(ets:new(test, [duplicate_bag])),
@@ -223,6 +224,9 @@ test_member() ->
     DB = new_table(duplicate_bag, [{key, value}, {key, value}]),
     true = ets:member(DB, key),
     false = ets:member(DB, key_not_exist),
+
+    % Badargs
+    assert_badarg(fun() -> ets:member(bad_table, key) end),
 
     ok.
 
@@ -396,10 +400,7 @@ test_update_element() ->
     [{key_not_exist, new_value1, new_last_value2}] = ets:lookup(S6, key_not_exist),
 
     % Badargs
-
-    TErr = ets:new(test, [set, {keypos, 3}]),
-    true = ets:insert(TErr, {value1, value2, key}),
-
+    TErr = new_table(3, [{value1, value2, key}]),
     OkDefault = {value, value, value},
 
     % The table type is not set
@@ -407,6 +408,7 @@ test_update_element() ->
     TErrDuplBag = ets:new(test, [duplicate_bag]),
     assert_badarg(fun() -> ets:update_element(TErrBag, key, {1, value}) end),
     assert_badarg(fun() -> ets:update_element(TErrDuplBag, key, {1, value}) end),
+    assert_badarg(fun() -> ets:update_element(bad_table, key, {2, value}) end),
 
     % Pos < 1
     assert_badarg(fun() -> ets:update_element(TErr, key, {-1, pos_neg}) end),
@@ -489,12 +491,12 @@ test_update_counter() ->
     [{key_not_exist, 15, 20, 30}] = ets:lookup(S10, key_not_exist),
 
     % Badargs
-
     % The table type is not set
     TErrBag = ets:new(test, [bag]),
     TErrDuplBag = ets:new(test, [duplicate_bag]),
     assert_badarg(fun() -> ets:update_counter(TErrBag, key, 10) end),
     assert_badarg(fun() -> ets:update_counter(TErrDuplBag, key, 10) end),
+    assert_badarg(fun() -> ets:update_counter(bad_table, key, 10) end),
 
     TErr = new_table(2, {0, key, not_number}),
 
@@ -582,6 +584,9 @@ test_take() ->
     [] = ets:lookup(DB2, key),
     [{key2, value2}] = ets:lookup(DB2, key2),
 
+    % Badargs
+    assert_badarg(fun() -> ets:take(bad_table, key) end),
+
     ok.
 
 test_delete() ->
@@ -630,9 +635,9 @@ test_delete() ->
     % Badargs
     TErr = new_table(2, []),
     true = ets:delete(TErr),
+    assert_badarg(fun() -> ets:delete(bad_table) end),
     assert_badarg(fun() -> ets:lookup(TErr, key) end),
     assert_badarg(fun() -> ets:delete(TErr) end),
-    assert_badarg(fun() -> ets:delete(bad_table) end),
 
     ok.
 
@@ -681,11 +686,11 @@ test_delete_object() ->
 
     % Badargs
     TErr = new_table(2, []),
+    assert_badarg(fun() -> ets:delete_object(bad_table, {key, value}) end),
     assert_badarg(fun() -> ets:delete_object(TErr, not_a_tuple) end),
     assert_badarg(fun() -> ets:delete_object(TErr, [{key, value}, {key, value2}]) end),
     assert_badarg(fun() -> ets:delete_object(TErr, {}) end),
     assert_badarg(fun() -> ets:delete_object(TErr, {bad_keypos}) end),
-    assert_badarg(fun() -> ets:delete_object(bad_table, {key, value}) end),
 
     ok.
 
