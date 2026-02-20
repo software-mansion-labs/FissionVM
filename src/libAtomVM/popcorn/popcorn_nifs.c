@@ -1,7 +1,7 @@
 // See popcorn_nifs.gperf for status of each NIF
 
 #include "popcorn_nifs.h"
-#include "popcorn_ets2.h"
+#include "popcorn_ets.h"
 #include "popcorn_md5.h"
 
 #include "nifs.h"
@@ -558,29 +558,29 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
     term public = interop_kv_get_value(options, ATOM_STR("\x6", "public"), ctx->global);
 
     // NOTE: If multiple accesses are specified, the precedence is: public > private > protected
-    Popcorn2EtsTableAccess access = Popcorn2EtsTableAccessProtected;
+    PopcornEtsTableAccess access = PopcornEtsTableAccessProtected;
     if (!term_is_invalid_term(private)) {
-        access = Popcorn2EtsTableAccessPrivate;
+        access = PopcornEtsTableAccessPrivate;
     }
     if (!term_is_invalid_term(public)) {
-        access = Popcorn2EtsTableAccessPublic;
+        access = PopcornEtsTableAccessPublic;
     }
 
     term bag = interop_kv_get_value(options, ATOM_STR("\x3", "bag"), ctx->global);
     term duplicate_bag = interop_kv_get_value(options, ATOM_STR("\xd", "duplicate_bag"), ctx->global);
 
     // NOTE: If multiple table types are specified, the precedence is: duplicate_bag > bag > set
-    Popcorn2EtsTableType type = Popcorn2EtsTableSet;
+    PopcornEtsTableType type = PopcornEtsTableSet;
     if (!term_is_invalid_term(bag)) {
-        type = Popcorn2EtsTableBag;
+        type = PopcornEtsTableBag;
     }
     if (!term_is_invalid_term(duplicate_bag)) {
-        type = Popcorn2EtsTableDuplicateBag;
+        type = PopcornEtsTableDuplicateBag;
     }
 
     term table = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_create_table_maybe_gc(
+    PopcornEtsStatus result = popcorn_ets_create_table_maybe_gc(
         name,
         is_named == TRUE_ATOM,
         type,
@@ -590,11 +590,11 @@ static term nif_ets_new(Context *ctx, int argc, term argv[])
         ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return table;
-        case Popcorn2EtsTableNameExists:
+        case PopcornEtsTableNameExists:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -616,15 +616,15 @@ static term nif_ets_insert(Context *ctx, int argc, term argv[])
 
     VALIDATE_VALUE(name_or_ref, is_ets_table_id);
 
-    Popcorn2EtsStatus result = popcorn2_ets_insert(name_or_ref, entry, false, ctx);
+    PopcornEtsStatus result = popcorn_ets_insert(name_or_ref, entry, false, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return TRUE_ATOM;
-        case Popcorn2EtsBadAccess:
-        case Popcorn2EtsBadEntry:
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -641,17 +641,17 @@ static term nif_ets_insert_new(Context *ctx, int argc, term argv[])
 
     VALIDATE_VALUE(name_or_ref, is_ets_table_id);
 
-    Popcorn2EtsStatus result = popcorn2_ets_insert(name_or_ref, entry, true, ctx);
+    PopcornEtsStatus result = popcorn_ets_insert(name_or_ref, entry, true, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return TRUE_ATOM;
-        case Popcorn2EtsKeyExists:
+        case PopcornEtsKeyExists:
             return FALSE_ATOM;
-        case Popcorn2EtsBadAccess:
-        case Popcorn2EtsBadEntry:
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -670,16 +670,16 @@ static term nif_ets_lookup(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_lookup_maybe_gc(name_or_ref, key, &ret, ctx);
+    PopcornEtsStatus result = popcorn_ets_lookup_maybe_gc(name_or_ref, key, &ret, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return ret;
-        case Popcorn2EtsTupleNotExists:
+        case PopcornEtsTupleNotExists:
             return term_nil();
-        case Popcorn2EtsBadAccess:
+        case PopcornEtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -696,16 +696,16 @@ static term nif_ets_member(Context *ctx, int argc, term argv[])
 
     VALIDATE_VALUE(name_or_ref, is_ets_table_id);
 
-    Popcorn2EtsStatus result = popcorn2_ets_member(name_or_ref, key, ctx);
+    PopcornEtsStatus result = popcorn_ets_member(name_or_ref, key, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return TRUE_ATOM;
-        case Popcorn2EtsTupleNotExists:
+        case PopcornEtsTupleNotExists:
             return FALSE_ATOM;
-        case Popcorn2EtsBadAccess:
+        case PopcornEtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -724,16 +724,16 @@ static term nif_ets_take(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_take_maybe_gc(name_or_ref, key, &ret, ctx);
+    PopcornEtsStatus result = popcorn_ets_take_maybe_gc(name_or_ref, key, &ret, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return ret;
-        case Popcorn2EtsTupleNotExists:
+        case PopcornEtsTupleNotExists:
             return term_nil();
-        case Popcorn2EtsBadAccess:
+        case PopcornEtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -759,18 +759,18 @@ static term nif_ets_update_counter(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_update_counter_maybe_gc(name_or_ref, key, operation, default_tuple, &ret, ctx);
+    PopcornEtsStatus result = popcorn_ets_update_counter_maybe_gc(name_or_ref, key, operation, default_tuple, &ret, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return ret;
-        case Popcorn2EtsBadAccess:
-        case Popcorn2EtsBadEntry:
-        case Popcorn2EtsTupleNotExists:
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
+        case PopcornEtsTupleNotExists:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-        case Popcorn2EtsOverflow:
+        case PopcornEtsOverflow:
             RAISE_ERROR(OVERFLOW_ATOM);
         default:
             // unreachable
@@ -794,17 +794,17 @@ static term nif_ets_update_element(Context *ctx, int argc, term argv[])
         VALIDATE_VALUE(default_tuple, term_is_tuple);
     }
 
-    Popcorn2EtsStatus result = popcorn2_ets_update_element(name_or_ref, key, element_spec, default_tuple, ctx);
+    PopcornEtsStatus result = popcorn_ets_update_element(name_or_ref, key, element_spec, default_tuple, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return TRUE_ATOM;
-        case Popcorn2EtsTupleNotExists:
+        case PopcornEtsTupleNotExists:
             return FALSE_ATOM;
-        case Popcorn2EtsBadAccess:
-        case Popcorn2EtsBadEntry:
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -835,20 +835,20 @@ static term nif_ets_lookup_element(Context *ctx, int argc, term argv[])
 
     term ret = term_invalid_term();
 
-    Popcorn2EtsStatus result = popcorn2_ets_lookup_element_maybe_gc(name_or_ref, key, (size_t) index, &ret, ctx);
+    PopcornEtsStatus result = popcorn_ets_lookup_element_maybe_gc(name_or_ref, key, (size_t) index, &ret, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return ret;
-        case Popcorn2EtsTupleNotExists:
+        case PopcornEtsTupleNotExists:
             if (!term_is_invalid_term(default_value)) {
                 return default_value;
             }
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsBadAccess:
-        case Popcorn2EtsBadIndex:
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadIndex:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -864,20 +864,20 @@ static term nif_ets_delete(Context *ctx, int argc, term argv[])
 
     VALIDATE_VALUE(name_or_ref, is_ets_table_id);
 
-    Popcorn2EtsStatus result;
+    PopcornEtsStatus result;
 
     if (argc == 1) {
-        result = popcorn2_ets_delete_table(name_or_ref, ctx);
+        result = popcorn_ets_delete_table(name_or_ref, ctx);
     } else {
-        result = popcorn2_ets_delete(name_or_ref, argv[1], ctx);
+        result = popcorn_ets_delete(name_or_ref, argv[1], ctx);
     }
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return TRUE_ATOM;
-        case Popcorn2EtsBadAccess:
+        case PopcornEtsBadAccess:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable
@@ -895,15 +895,15 @@ static term nif_ets_delete_object(Context *ctx, int argc, term argv[])
     VALIDATE_VALUE(name_or_ref, is_ets_table_id);
     VALIDATE_VALUE(tuple, term_is_tuple);
 
-    Popcorn2EtsStatus result = popcorn2_ets_delete_object(name_or_ref, tuple, ctx);
+    PopcornEtsStatus result = popcorn_ets_delete_object(name_or_ref, tuple, ctx);
 
     switch (result) {
-        case Popcorn2EtsOk:
+        case PopcornEtsOk:
             return TRUE_ATOM;
-        case Popcorn2EtsBadAccess:
-        case Popcorn2EtsBadEntry:
+        case PopcornEtsBadAccess:
+        case PopcornEtsBadEntry:
             RAISE_ERROR(BADARG_ATOM);
-        case Popcorn2EtsAllocationError:
+        case PopcornEtsAllocationError:
             RAISE_ERROR(OUT_OF_MEMORY_ATOM);
         default:
             // unreachable

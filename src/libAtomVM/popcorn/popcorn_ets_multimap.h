@@ -18,8 +18,8 @@
  * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
 
-#ifndef _POPCORN2_ETS_MULTIMAP_H_
-#define _POPCORN2_ETS_MULTIMAP_H_
+#ifndef _popcorn_ETS_MULTIMAP_H_
+#define _popcorn_ETS_MULTIMAP_H_
 
 #include "../globalcontext.h"
 #include "../term.h"
@@ -91,7 +91,7 @@ void ets_multimap_delete(EtsMultimap *multimap, GlobalContext *global);
  * @warning The caller is responsible for freeing the memory pointed to by `tuples`
  *          using `free()`. When count is zero, memory is not allocated.
  */
-Popcorn2EtsStatus ets_multimap_lookup(
+PopcornEtsStatus ets_multimap_lookup(
     EtsMultimap *multimap,
     term key,
     term **tuples,
@@ -108,7 +108,7 @@ Popcorn2EtsStatus ets_multimap_lookup(
  *
  * @note Terms passed to this function will be copied to the ETS heap.
  */
-Popcorn2EtsStatus ets_multimap_insert(
+PopcornEtsStatus ets_multimap_insert(
     EtsMultimap *multimap,
     term *tuples,
     size_t count,
@@ -122,7 +122,7 @@ Popcorn2EtsStatus ets_multimap_insert(
  * @param global the global context
  * @return EtsOk on success, otherwise an error status
  */
-Popcorn2EtsStatus ets_multimap_remove(
+PopcornEtsStatus ets_multimap_remove(
     EtsMultimap *multimap,
     term key,
     GlobalContext *global);
@@ -135,7 +135,7 @@ Popcorn2EtsStatus ets_multimap_remove(
  * @param global the global context
  * @return EtsOk on success, otherwise an error status
  */
-Popcorn2EtsStatus ets_multimap_remove_tuple(
+PopcornEtsStatus ets_multimap_remove_tuple(
     EtsMultimap *multimap,
     term tuple,
     GlobalContext *global);
@@ -144,4 +144,4 @@ Popcorn2EtsStatus ets_multimap_remove_tuple(
 }
 #endif
 
-#endif // _POPCORN2_ETS_MULTIMAP_H_
+#endif // _popcorn_ETS_MULTIMAP_H_
