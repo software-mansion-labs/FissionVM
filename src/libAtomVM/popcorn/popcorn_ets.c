@@ -29,7 +29,7 @@
 #include "../term.h"
 #include "../utils.h"
 
-#include "popcorn_ets2.h"
+#include "popcorn_ets.h"
 #include "popcorn_ets_multimap.h"
 
 #define ETS_ANY_PROCESS -1
@@ -46,15 +46,15 @@
 #define SMP_UNLOCK(table) UNUSED(table)
 #endif
 
-struct Popcorn2EtsTable
+struct PopcornEtsTable
 {
     struct ListHead head;
 
     term name;
     bool named;
     size_t key_index;
-    Popcorn2EtsTableType type;
-    Popcorn2EtsTableAccess access;
+    PopcornEtsTableType type;
+    PopcornEtsTableAccess access;
 
     EtsMultimap *multimap;
 
@@ -73,58 +73,58 @@ typedef enum TableAccess
     TableAccessWrite
 } TableAccess;
 
-static struct Popcorn2EtsTable *get_table(
-    Popcorn2Ets *ets,
+static struct PopcornEtsTable *get_table(
+    PopcornEts *ets,
     term name_or_ref,
     int32_t process_id,
     TableAccess access);
-static void add_table(Popcorn2Ets *ets, struct Popcorn2EtsTable *table);
-static void delete_all_tables(Popcorn2Ets *ets, GlobalContext *global);
-static void table_destroy(struct Popcorn2EtsTable *table, GlobalContext *global);
-static Popcorn2EtsStatus insert_one(
-    struct Popcorn2EtsTable *table,
+static void add_table(PopcornEts *ets, struct PopcornEtsTable *table);
+static void delete_all_tables(PopcornEts *ets, GlobalContext *global);
+static void table_destroy(struct PopcornEtsTable *table, GlobalContext *global);
+static PopcornEtsStatus insert_one(
+    struct PopcornEtsTable *table,
     term tuple,
     bool as_new,
     Context *ctx);
-static Popcorn2EtsStatus insert_many(
-    struct Popcorn2EtsTable *table,
+static PopcornEtsStatus insert_many(
+    struct PopcornEtsTable *table,
     term tuples,
     bool as_new,
     Context *ctx);
-static Popcorn2EtsStatus lookup_select_maybe_gc(
-    struct Popcorn2EtsTable *table,
+static PopcornEtsStatus lookup_select_maybe_gc(
+    struct PopcornEtsTable *table,
     term key,
     size_t index,
     size_t num_roots,
     term *roots,
     term *ret,
     Context *ctx);
-static Popcorn2EtsStatus lookup_or_default(
-    struct Popcorn2EtsTable *table,
+static PopcornEtsStatus lookup_or_default(
+    struct PopcornEtsTable *table,
     term key,
     term default_tuple,
     Heap *ret_heap,
     term *ret,
     Context *ctx);
-static Popcorn2EtsStatus apply_spec(term tuple, term spec, size_t key_index);
-static Popcorn2EtsStatus apply_op(term tuple, term opt, avm_int_t *ret, size_t key_index);
+static PopcornEtsStatus apply_spec(term tuple, term spec, size_t key_index);
+static PopcornEtsStatus apply_op(term tuple, term opt, avm_int_t *ret, size_t key_index);
 
-void popcorn2_ets_init(Popcorn2Ets *ets)
+void popcorn_ets_init(PopcornEts *ets)
 {
     synclist_init(&ets->ets_tables);
 }
 
-void popcorn2_ets_destroy(Popcorn2Ets *ets, GlobalContext *global)
+void popcorn_ets_destroy(PopcornEts *ets, GlobalContext *global)
 {
     delete_all_tables(ets, global);
     synclist_destroy(&ets->ets_tables);
 }
 
-Popcorn2EtsStatus popcorn2_ets_create_table_maybe_gc(
+PopcornEtsStatus popcorn_ets_create_table_maybe_gc(
     term name,
     bool named,
-    Popcorn2EtsTableType type,
-    Popcorn2EtsTableAccess access,
+    PopcornEtsTableType type,
+    PopcornEtsTableAccess access,
     size_t key_index,
     term *ret,
     Context *ctx)
@@ -132,34 +132,34 @@ Popcorn2EtsStatus popcorn2_ets_create_table_maybe_gc(
     assert(ret != NULL);
 
     if (named) {
-        struct Popcorn2EtsTable *table = get_table(
-            &ctx->global->popcorn2_ets,
+        struct PopcornEtsTable *table = get_table(
+            &ctx->global->popcorn_ets,
             name,
             ETS_ANY_PROCESS,
             TableAccessNone);
 
         if (table != NULL) {
             // Don't need to drop lock as we used TableAccessNone
-            return Popcorn2EtsTableNameExists;
+            return PopcornEtsTableNameExists;
         }
     }
 
-    struct Popcorn2EtsTable *table = malloc(sizeof(struct Popcorn2EtsTable));
+    struct PopcornEtsTable *table = malloc(sizeof(struct PopcornEtsTable));
     if (IS_NULL_PTR(table)) {
-        return Popcorn2EtsAllocationError;
+        return PopcornEtsAllocationError;
     }
 
     EtsMultimapType multimap_type = EtsMultimapTypeSingle;
-    if (type == Popcorn2EtsTableBag) {
+    if (type == PopcornEtsTableBag) {
         multimap_type = EtsMultimapTypeSet;
-    } else if (type == Popcorn2EtsTableDuplicateBag) {
+    } else if (type == PopcornEtsTableDuplicateBag) {
         multimap_type = EtsMultimapTypeList;
     }
 
     EtsMultimap *multimap = ets_multimap_new(multimap_type, key_index);
     if (IS_NULL_PTR(multimap)) {
         free(table);
-        return Popcorn2EtsAllocationError;
+        return PopcornEtsAllocationError;
     }
 
     list_init(&table->head);
@@ -186,75 +186,75 @@ Popcorn2EtsStatus popcorn2_ets_create_table_maybe_gc(
             smp_rwlock_destroy(table->lock);
 #endif
             free(table);
-            return Popcorn2EtsAllocationError;
+            return PopcornEtsAllocationError;
         }
         *ret = term_from_ref_ticks(table->ref_ticks, &ctx->heap);
     }
 
-    add_table(&ctx->global->popcorn2_ets, table);
+    add_table(&ctx->global->popcorn_ets, table);
 
-    return Popcorn2EtsOk;
+    return PopcornEtsOk;
 }
 
-Popcorn2EtsStatus popcorn2_ets_lookup_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx)
+PopcornEtsStatus popcorn_ets_lookup_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx)
 {
     assert(ret != NULL);
 
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessRead);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = lookup_select_maybe_gc(table, key, ETS_WHOLE_TUPLE, 0, NULL, ret, ctx);
+    PopcornEtsStatus result = lookup_select_maybe_gc(table, key, ETS_WHOLE_TUPLE, 0, NULL, ret, ctx);
 
     SMP_UNLOCK(table);
 
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_lookup_element_maybe_gc(term name_or_ref, term key, size_t index, term *ret, Context *ctx)
+PopcornEtsStatus popcorn_ets_lookup_element_maybe_gc(term name_or_ref, term key, size_t index, term *ret, Context *ctx)
 {
     assert(ret != NULL);
 
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessRead);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = lookup_select_maybe_gc(table, key, index, 0, NULL, ret, ctx);
+    PopcornEtsStatus result = lookup_select_maybe_gc(table, key, index, 0, NULL, ret, ctx);
 
     SMP_UNLOCK(table);
 
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_member(term name_or_ref, term key, Context *ctx)
+PopcornEtsStatus popcorn_ets_member(term name_or_ref, term key, Context *ctx)
 {
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessRead);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
     size_t count;
-    Popcorn2EtsStatus result = ets_multimap_lookup(table->multimap, key, NULL, &count, ctx->global);
+    PopcornEtsStatus result = ets_multimap_lookup(table->multimap, key, NULL, &count, ctx->global);
 
-    if (result == Popcorn2EtsOk && count == 0) {
-        result = Popcorn2EtsTupleNotExists;
+    if (result == PopcornEtsOk && count == 0) {
+        result = PopcornEtsTupleNotExists;
     }
 
     SMP_UNLOCK(table);
@@ -262,19 +262,19 @@ Popcorn2EtsStatus popcorn2_ets_member(term name_or_ref, term key, Context *ctx)
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool as_new, Context *ctx)
+PopcornEtsStatus popcorn_ets_insert(term name_or_ref, term entry, bool as_new, Context *ctx)
 {
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessWrite);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = Popcorn2EtsBadEntry;
+    PopcornEtsStatus result = PopcornEtsBadEntry;
 
     if (term_is_tuple(entry)) {
         result = insert_one(table, entry, as_new, ctx);
@@ -287,52 +287,52 @@ Popcorn2EtsStatus popcorn2_ets_insert(term name_or_ref, term entry, bool as_new,
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_update_element(
+PopcornEtsStatus popcorn_ets_update_element(
     term name_or_ref,
     term key,
     term element_spec,
     term default_tuple,
     Context *ctx)
 {
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessWrite);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
     Heap insert_heap;
     term insert_tuple;
-    Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &insert_heap, &insert_tuple, ctx);
-    if (result != Popcorn2EtsOk) {
+    PopcornEtsStatus result = lookup_or_default(table, key, default_tuple, &insert_heap, &insert_tuple, ctx);
+    if (result != PopcornEtsOk) {
         SMP_UNLOCK(table);
         return result;
     }
 
     if (term_is_tuple(element_spec)) {
         result = apply_spec(insert_tuple, element_spec, table->key_index);
-        if (result != Popcorn2EtsOk) {
+        if (result != PopcornEtsOk) {
             goto cleanup;
         }
     } else if (term_is_list(element_spec)) {
         for (term iter = element_spec; !term_is_nil(iter); iter = term_get_list_tail(iter)) {
             if (!term_is_list(iter)) {
-                result = Popcorn2EtsBadEntry;
+                result = PopcornEtsBadEntry;
                 goto cleanup;
             }
 
             term spec = term_get_list_head(iter);
 
             result = apply_spec(insert_tuple, spec, table->key_index);
-            if (result != Popcorn2EtsOk) {
+            if (result != PopcornEtsOk) {
                 goto cleanup;
             }
         }
     } else {
-        result = Popcorn2EtsBadEntry;
+        result = PopcornEtsBadEntry;
         goto cleanup;
     }
 
@@ -344,21 +344,21 @@ cleanup:
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_take_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx)
+PopcornEtsStatus popcorn_ets_take_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx)
 {
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessWrite);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = lookup_select_maybe_gc(table, key, ETS_WHOLE_TUPLE, 1, &key, ret, ctx);
+    PopcornEtsStatus result = lookup_select_maybe_gc(table, key, ETS_WHOLE_TUPLE, 1, &key, ret, ctx);
 
-    if (result == Popcorn2EtsOk) {
+    if (result == PopcornEtsOk) {
         result = ets_multimap_remove(table->multimap, key, ctx->global);
     }
 
@@ -367,7 +367,7 @@ Popcorn2EtsStatus popcorn2_ets_take_maybe_gc(term name_or_ref, term key, term *r
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
+PopcornEtsStatus popcorn_ets_update_counter_maybe_gc(
     term name_or_ref,
     term key,
     term op,
@@ -375,20 +375,20 @@ Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
     term *ret,
     Context *ctx)
 {
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessWrite);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
     Heap insert_heap;
     term insert_tuple;
-    Popcorn2EtsStatus result = lookup_or_default(table, key, default_tuple, &insert_heap, &insert_tuple, ctx);
-    if (result != Popcorn2EtsOk) {
+    PopcornEtsStatus result = lookup_or_default(table, key, default_tuple, &insert_heap, &insert_tuple, ctx);
+    if (result != PopcornEtsOk) {
         SMP_UNLOCK(table);
         return result;
     }
@@ -397,19 +397,19 @@ Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
         avm_int_t index = (avm_int_t) table->key_index + 1;
 
         if (index < 0 || index >= term_get_tuple_arity(insert_tuple)) {
-            result = Popcorn2EtsBadEntry;
+            result = PopcornEtsBadEntry;
             goto cleanup;
         }
 
         term value = term_get_tuple_element(insert_tuple, (uint32_t) index);
         if (!term_is_integer(value)) {
-            result = Popcorn2EtsBadEntry;
+            result = PopcornEtsBadEntry;
             goto cleanup;
         }
 
         avm_int_t new_value;
         if (BUILTIN_ADD_OVERFLOW_INT(term_to_int(value), term_to_int(op), &new_value)) {
-            result = Popcorn2EtsOverflow;
+            result = PopcornEtsOverflow;
             goto cleanup;
         }
 
@@ -420,7 +420,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
         avm_int_t value;
 
         result = apply_op(insert_tuple, op, &value, table->key_index);
-        if (result != Popcorn2EtsOk) {
+        if (result != PopcornEtsOk) {
             goto cleanup;
         }
 
@@ -429,7 +429,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
         size_t num_ops = 0;
         for (term iter = op; !term_is_nil(iter); iter = term_get_list_tail(iter)) {
             if (!term_is_list(iter)) {
-                result = Popcorn2EtsBadEntry;
+                result = PopcornEtsBadEntry;
                 goto cleanup;
             }
             num_ops++;
@@ -441,13 +441,13 @@ Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
         }
 
         if (UNLIKELY(memory_ensure_free_with_roots(ctx, num_ops * CONS_SIZE, 1, &op, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-            result = Popcorn2EtsAllocationError;
+            result = PopcornEtsAllocationError;
             goto cleanup;
         }
 
         avm_int_t *values = malloc(sizeof(avm_int_t) * num_ops);
         if (IS_NULL_PTR(values)) {
-            result = Popcorn2EtsAllocationError;
+            result = PopcornEtsAllocationError;
             goto cleanup;
         }
 
@@ -455,7 +455,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
         for (term iter = op; !term_is_nil(iter); iter = term_get_list_tail(iter), i++) {
             term entry = term_get_list_head(iter);
             result = apply_op(insert_tuple, entry, &values[i], table->key_index);
-            if (result != Popcorn2EtsOk) {
+            if (result != PopcornEtsOk) {
                 free(values);
                 goto cleanup;
             }
@@ -471,7 +471,7 @@ Popcorn2EtsStatus popcorn2_ets_update_counter_maybe_gc(
 
         *ret = list;
     } else {
-        result = Popcorn2EtsBadEntry;
+        result = PopcornEtsBadEntry;
         goto cleanup;
     }
 
@@ -483,75 +483,75 @@ cleanup:
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_delete(term name_or_ref, term key, Context *ctx)
+PopcornEtsStatus popcorn_ets_delete(term name_or_ref, term key, Context *ctx)
 {
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessWrite);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = ets_multimap_remove(table->multimap, key, ctx->global);
+    PopcornEtsStatus result = ets_multimap_remove(table->multimap, key, ctx->global);
 
     SMP_UNLOCK(table);
 
     return result;
 }
 
-Popcorn2EtsStatus popcorn2_ets_delete_table(term name_or_ref, Context *ctx)
+PopcornEtsStatus popcorn_ets_delete_table(term name_or_ref, Context *ctx)
 {
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessWrite);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
-    synclist_wrlock(&ctx->global->popcorn2_ets.ets_tables);
+    synclist_wrlock(&ctx->global->popcorn_ets.ets_tables);
 
     list_remove(&table->head);
 
     SMP_UNLOCK(table);
     table_destroy(table, ctx->global);
 
-    synclist_unlock(&ctx->global->popcorn2_ets.ets_tables);
+    synclist_unlock(&ctx->global->popcorn_ets.ets_tables);
 
-    return Popcorn2EtsOk;
+    return PopcornEtsOk;
 }
 
-Popcorn2EtsStatus popcorn2_ets_delete_object(term name_or_ref, term tuple, Context *ctx)
+PopcornEtsStatus popcorn_ets_delete_object(term name_or_ref, term tuple, Context *ctx)
 {
-    struct Popcorn2EtsTable *table = get_table(
-        &ctx->global->popcorn2_ets,
+    struct PopcornEtsTable *table = get_table(
+        &ctx->global->popcorn_ets,
         name_or_ref,
         ctx->process_id,
         TableAccessWrite);
 
     if (table == NULL) {
-        return Popcorn2EtsBadAccess;
+        return PopcornEtsBadAccess;
     }
 
-    Popcorn2EtsStatus result = ets_multimap_remove_tuple(table->multimap, tuple, ctx->global);
+    PopcornEtsStatus result = ets_multimap_remove_tuple(table->multimap, tuple, ctx->global);
 
     SMP_UNLOCK(table);
 
     return result;
 }
 
-void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, GlobalContext *global)
+void popcorn_ets_delete_owned_tables(PopcornEts *ets, int32_t process_id, GlobalContext *global)
 {
     struct ListHead *ets_tables = synclist_wrlock(&ets->ets_tables);
 
     struct ListHead *item, *tmp;
     MUTABLE_LIST_FOR_EACH (item, tmp, ets_tables) {
-        struct Popcorn2EtsTable *table = GET_LIST_ENTRY(item, struct Popcorn2EtsTable, head);
+        struct PopcornEtsTable *table = GET_LIST_ENTRY(item, struct PopcornEtsTable, head);
 
         if (table->owner_process_id == process_id) {
             list_remove(&table->head);
@@ -562,7 +562,7 @@ void popcorn2_ets_delete_owned_tables(Popcorn2Ets *ets, int32_t process_id, Glob
     synclist_unlock(&ets->ets_tables);
 }
 
-static void table_destroy(struct Popcorn2EtsTable *table, GlobalContext *global)
+static void table_destroy(struct PopcornEtsTable *table, GlobalContext *global)
 {
     SMP_WRLOCK(table);
     ets_multimap_delete(table->multimap, global);
@@ -575,13 +575,13 @@ static void table_destroy(struct Popcorn2EtsTable *table, GlobalContext *global)
     free(table);
 }
 
-static void delete_all_tables(Popcorn2Ets *ets, GlobalContext *global)
+static void delete_all_tables(PopcornEts *ets, GlobalContext *global)
 {
     struct ListHead *ets_tables = synclist_wrlock(&ets->ets_tables);
 
     struct ListHead *item, *tmp;
     MUTABLE_LIST_FOR_EACH (item, tmp, ets_tables) {
-        struct Popcorn2EtsTable *table = GET_LIST_ENTRY(item, struct Popcorn2EtsTable, head);
+        struct PopcornEtsTable *table = GET_LIST_ENTRY(item, struct PopcornEtsTable, head);
         list_remove(&table->head);
         table_destroy(table, global);
     }
@@ -589,22 +589,22 @@ static void delete_all_tables(Popcorn2Ets *ets, GlobalContext *global)
     synclist_unlock(&ets->ets_tables);
 }
 
-static void add_table(Popcorn2Ets *ets, struct Popcorn2EtsTable *table)
+static void add_table(PopcornEts *ets, struct PopcornEtsTable *table)
 {
     struct ListHead *tables = synclist_wrlock(&ets->ets_tables);
     list_append(tables, &table->head);
     synclist_unlock(&ets->ets_tables);
 }
 
-static struct Popcorn2EtsTable *get_table(
-    Popcorn2Ets *ets,
+static struct PopcornEtsTable *get_table(
+    PopcornEts *ets,
     term name_or_ref,
     int32_t process_id,
     TableAccess access)
 {
     struct ListHead *ets_tables = synclist_rdlock(&ets->ets_tables);
     struct ListHead *item;
-    struct Popcorn2EtsTable *ret = NULL;
+    struct PopcornEtsTable *ret = NULL;
 
     uint64_t ref = 0;
     term name = term_invalid_term();
@@ -617,12 +617,12 @@ static struct Popcorn2EtsTable *get_table(
     }
 
     LIST_FOR_EACH (item, ets_tables) {
-        struct Popcorn2EtsTable *table = GET_LIST_ENTRY(item, struct Popcorn2EtsTable, head);
+        struct PopcornEtsTable *table = GET_LIST_ENTRY(item, struct PopcornEtsTable, head);
         bool found = is_atom ? table->named && table->name == name : table->ref_ticks == ref;
         if (found) {
             bool is_owner = table->owner_process_id == process_id;
-            bool can_read = access == TableAccessRead && (table->access != Popcorn2EtsTableAccessPrivate || is_owner);
-            bool can_write = access == TableAccessWrite && (table->access == Popcorn2EtsTableAccessPublic || is_owner);
+            bool can_read = access == TableAccessRead && (table->access != PopcornEtsTableAccessPrivate || is_owner);
+            bool can_write = access == TableAccessWrite && (table->access == PopcornEtsTableAccessPublic || is_owner);
             bool access_none = access == TableAccessNone;
             if (can_read) {
                 SMP_RDLOCK(table);
@@ -641,29 +641,29 @@ static struct Popcorn2EtsTable *get_table(
     return ret;
 }
 
-static Popcorn2EtsStatus insert_one(
-    struct Popcorn2EtsTable *table,
+static PopcornEtsStatus insert_one(
+    struct PopcornEtsTable *table,
     term tuple,
     bool as_new,
     Context *ctx)
 {
     assert(term_is_tuple(tuple));
 
-    Popcorn2EtsStatus result = Popcorn2EtsOk;
+    PopcornEtsStatus result = PopcornEtsOk;
 
     if (table->key_index >= (size_t) term_get_tuple_arity(tuple)) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     if (as_new) {
         term key = term_get_tuple_element(tuple, table->key_index);
         size_t existing = 0;
         result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
-        if (UNLIKELY(result == Popcorn2EtsAllocationError)) {
-            return Popcorn2EtsAllocationError;
+        if (UNLIKELY(result == PopcornEtsAllocationError)) {
+            return PopcornEtsAllocationError;
         }
         if (existing > 0) {
-            return Popcorn2EtsKeyExists;
+            return PopcornEtsKeyExists;
         }
     }
 
@@ -672,44 +672,44 @@ static Popcorn2EtsStatus insert_one(
     return result;
 }
 
-static Popcorn2EtsStatus insert_many(
-    struct Popcorn2EtsTable *table,
+static PopcornEtsStatus insert_many(
+    struct PopcornEtsTable *table,
     term tuples,
     bool as_new,
     Context *ctx)
 {
     assert(term_is_list(tuples));
 
-    Popcorn2EtsStatus result = Popcorn2EtsOk;
+    PopcornEtsStatus result = PopcornEtsOk;
 
     size_t count = 0;
     for (term iter = tuples; !term_is_nil(iter); iter = term_get_list_tail(iter), count++) {
         if (!term_is_list(iter)) {
-            return Popcorn2EtsBadEntry; // improper list
+            return PopcornEtsBadEntry; // improper list
         }
 
         term tuple = term_get_list_head(iter);
 
         if (!term_is_tuple(tuple) || table->key_index >= (size_t) term_get_tuple_arity(tuple)) {
-            return Popcorn2EtsBadEntry;
+            return PopcornEtsBadEntry;
         }
 
         if (as_new) {
             term key = term_get_tuple_element(tuple, table->key_index);
             size_t existing = 0;
             result = ets_multimap_lookup(table->multimap, key, NULL, &existing, ctx->global);
-            if (UNLIKELY(result == Popcorn2EtsAllocationError)) {
-                return Popcorn2EtsAllocationError;
+            if (UNLIKELY(result == PopcornEtsAllocationError)) {
+                return PopcornEtsAllocationError;
             }
             if (existing > 0) {
-                return Popcorn2EtsKeyExists;
+                return PopcornEtsKeyExists;
             }
         }
     }
 
     term *to_insert = malloc(sizeof(term) * count);
     if (IS_NULL_PTR(to_insert)) {
-        return Popcorn2EtsAllocationError;
+        return PopcornEtsAllocationError;
     }
 
     for (size_t i = 0; !term_is_nil(tuples); tuples = term_get_list_tail(tuples), i++) {
@@ -724,8 +724,8 @@ static Popcorn2EtsStatus insert_many(
     return result;
 }
 
-static Popcorn2EtsStatus lookup_select_maybe_gc(
-    struct Popcorn2EtsTable *table,
+static PopcornEtsStatus lookup_select_maybe_gc(
+    struct PopcornEtsTable *table,
     term key,
     size_t index,
     size_t num_roots,
@@ -740,13 +740,13 @@ static Popcorn2EtsStatus lookup_select_maybe_gc(
     term *tuples = NULL;
 
     size_t count;
-    Popcorn2EtsStatus result = ets_multimap_lookup(table->multimap, key, &tuples, &count, ctx->global);
-    if (UNLIKELY(result == Popcorn2EtsAllocationError)) {
-        return Popcorn2EtsAllocationError;
+    PopcornEtsStatus result = ets_multimap_lookup(table->multimap, key, &tuples, &count, ctx->global);
+    if (UNLIKELY(result == PopcornEtsAllocationError)) {
+        return PopcornEtsAllocationError;
     }
 
     if (count == 0) {
-        return Popcorn2EtsTupleNotExists;
+        return PopcornEtsTupleNotExists;
     }
 
     assert(tuples != NULL);
@@ -760,15 +760,15 @@ static Popcorn2EtsStatus lookup_select_maybe_gc(
         } else {
             if (index >= (size_t) term_get_tuple_arity(tuple)) {
                 free(tuples);
-                return Popcorn2EtsBadIndex;
+                return PopcornEtsBadIndex;
             }
             term element = term_get_tuple_element(tuple, index);
             elements_size += memory_estimate_usage(element);
         }
     }
 
-    bool return_list = table->type == Popcorn2EtsTableBag ||
-                       table->type == Popcorn2EtsTableDuplicateBag ||
+    bool return_list = table->type == PopcornEtsTableBag ||
+                       table->type == PopcornEtsTableDuplicateBag ||
                        index == ETS_WHOLE_TUPLE;
 
     if (return_list) {
@@ -778,7 +778,7 @@ static Popcorn2EtsStatus lookup_select_maybe_gc(
     // Terms in `tuples` come from ETS heap, we need to copy them to process heap before returning.
     if (UNLIKELY(memory_ensure_free_with_roots(ctx, elements_size, num_roots, roots, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
         free(tuples);
-        return Popcorn2EtsAllocationError;
+        return PopcornEtsAllocationError;
     }
 
     if (return_list) {
@@ -808,37 +808,37 @@ static Popcorn2EtsStatus lookup_select_maybe_gc(
 
     free(tuples);
 
-    return Popcorn2EtsOk;
+    return PopcornEtsOk;
 }
 
-static Popcorn2EtsStatus lookup_or_default(
-    struct Popcorn2EtsTable *table,
+static PopcornEtsStatus lookup_or_default(
+    struct PopcornEtsTable *table,
     term key,
     term default_tuple,
     Heap *ret_heap,
     term *ret,
     Context *ctx)
 {
-    if (table->type != Popcorn2EtsTableSet) {
-        return Popcorn2EtsBadAccess;
+    if (table->type != PopcornEtsTableSet) {
+        return PopcornEtsBadAccess;
     }
 
     term *tuple = NULL;
     size_t count;
-    Popcorn2EtsStatus result = ets_multimap_lookup(table->multimap, key, &tuple, &count, ctx->global);
-    if (result != Popcorn2EtsOk) {
+    PopcornEtsStatus result = ets_multimap_lookup(table->multimap, key, &tuple, &count, ctx->global);
+    if (result != PopcornEtsOk) {
         return result;
     }
 
     bool insert_default = (count == 0);
 
     if (insert_default && term_is_invalid_term(default_tuple)) {
-        return Popcorn2EtsTupleNotExists;
+        return PopcornEtsTupleNotExists;
     }
 
     if (insert_default) {
         if ((size_t) term_get_tuple_arity(default_tuple) <= table->key_index) {
-            return Popcorn2EtsBadEntry;
+            return PopcornEtsBadEntry;
         }
         tuple = &default_tuple;
     }
@@ -849,7 +849,7 @@ static Popcorn2EtsStatus lookup_or_default(
         if (!insert_default) {
             free(tuple);
         }
-        return Popcorn2EtsAllocationError;
+        return PopcornEtsAllocationError;
     }
 
     *ret = memory_copy_term_tree(ret_heap, *tuple);
@@ -861,74 +861,74 @@ static Popcorn2EtsStatus lookup_or_default(
         free(tuple);
     }
 
-    return Popcorn2EtsOk;
+    return PopcornEtsOk;
 }
 
-static Popcorn2EtsStatus apply_spec(term tuple, term spec, size_t key_index)
+static PopcornEtsStatus apply_spec(term tuple, term spec, size_t key_index)
 {
     if (!term_is_tuple(spec) || term_get_tuple_arity(spec) != 2) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     term pos = term_get_tuple_element(spec, 0);
     term value = term_get_tuple_element(spec, 1);
 
     if (!term_is_integer(pos)) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     avm_int_t index = term_to_int(pos) - 1;
 
     if (index < 0 || index >= term_get_tuple_arity(tuple)) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     if ((size_t) index == key_index) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     term_put_tuple_element(tuple, (uint32_t) index, value);
 
-    return Popcorn2EtsOk;
+    return PopcornEtsOk;
 }
 
-static Popcorn2EtsStatus apply_op(term tuple, term op, avm_int_t *ret, size_t key_index)
+static PopcornEtsStatus apply_op(term tuple, term op, avm_int_t *ret, size_t key_index)
 {
     assert(term_is_tuple(op));
 
     int arity = term_get_tuple_arity(op);
 
     if (arity != 2 && arity != 4) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     term pos = term_get_tuple_element(op, 0);
     term incr = term_get_tuple_element(op, 1);
 
     if (!term_is_integer(pos) || !term_is_integer(incr)) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     avm_int_t index = term_to_int(pos) - 1;
     if (index < 0 || index >= term_get_tuple_arity(tuple)) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     if ((size_t) index == key_index) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     term value = term_get_tuple_element(tuple, (uint32_t) index);
 
     if (!term_is_integer(value)) {
-        return Popcorn2EtsBadEntry;
+        return PopcornEtsBadEntry;
     }
 
     avm_int_t current = term_to_int(value);
     avm_int_t delta = term_to_int(incr);
     avm_int_t new_value;
     if (BUILTIN_ADD_OVERFLOW_INT(current, delta, &new_value)) {
-        return Popcorn2EtsOverflow;
+        return PopcornEtsOverflow;
     }
 
     if (arity == 4) {
@@ -936,7 +936,7 @@ static Popcorn2EtsStatus apply_op(term tuple, term op, avm_int_t *ret, size_t ke
         term setvalue = term_get_tuple_element(op, 3);
 
         if (!term_is_integer(threshold) || !term_is_integer(setvalue)) {
-            return Popcorn2EtsBadEntry;
+            return PopcornEtsBadEntry;
         }
 
         avm_int_t thresh = term_to_int(threshold);
@@ -950,5 +950,5 @@ static Popcorn2EtsStatus apply_op(term tuple, term op, avm_int_t *ret, size_t ke
     term_put_tuple_element(tuple, index, term_from_int(new_value));
     *ret = new_value;
 
-    return Popcorn2EtsOk;
+    return PopcornEtsOk;
 }

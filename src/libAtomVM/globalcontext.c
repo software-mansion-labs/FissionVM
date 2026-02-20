@@ -85,7 +85,7 @@ GlobalContext *globalcontext_new(void)
     synclist_init(&glb->select_events);
 
     ets_init(&glb->ets);
-    popcorn2_ets_init(&glb->popcorn2_ets);
+    popcorn_ets_init(&glb->popcorn_ets);
 
     glb->last_process_id = 0;
 
@@ -233,7 +233,7 @@ COLD_FUNC void globalcontext_destroy(GlobalContext *glb)
     synclist_destroy(&glb->select_events);
 
     ets_destroy(&glb->ets, glb);
-    popcorn2_ets_destroy(&glb->popcorn2_ets, glb);
+    popcorn_ets_destroy(&glb->popcorn_ets, glb);
 
     // Destroy refc binaries including resources
     // (this list should be empty if resources were properly refcounted)
