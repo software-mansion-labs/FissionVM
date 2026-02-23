@@ -124,7 +124,7 @@ struct GlobalContext
     struct SyncList select_events;
 
     struct Ets ets;
-    struct PopcornEts popcorn_ets;
+    PopcornEts popcorn_ets;
 
     int32_t last_process_id;
 
