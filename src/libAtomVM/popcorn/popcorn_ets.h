@@ -2,6 +2,7 @@
  * This file is part of AtomVM.
  *
  * Copyright 2024 Fred Dushin <fred@dushin.net>
+ * Copyright 2025 Mateusz Furga <mateusz.furga@swmansion.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,22 +19,22 @@
  * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
 
-#ifndef _POPCORN_ETS_H_
-#define _POPCORN_ETS_H_
+#ifndef _popcorn_ETS_H_
+#define _popcorn_ETS_H_
 
-struct Context;
-struct GlobalContext;
-
-#include "list.h"
-#include "synclist.h"
-#include "term.h"
 #include <stdbool.h>
+
+struct GlobalContext;
+struct Context;
+
+#include "../synclist.h"
+#include "../term.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// N.B. Only PopcornEtsTableSet currently supported
+// NOTE: Ordered set is not currently supported
 typedef enum PopcornEtsTableType
 {
     PopcornEtsTableSet,
@@ -42,49 +43,57 @@ typedef enum PopcornEtsTableType
     PopcornEtsTableDuplicateBag
 } PopcornEtsTableType;
 
-typedef enum PopcornEtsAccessType
+typedef enum PopcornEtsTableAccess
 {
-    PopcornEtsAccessPrivate,
-    PopcornEtsAccessProtected,
-    PopcornEtsAccessPublic
-} PopcornEtsAccessType;
+    PopcornEtsTableAccessPrivate,
+    PopcornEtsTableAccessProtected,
+    PopcornEtsTableAccessPublic
+} PopcornEtsTableAccess;
 
-typedef enum PopcornEtsErrorCode
+typedef enum PopcornEtsStatus
 {
     PopcornEtsOk,
-    PopcornEtsBadAccess,
-    PopcornEtsTableNameInUse,
+    PopcornEtsKeyExists,
+    PopcornEtsTableNameExists,
+    PopcornEtsTupleNotExists,
     PopcornEtsBadEntry,
-    PopcornEtsAllocationFailure,
-    PopcornEtsEntryNotFound,
-    PopcornEtsBadPosition
-} PopcornEtsErrorCode;
-struct PopcornEts
+    PopcornEtsBadAccess,
+    PopcornEtsBadIndex,
+    PopcornEtsAllocationError,
+    PopcornEtsOverflow
+} PopcornEtsStatus;
+
+typedef struct PopcornEts
 {
-    // TODO Using a list imposes O(len(popcorn_ets_tables)) cost
-    // on lookup, so in the future we may want to consider
-    // a table or map instead of a list.
-    struct SyncList popcorn_ets_tables;
-};
+    struct SyncList ets_tables;
+} PopcornEts;
 
-void popcorn_ets_init(struct PopcornEts *popcorn_ets);
-void popcorn_ets_destroy(struct PopcornEts *popcorn_ets, GlobalContext *global);
+void popcorn_ets_init(PopcornEts *ets);
+void popcorn_ets_destroy(PopcornEts *ets, GlobalContext *global);
 
-PopcornEtsErrorCode popcorn_ets_create_table(term name, bool is_named, PopcornEtsTableType table_type, PopcornEtsAccessType access_type, size_t keypos, term *ret, Context *ctx);
-void popcorn_ets_delete_owned_tables(struct PopcornEts *popcorn_ets, int32_t process_id, GlobalContext *global);
+PopcornEtsStatus popcorn_ets_create_table_maybe_gc(
+    term name,
+    bool named,
+    PopcornEtsTableType type,
+    PopcornEtsTableAccess access,
+    size_t index,
+    term *ret,
+    Context *ctx);
+void popcorn_ets_delete_owned_tables(PopcornEts *ets, int32_t process_id, GlobalContext *global);
 
-PopcornEtsErrorCode popcorn_ets_insert(term ref, term entry, bool *entry_inserted, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_lookup(term ref, term key, term *ret, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_lookup_element(term ref, term key, size_t pos, term *ret, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_delete(term ref, term key, term *ret, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_drop_table(term ref, term *ret, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_update_counter(term ref, term key, term operation, term default_value, term *ret, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_delete_object(term ref, term tuple, term *ret, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_update_element(term ref, term key, term element_spec, term *ret, Context *ctx);
-PopcornEtsErrorCode popcorn_ets_take(term ref, term key, term *ret, Context *ctx);
+PopcornEtsStatus popcorn_ets_lookup_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx);
+PopcornEtsStatus popcorn_ets_lookup_element_maybe_gc(term name_or_ref, term key, size_t index, term *ret, Context *ctx);
+PopcornEtsStatus popcorn_ets_member(term name_or_ref, term key, Context *ctx);
+PopcornEtsStatus popcorn_ets_insert(term name_or_ref, term entry, bool as_new, Context *ctx);
+PopcornEtsStatus popcorn_ets_update_element(term name_or_ref, term key, term element_spec, term default_tuple, Context *ctx);
+PopcornEtsStatus popcorn_ets_update_counter_maybe_gc(term name_or_ref, term key, term op, term default_tuple, term *ret, Context *ctx);
+PopcornEtsStatus popcorn_ets_take_maybe_gc(term name_or_ref, term key, term *ret, Context *ctx);
+PopcornEtsStatus popcorn_ets_delete(term name_or_ref, term key, Context *ctx);
+PopcornEtsStatus popcorn_ets_delete_table(term name_or_ref, Context *ctx);
+PopcornEtsStatus popcorn_ets_delete_object(term name_or_ref, term tuple, Context *ctx);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif // _popcorn_ETS_H_
