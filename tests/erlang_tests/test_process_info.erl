@@ -23,96 +23,216 @@
 -export([start/0, loop/2]).
 
 start() ->
-    Self = self(),
-    {Pid, Ref} = spawn_opt(?MODULE, loop, [Self, []], [monitor]),
-    receive
-        ok -> ok
-    end,
-    [] = erlang:process_info(Self, registered_name),
-    erlang:register(has_name, Self),
-    {registered_name, Name} = erlang:process_info(Self, registered_name),
-    assert(Name =:= has_name),
-    erlang:unregister(has_name),
-    [] = erlang:process_info(Self, registered_name),
-    test_message_queue_len(Pid, Self),
-    {links, []} = process_info(Pid, links),
-    link(Pid),
-    {links, [Self]} = process_info(Pid, links),
-    unlink(Pid),
-    {links, []} = process_info(Pid, links),
-    Monitor = monitor(process, Pid),
-    % Twice because of spawn_opt above
-    {monitored_by, [Self, Self]} = process_info(Pid, monitored_by),
-    demonitor(Monitor),
-    {monitored_by, [Self]} = process_info(Pid, monitored_by),
-    Pid ! {Self, stop},
-    _Accum =
-        receive
-            {Pid, result, X} -> X
-        end,
-    normal =
-        receive
-            {'DOWN', Ref, process, Pid, Reason} -> Reason
-        end,
-    MessageQueueLen = process_info(Pid, message_queue_len),
-    MessageQueueLen = undefined,
-    ok = test_process_info_memory_other(),
+    ok = test_registered_name(),
+    ok = test_heap_size(),
+    ok = test_memory(),
+    ok = test_total_heap_size(),
+    ok = test_message_queue_len(),
+    ok = test_links(),
+    ok = test_monitored_by(),
+
+    ok = test_list_semantics(),
+    ok = test_badargs(),
+
     0.
 
-test_message_queue_len(Pid, Self) ->
-    {message_queue_len, MessageQueueLen} = process_info(Pid, message_queue_len),
-    {memory, Memory} = process_info(Pid, memory),
-    {heap_size, HeapSize} = process_info(Pid, heap_size),
-    {total_heap_size, TotalHeapSize} = process_info(Pid, total_heap_size),
-    Pid ! incr,
-    Pid ! incr,
-    Pid ! incr,
-    {message_queue_len, MessageQueueLen2} = process_info(Pid, message_queue_len),
-    {memory, Memory2} = process_info(Pid, memory),
-    Pid ! unlock,
-    Pid ! {Self, ping},
-    receive
-        pong -> ok
-    end,
-    {total_heap_size, TotalHeapSize2} = process_info(Pid, total_heap_size),
-    {heap_size, HeapSize2} = process_info(Pid, heap_size),
-    true = MessageQueueLen < MessageQueueLen2,
-    case erlang:system_info(machine) of
-        "BEAM" ->
-            true = Memory =< Memory2,
-            true = HeapSize =< TotalHeapSize,
-            true = HeapSize2 =< TotalHeapSize2,
-            true = TotalHeapSize =< TotalHeapSize2;
-        _ ->
-            true = Memory < Memory2,
-            true = HeapSize =< TotalHeapSize,
-            true = HeapSize2 =< TotalHeapSize2,
-            true = TotalHeapSize =< TotalHeapSize2
-    end.
-
-test_process_info_memory_other() ->
-    {Pid, Ref} = spawn_opt(
-        fun() ->
-            receive
-                quit -> ok
-            end
-        end,
-        [monitor]
-    ),
-    {total_heap_size, THS0} = process_info(Pid, total_heap_size),
-    test_process_info_memory_other_loop(Pid, THS0, 50),
+with_other_pid(Fun) ->
+    {Pid, Ref} = spawn_opt(fun() -> receive quit -> ok end end, [monitor]),
+    Fun(Pid),
     Pid ! quit,
-    normal =
-        receive
-            {'DOWN', Ref, process, Pid, Reason} -> Reason
-        end,
+    normal = receive {'DOWN', Ref, process, Pid, Reason} -> Reason end.
+
+with_dead_pid(Fun) ->
+    {DeadPid, Ref} = spawn_opt(fun() -> ok end, [monitor]),
+    normal = receive {'DOWN', Ref, process, DeadPid, Reason} -> Reason end,
+    Fun(DeadPid).
+
+get_item(Pid, Item) ->
+    {Item, Val} = process_info(Pid, Item),
+    [{Item, Val}] = process_info(Pid, [Item]),
+    Val.
+
+test_registered_name() ->
+    Self = self(),
+
+    [] = process_info(Self, registered_name),
+    [{registered_name, []}] = process_info(Self, [registered_name]),
+
+    erlang:register(has_name, Self),
+    has_name = get_item(Self, registered_name),
+
+    erlang:unregister(has_name),
+    [] = process_info(Self, registered_name),
+    [{registered_name, []}] = process_info(Self, [registered_name]),
+
     ok.
 
-test_process_info_memory_other_loop(_Pid, _THS0, 0) ->
+test_heap_size() ->
+    Self = self(),
+    HS = get_item(Self, heap_size),
+    true = is_integer(HS) andalso HS > 0,
+
+    with_other_pid(fun(Pid) ->
+        HS2 = get_item(Pid, heap_size),
+        true = is_integer(HS2) andalso HS2 > 0
+    end),
+
+    with_dead_pid(fun(DeadPid) ->
+        undefined = process_info(DeadPid, heap_size)
+    end),
+
+    ok.
+
+test_memory() ->
+    Self = self(),
+    M = get_item(Self, memory),
+    true = is_integer(M) andalso M > 0,
+
+    with_other_pid(fun(Pid) ->
+        M2 = get_item(Pid, memory),
+        true = is_integer(M2) andalso M2 > 0
+    end),
+
+    with_dead_pid(fun(DeadPid) ->
+        undefined = process_info(DeadPid, memory)
+    end),
+
+    ok.
+
+test_total_heap_size() ->
+    Self = self(),
+    HS = get_item(Self, heap_size),
+    THS = get_item(Self, total_heap_size),
+    true = HS =< THS,
+
+    with_other_pid(fun(Pid) ->
+        HS2 = get_item(Pid, heap_size),
+        THS2 = get_item(Pid, total_heap_size),
+        true = HS2 =< THS2,
+        verify_stable_total_heap_size(Pid, THS2, 50)
+    end),
+
+    with_dead_pid(fun(DeadPid) ->
+        undefined = process_info(DeadPid, total_heap_size)
+    end),
+
+    ok.
+
+verify_stable_total_heap_size(_Pid, _THS, 0) ->
     ok;
-test_process_info_memory_other_loop(Pid, THS0, N) ->
-    {total_heap_size, THS0} = process_info(Pid, total_heap_size),
-    test_process_info_memory_other_loop(Pid, THS0, N - 1).
+verify_stable_total_heap_size(Pid, THS, N) ->
+    {total_heap_size, THS} = process_info(Pid, total_heap_size),
+    verify_stable_total_heap_size(Pid, THS, N - 1).
+
+test_message_queue_len() ->
+    Self = self(),
+    {Pid, Ref} = spawn_opt(?MODULE, loop, [Self, []], [monitor]),
+    receive ok -> ok end,
+
+    Q0 = get_item(Pid, message_queue_len),
+    Mem0 = get_item(Pid, memory),
+
+    Pid ! incr,
+    Pid ! incr,
+    Pid ! incr,
+
+    Q1 = get_item(Pid, message_queue_len),
+    Mem1 = get_item(Pid, memory),
+    true = Q0 < Q1,
+    case erlang:system_info(machine) of
+        "BEAM" -> true = Mem0 =< Mem1;
+        _ -> true = Mem0 < Mem1
+    end,
+
+    Pid ! unlock,
+    Pid ! {Self, ping},
+    receive pong -> ok end,
+    Q2 = get_item(Pid, message_queue_len),
+    true = Q2 < Q1,
+
+    Pid ! {Self, stop},
+    receive {Pid, result, _} -> ok end,
+    normal = receive {'DOWN', Ref, process, Pid, Reason} -> Reason end,
+
+    undefined = process_info(Pid, message_queue_len),
+
+    ok.
+
+test_links() ->
+    Self = self(),
+
+    with_other_pid(fun(Pid) ->
+        [] = get_item(Pid, links),
+
+        link(Pid),
+        [Self] = get_item(Pid, links),
+
+        unlink(Pid),
+        [] = get_item(Pid, links)
+    end),
+
+    ok.
+
+test_monitored_by() ->
+    Self = self(),
+    [] = get_item(Self, monitored_by),
+
+    {Pid, Ref} = spawn_opt(fun() -> receive quit -> ok end end, [monitor]),
+
+    % spawn_opt with [monitor] counts as one monitor from Self
+    [Self] = get_item(Pid, monitored_by),
+
+    Mon = monitor(process, Pid),
+    [Self, Self] = get_item(Pid, monitored_by),
+
+    demonitor(Mon),
+    [Self] = get_item(Pid, monitored_by),
+
+    Pid ! quit,
+    normal = receive {'DOWN', Ref, process, Pid, Reason} -> Reason end,
+
+    ok.
+
+test_list_semantics() ->
+    Self = self(),
+
+    [] = process_info(Self, []),
+
+    [{heap_size, _}, {memory, _}] = process_info(Self, [heap_size, memory]),
+    [{memory, _}, {heap_size, _}] = process_info(Self, [memory, heap_size]),
+
+    [{total_heap_size, THS}, {total_heap_size, THS}] =
+         process_info(Self, [total_heap_size, total_heap_size]),
+
+    with_other_pid(fun(Pid) ->
+        [] = process_info(Pid, []),
+        [{message_queue_len, _}, {heap_size, _}, {memory, _}] =
+            process_info(Pid, [message_queue_len, heap_size, memory])
+    end),
+
+    with_dead_pid(fun(DeadPid) ->
+        undefined = process_info(DeadPid, []),
+        undefined = process_info(DeadPid, [heap_size]),
+        undefined = process_info(DeadPid, [heap_size, memory])
+    end),
+
+    ok.
+
+test_badargs() ->
+    Self = self(),
+
+    assert_badarg(fun() -> process_info(bad_pid, heap_size) end),
+    assert_badarg(fun() -> process_info(Self, bad_item) end),
+
+    assert_badarg(fun() -> process_info(Self, 42) end),
+    assert_badarg(fun() -> process_info(Self, {heap_size}) end),
+
+    assert_badarg(fun() -> process_info(bad_pid, [heap_size]) end),
+    assert_badarg(fun() -> process_info(Self, [heap_size, 42]) end),
+    assert_badarg(fun() -> process_info(Self, [heap_size, invalid_key]) end),
+    assert_badarg(fun() -> process_info(Self, [heap_size | not_a_list]) end),
+
+    ok.
 
 loop(undefined, Accum) ->
     receive
@@ -132,4 +252,13 @@ loop(Pid, Accum) ->
     Pid ! ok,
     loop(locked, Accum).
 
-assert(true) -> ok.
+assert_badarg(Fun) ->
+    try
+        Fun(),
+        erlang:error(no_throw)
+    catch
+        error:badarg ->
+            ok;
+        OtherClass:OtherError ->
+            erlang:error({OtherClass, OtherError})
+    end.
