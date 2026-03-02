@@ -23,6 +23,8 @@
 -export([start/0, loop/2]).
 
 start() ->
+    ok = test_process_info_1(),
+
     ok = test_registered_name(),
     ok = test_heap_size(),
     ok = test_memory(),
@@ -51,6 +53,46 @@ get_item(Pid, Item) ->
     {Item, Val} = process_info(Pid, Item),
     [{Item, Val}] = process_info(Pid, [Item]),
     Val.
+
+test_process_info_1() ->
+    CheckInfo = 
+        fun(Info) ->
+            true = is_list(Info),
+
+            {heap_size, HS} = lists:keyfind(heap_size, 1, Info),
+            true = is_integer(HS) andalso HS > 0,
+
+            {total_heap_size, THS} = lists:keyfind(total_heap_size, 1, Info),
+            true = THS >= HS,
+
+            {stack_size, SS} = lists:keyfind(stack_size, 1, Info),
+            true = is_integer(SS) andalso SS >= 0,
+
+            {message_queue_len, MQL} = lists:keyfind(message_queue_len, 1, Info),
+            true = is_integer(MQL) andalso MQL >= 0,
+
+            {links, Links} = lists:keyfind(links, 1, Info),
+            true = is_list(Links),
+
+            {trap_exit, TE} = lists:keyfind(trap_exit, 1, Info),
+            true = is_boolean(TE),
+
+            false = lists:keyfind(registered_name, 1, Info)
+        end,
+
+    Self = self(),
+
+    CheckInfo(process_info(Self)),
+
+    with_other_pid(fun(Pid) ->
+        CheckInfo(process_info(Pid))
+    end),
+
+    with_dead_pid(fun(DeadPid) ->
+        undefined = process_info(DeadPid)
+    end),
+
+    ok.
 
 test_registered_name() ->
     Self = self(),
@@ -221,6 +263,7 @@ test_list_semantics() ->
 test_badargs() ->
     Self = self(),
 
+    assert_badarg(fun() -> process_info(bad_pid) end),
     assert_badarg(fun() -> process_info(bad_pid, heap_size) end),
     assert_badarg(fun() -> process_info(Self, bad_item) end),
 
