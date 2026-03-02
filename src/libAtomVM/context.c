@@ -322,7 +322,7 @@ void context_process_process_info_request_signal(Context *ctx, struct ProcessInf
         return;
     }
 
-    if (!signal->return_list) {
+    if (signal->mode == PROCESS_INFO_SINGLE) {
         term atom = signal->atoms[0];
         size_t term_size;
         if (context_get_process_info(ctx, NULL, &term_size, atom, NULL)) {
@@ -376,6 +376,13 @@ void context_process_process_info_request_signal(Context *ctx, struct ProcessInf
                         build_ok = false;
                         break;
                     }
+
+                    if (signal->mode == PROCESS_INFO_LIST_OMIT_UNREGISTERED &&
+                        signal->atoms[i] == REGISTERED_NAME_ATOM &&
+                        term_is_nil(term_get_tuple_element(item_result, 1))) {
+                        continue;
+                    }
+
                     result = term_list_prepend(item_result, result, &heap);
                 }
                 if (LIKELY(build_ok)) {

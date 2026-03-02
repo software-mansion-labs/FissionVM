@@ -137,12 +137,19 @@ struct ImmediateSignal
     term immediate;
 };
 
+enum ProcessInfoMode
+{
+    PROCESS_INFO_SINGLE,
+    PROCESS_INFO_LIST,
+    PROCESS_INFO_LIST_OMIT_UNREGISTERED,
+};
+
 struct ProcessInfoRequestSignal
 {
     MailboxMessage base;
 
     int32_t sender_pid;
-    bool return_list;
+    enum ProcessInfoMode mode;
     size_t len;
     term atoms[];
 };
@@ -250,12 +257,12 @@ void mailbox_send_immediate_signal(Context *c, enum MessageType type, term immed
  *
  * @param c the process context.
  * @param sender_pid the sender of the signal (to get the answer)
- * @param return_list true if the result should be returned as a list, false for a single term
+ * @param mode controls result shape and registered_name handling
  * @param atoms array of atom terms to query
  * @param len number of atoms in the array
  */
 void mailbox_send_process_info_request_signal(
-    Context *c, int32_t sender_pid, bool return_list, const term *atoms, size_t len);
+    Context *c, int32_t sender_pid, enum ProcessInfoMode mode, const term *atoms, size_t len);
 
 /**
  * @brief Sends a ref signal to a certain mailbox.

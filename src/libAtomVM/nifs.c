@@ -2922,14 +2922,7 @@ static term nif_erlang_processes(Context *ctx, int argc, term argv[])
 
 static term nif_erlang_process_info(Context *ctx, int argc, term argv[])
 {
-    UNUSED(argc);
-
     term pid = argv[0];
-    term item_or_item_list = argv[1];
-
-    if (!term_is_atom(item_or_item_list) && !term_is_list(item_or_item_list)) {
-        RAISE_ERROR(BADARG_ATOM);
-    }
 
     if (!term_is_pid(pid)) {
         RAISE_ERROR(BADARG_ATOM);
@@ -2941,7 +2934,60 @@ static term nif_erlang_process_info(Context *ctx, int argc, term argv[])
         return UNDEFINED_ATOM;
     }
 
-    // TODO add support for process_info/1
+    if (argc == 1) {
+        static const term default_items[] = {
+            REGISTERED_NAME_ATOM,
+            MESSAGE_QUEUE_LEN_ATOM,
+            LINKS_ATOM,
+            TRAP_EXIT_ATOM,
+            TOTAL_HEAP_SIZE_ATOM,
+            HEAP_SIZE_ATOM,
+            STACK_SIZE_ATOM,
+        };
+
+        size_t default_items_len = sizeof(default_items) / sizeof(default_items[0]);
+
+        if (ctx == target) {
+            size_t total_size = 0;
+            for (size_t i = 0; i < default_items_len; i++) {
+                size_t item_size;
+                context_get_process_info(ctx, NULL, &item_size, default_items[i], NULL);
+                total_size += item_size + CONS_SIZE;
+            }
+            if (UNLIKELY(memory_ensure_free_opt(ctx, total_size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+                globalcontext_get_process_unlock(ctx->global, target);
+                RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+            }
+            term ret = term_nil();
+            for (ssize_t i = (ssize_t) default_items_len - 1; i >= 0; i--) {
+                term item_result;
+                if (UNLIKELY(!context_get_process_info(ctx, &item_result, NULL, default_items[i], &ctx->heap))) {
+                    globalcontext_get_process_unlock(ctx->global, target);
+                    RAISE_ERROR(item_result);
+                }
+
+                if (default_items[i] == REGISTERED_NAME_ATOM && term_is_nil(term_get_tuple_element(item_result, 1))) {
+                    continue;
+                }
+
+                ret = term_list_prepend(item_result, ret, &ctx->heap);
+            }
+            globalcontext_get_process_unlock(ctx->global, target);
+            return ret;
+        } else {
+            mailbox_send_process_info_request_signal(target, ctx->process_id, PROCESS_INFO_LIST_OMIT_UNREGISTERED, default_items, default_items_len);
+            context_update_flags(ctx, ~NoFlags, Trap);
+            globalcontext_get_process_unlock(ctx->global, target);
+            return term_invalid_term();
+        }
+    }
+
+    term item_or_item_list = argv[1];
+
+    if (!term_is_atom(item_or_item_list) && !term_is_list(item_or_item_list)) {
+        globalcontext_get_process_unlock(ctx->global, target);
+        RAISE_ERROR(BADARG_ATOM);
+    }
 
     if (!term_is_list(item_or_item_list)) {
         term item = item_or_item_list;
@@ -2967,7 +3013,7 @@ static term nif_erlang_process_info(Context *ctx, int argc, term argv[])
         } else {
             // Currently, all items require a signal. We could nevertheless filter
             // items that do not exist.
-            mailbox_send_process_info_request_signal(target, ctx->process_id, false, &item, 1);
+            mailbox_send_process_info_request_signal(target, ctx->process_id, PROCESS_INFO_SINGLE, &item, 1);
             context_update_flags(ctx, ~NoFlags, Trap);
         }
         globalcontext_get_process_unlock(ctx->global, target);
@@ -3040,7 +3086,7 @@ static term nif_erlang_process_info(Context *ctx, int argc, term argv[])
         }
         free(items);
     } else {
-        mailbox_send_process_info_request_signal(target, ctx->process_id, true, items, list_len);
+        mailbox_send_process_info_request_signal(target, ctx->process_id, PROCESS_INFO_LIST, items, list_len);
         free(items);
         context_update_flags(ctx, ~NoFlags, Trap);
         ret = term_invalid_term();

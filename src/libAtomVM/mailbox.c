@@ -291,7 +291,7 @@ void mailbox_send_immediate_signal(Context *c, enum MessageType type, term immed
 }
 
 void mailbox_send_process_info_request_signal(
-    Context *c, int32_t sender_pid, bool return_list, const term *atoms, size_t len)
+    Context *c, int32_t sender_pid, enum ProcessInfoMode mode, const term *atoms, size_t len)
 {
     struct ProcessInfoRequestSignal *signal = malloc(
         sizeof(struct ProcessInfoRequestSignal) + len * sizeof(term));
@@ -301,7 +301,7 @@ void mailbox_send_process_info_request_signal(
     }
     signal->base.type = ProcessInfoRequestSignal;
     signal->sender_pid = sender_pid;
-    signal->return_list = return_list;
+    signal->mode = mode;
     signal->len = len;
     for (size_t i = 0; i < len; i++) {
         signal->atoms[i] = atoms[i];
