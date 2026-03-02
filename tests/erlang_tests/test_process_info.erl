@@ -55,38 +55,33 @@ get_item(Pid, Item) ->
     Val.
 
 test_process_info_1() ->
-    CheckInfo = 
-        fun(Info) ->
-            true = is_list(Info),
+    Check = fun(Pid) ->
+        Info = process_info(Pid),
+        true = is_list(Info),
 
-            {heap_size, HS} = lists:keyfind(heap_size, 1, Info),
-            true = is_integer(HS) andalso HS > 0,
+        {heap_size, HS} = lists:keyfind(heap_size, 1, Info),
+        true = is_integer(HS) andalso HS > 0,
 
-            {total_heap_size, THS} = lists:keyfind(total_heap_size, 1, Info),
-            true = THS >= HS,
+        {total_heap_size, THS} = lists:keyfind(total_heap_size, 1, Info),
+        true = THS >= HS,
 
-            {stack_size, SS} = lists:keyfind(stack_size, 1, Info),
-            true = is_integer(SS) andalso SS >= 0,
+        {stack_size, SS} = lists:keyfind(stack_size, 1, Info),
+        true = is_integer(SS) andalso SS >= 0,
 
-            {message_queue_len, MQL} = lists:keyfind(message_queue_len, 1, Info),
-            true = is_integer(MQL) andalso MQL >= 0,
+        {message_queue_len, MQL} = lists:keyfind(message_queue_len, 1, Info),
+        true = is_integer(MQL) andalso MQL >= 0,
 
-            {links, Links} = lists:keyfind(links, 1, Info),
-            true = is_list(Links),
+        {links, Links} = lists:keyfind(links, 1, Info),
+        true = is_list(Links),
 
-            {trap_exit, TE} = lists:keyfind(trap_exit, 1, Info),
-            true = is_boolean(TE),
+        {trap_exit, TE} = lists:keyfind(trap_exit, 1, Info),
+        true = is_boolean(TE),
 
-            false = lists:keyfind(registered_name, 1, Info)
-        end,
+        false = lists:keyfind(registered_name, 1, Info)
+    end,
 
-    Self = self(),
-
-    CheckInfo(process_info(Self)),
-
-    with_other_pid(fun(Pid) ->
-        CheckInfo(process_info(Pid))
-    end),
+    Check(self()),
+    with_other_pid(Check),
 
     with_dead_pid(fun(DeadPid) ->
         undefined = process_info(DeadPid)
@@ -95,17 +90,20 @@ test_process_info_1() ->
     ok.
 
 test_registered_name() ->
-    Self = self(),
+    Check = fun(Pid) ->
+        [] = process_info(Pid, registered_name),
+        [{registered_name, []}] = process_info(Pid, [registered_name]),
 
-    [] = process_info(Self, registered_name),
-    [{registered_name, []}] = process_info(Self, [registered_name]),
+        erlang:register(has_name, Pid),
+        has_name = get_item(Pid, registered_name),
 
-    erlang:register(has_name, Self),
-    has_name = get_item(Self, registered_name),
+        erlang:unregister(has_name),
+        [] = process_info(Pid, registered_name),
+        [{registered_name, []}] = process_info(Pid, [registered_name])
+    end,
 
-    erlang:unregister(has_name),
-    [] = process_info(Self, registered_name),
-    [{registered_name, []}] = process_info(Self, [registered_name]),
+    Check(self()),
+    with_other_pid(Check),
 
     ok.
 
