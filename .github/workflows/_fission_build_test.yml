@@ -55,7 +55,7 @@ jobs:
           emmake make -j $(nproc)
       - name: Build Popcorn
         run: |
-          git clone git@github.com:software-mansion/popcorn.git
+          git clone git@github.com:software-mansion/popcorn.git -b mf/update-patches
           cd popcorn/popcorn/elixir
           echo 'import Config; config :popcorn, :runtime, [{:path, "../../../build/src", target: :unix}, {:path, "../../../src/platforms/emscripten/build/src", target: :wasm}]' > config/config.secret.exs
           mix deps.get
