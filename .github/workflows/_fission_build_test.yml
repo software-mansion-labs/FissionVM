@@ -55,13 +55,13 @@ jobs:
           emmake make -j $(nproc)
       - name: Build Popcorn
         run: |
-          git clone git@github.com:software-mansion/popcorn.git
-          cd popcorn
-          echo 'import Config; config :popcorn, :runtime, [{:path, "../build/src", target: :unix}, {:path, "../src/platforms/emscripten/build/src", target: :wasm}]' > config/config.secret.exs
+          git clone git@github.com:software-mansion/popcorn.git popcorn-repo
+          cd popcorn-repo/popcorn/elixir
+          echo 'import Config; config :popcorn, :runtime, [{:path, "../../../build/src", target: :unix}, {:path, "../../../src/platforms/emscripten/build/src", target: :wasm}]' > config/config.secret.exs
           mix deps.get
           MIX_ENV=test mix compile
           MIX_ENV=test mix playwright.install
       - name: Test Popcorn Unix
-        run: cd popcorn && mix test
+        run: cd popcorn-repo/popcorn/elixir && mix test
       - name: Test Popcorn WASM
-        run: cd popcorn && TARGET=wasm mix test
+        run: cd popcorn-repo/popcorn/elixir && TARGET=wasm mix test
