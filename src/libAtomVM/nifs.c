@@ -2947,39 +2947,39 @@ static term nif_erlang_process_info(Context *ctx, int argc, term argv[])
 
         size_t default_items_len = sizeof(default_items) / sizeof(default_items[0]);
 
-        if (ctx == target) {
-            size_t total_size = 0;
-            for (size_t i = 0; i < default_items_len; i++) {
-                size_t item_size;
-                context_get_process_info(ctx, NULL, &item_size, default_items[i], NULL);
-                total_size += item_size + CONS_SIZE;
-            }
-            if (UNLIKELY(memory_ensure_free_opt(ctx, total_size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
-                globalcontext_get_process_unlock(ctx->global, target);
-                RAISE_ERROR(OUT_OF_MEMORY_ATOM);
-            }
-            term ret = term_nil();
-            for (ssize_t i = (ssize_t) default_items_len - 1; i >= 0; i--) {
-                term item_result;
-                if (UNLIKELY(!context_get_process_info(ctx, &item_result, NULL, default_items[i], &ctx->heap))) {
-                    globalcontext_get_process_unlock(ctx->global, target);
-                    RAISE_ERROR(item_result);
-                }
-
-                if (default_items[i] == REGISTERED_NAME_ATOM && term_is_nil(term_get_tuple_element(item_result, 1))) {
-                    continue;
-                }
-
-                ret = term_list_prepend(item_result, ret, &ctx->heap);
-            }
-            globalcontext_get_process_unlock(ctx->global, target);
-            return ret;
-        } else {
+        if (ctx != target) {
             mailbox_send_process_info_request_signal(target, ctx->process_id, PROCESS_INFO_LIST_OMIT_UNREGISTERED, default_items, default_items_len);
             context_update_flags(ctx, ~NoFlags, Trap);
             globalcontext_get_process_unlock(ctx->global, target);
             return term_invalid_term();
         }
+
+        size_t total_size = 0;
+        for (size_t i = 0; i < default_items_len; i++) {
+            size_t item_size;
+            context_get_process_info(ctx, NULL, &item_size, default_items[i], NULL);
+            total_size += item_size + CONS_SIZE;
+        }
+        if (UNLIKELY(memory_ensure_free_opt(ctx, total_size, MEMORY_CAN_SHRINK) != MEMORY_GC_OK)) {
+            globalcontext_get_process_unlock(ctx->global, target);
+            RAISE_ERROR(OUT_OF_MEMORY_ATOM);
+        }
+        term ret = term_nil();
+        for (ssize_t i = (ssize_t) default_items_len - 1; i >= 0; i--) {
+            term item_result;
+            if (UNLIKELY(!context_get_process_info(ctx, &item_result, NULL, default_items[i], &ctx->heap))) {
+                globalcontext_get_process_unlock(ctx->global, target);
+                RAISE_ERROR(item_result);
+            }
+
+            if (default_items[i] == REGISTERED_NAME_ATOM && term_is_nil(term_get_tuple_element(item_result, 1))) {
+                continue;
+            }
+
+            ret = term_list_prepend(item_result, ret, &ctx->heap);
+        }
+        globalcontext_get_process_unlock(ctx->global, target);
+        return ret;
     }
 
     term item_or_item_list = argv[1];
@@ -3026,7 +3026,7 @@ static term nif_erlang_process_info(Context *ctx, int argc, term argv[])
     size_t list_len = 0;
     term l = item_list;
 
-    for (l = item_list; term_is_nonempty_list(l); l = term_get_list_tail(l), list_len++) {
+    for (; term_is_nonempty_list(l); l = term_get_list_tail(l), list_len++) {
         term item = term_get_list_head(l);
 
         if (UNLIKELY(!term_is_atom(item))) {

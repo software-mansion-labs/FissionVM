@@ -325,74 +325,76 @@ void context_process_process_info_request_signal(Context *ctx, struct ProcessInf
     if (signal->mode == PROCESS_INFO_SINGLE) {
         term atom = signal->atoms[0];
         size_t term_size;
-        if (context_get_process_info(ctx, NULL, &term_size, atom, NULL)) {
-            Heap heap;
-            if (UNLIKELY(memory_init_heap(&heap, term_size) != MEMORY_GC_OK)) {
-                mailbox_send_immediate_signal(target, TrapExceptionSignal, OUT_OF_MEMORY_ATOM);
-            } else {
-                term ret;
-                if (context_get_process_info(ctx, &ret, NULL, atom, &heap)) {
-                    // return [] when unregistered (BEAM backward compatibility)
-                    if (atom == REGISTERED_NAME_ATOM && term_is_tuple(ret) && term_is_nil(term_get_tuple_element(ret, 1))) {
-                        ret = term_nil();
-                    }
-                    mailbox_send_term_signal(target, TrapAnswerSignal, ret);
-                } else {
-                    mailbox_send_immediate_signal(target, TrapExceptionSignal, ret);
-                }
-                memory_destroy_heap(&heap, ctx->global);
-            }
-        } else {
+        if (!context_get_process_info(ctx, NULL, &term_size, atom, NULL)) {
             mailbox_send_immediate_signal(target, TrapExceptionSignal, BADARG_ATOM);
+            goto done;
         }
+
+        Heap heap;
+        if (UNLIKELY(memory_init_heap(&heap, term_size) != MEMORY_GC_OK)) {
+            mailbox_send_immediate_signal(target, TrapExceptionSignal, OUT_OF_MEMORY_ATOM);
+            goto done;
+        }
+
+        term ret;
+        if (context_get_process_info(ctx, &ret, NULL, atom, &heap)) {
+            // return [] when unregistered (BEAM backward compatibility)
+            if (atom == REGISTERED_NAME_ATOM && term_is_tuple(ret) && term_is_nil(term_get_tuple_element(ret, 1))) {
+                ret = term_nil();
+            }
+            mailbox_send_term_signal(target, TrapAnswerSignal, ret);
+        } else {
+            mailbox_send_immediate_signal(target, TrapExceptionSignal, ret);
+        }
+        memory_destroy_heap(&heap, ctx->global);
     } else {
         size_t total_size = 0;
-        bool valid = true;
         for (size_t i = 0; i < signal->len; i++) {
             size_t item_size;
             if (UNLIKELY(!context_get_process_info(ctx, NULL, &item_size, signal->atoms[i], NULL))) {
-                valid = false;
-                break;
+                mailbox_send_immediate_signal(target, TrapExceptionSignal, BADARG_ATOM);
+                goto done;
             }
             total_size += item_size + CONS_SIZE;
         }
 
-        if (UNLIKELY(!valid)) {
-            mailbox_send_immediate_signal(target, TrapExceptionSignal, BADARG_ATOM);
-        } else if (signal->len == 0) {
+        if (signal->len == 0) {
             mailbox_send_term_signal(target, TrapAnswerSignal, term_nil());
-        } else {
-            Heap heap;
-            if (UNLIKELY(memory_init_heap(&heap, total_size) != MEMORY_GC_OK)) {
-                mailbox_send_immediate_signal(target, TrapExceptionSignal, OUT_OF_MEMORY_ATOM);
-            } else {
-                // Build list backwards to preserve input order
-                term result = term_nil();
-                bool build_ok = true;
-                for (ssize_t i = (ssize_t) signal->len - 1; i >= 0; i--) {
-                    term item_result;
-                    if (UNLIKELY(!context_get_process_info(ctx, &item_result, NULL, signal->atoms[i], &heap))) {
-                        mailbox_send_immediate_signal(target, TrapExceptionSignal, item_result);
-                        build_ok = false;
-                        break;
-                    }
-
-                    if (signal->mode == PROCESS_INFO_LIST_OMIT_UNREGISTERED &&
-                        signal->atoms[i] == REGISTERED_NAME_ATOM &&
-                        term_is_nil(term_get_tuple_element(item_result, 1))) {
-                        continue;
-                    }
-
-                    result = term_list_prepend(item_result, result, &heap);
-                }
-                if (LIKELY(build_ok)) {
-                    mailbox_send_term_signal(target, TrapAnswerSignal, result);
-                }
-                memory_destroy_heap(&heap, ctx->global);
-            }
+            goto done;
         }
+
+        Heap heap;
+        if (UNLIKELY(memory_init_heap(&heap, total_size) != MEMORY_GC_OK)) {
+            mailbox_send_immediate_signal(target, TrapExceptionSignal, OUT_OF_MEMORY_ATOM);
+            goto done;
+        }
+
+        // Build list backwards to preserve input order
+        term result = term_nil();
+        bool build_ok = true;
+        for (ssize_t i = (ssize_t) signal->len - 1; i >= 0; i--) {
+            term item_result;
+            if (UNLIKELY(!context_get_process_info(ctx, &item_result, NULL, signal->atoms[i], &heap))) {
+                mailbox_send_immediate_signal(target, TrapExceptionSignal, item_result);
+                build_ok = false;
+                break;
+            }
+
+            if (signal->mode == PROCESS_INFO_LIST_OMIT_UNREGISTERED &&
+                signal->atoms[i] == REGISTERED_NAME_ATOM &&
+                term_is_nil(term_get_tuple_element(item_result, 1))) {
+                continue;
+            }
+
+            result = term_list_prepend(item_result, result, &heap);
+        }
+        if (LIKELY(build_ok)) {
+            mailbox_send_term_signal(target, TrapAnswerSignal, result);
+        }
+        memory_destroy_heap(&heap, ctx->global);
     }
 
+done:
     if (!process_table_locked) {
         globalcontext_get_process_unlock(ctx->global, target);
     }

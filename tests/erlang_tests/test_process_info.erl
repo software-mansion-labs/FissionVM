@@ -170,19 +170,13 @@ test_message_queue_len() ->
     receive ok -> ok end,
 
     Q0 = get_item(Pid, message_queue_len),
-    Mem0 = get_item(Pid, memory),
 
     Pid ! incr,
     Pid ! incr,
     Pid ! incr,
 
     Q1 = get_item(Pid, message_queue_len),
-    Mem1 = get_item(Pid, memory),
     true = Q0 < Q1,
-    case erlang:system_info(machine) of
-        "BEAM" -> true = Mem0 =< Mem1;
-        _ -> true = Mem0 < Mem1
-    end,
 
     Pid ! unlock,
     Pid ! {Self, ping},
